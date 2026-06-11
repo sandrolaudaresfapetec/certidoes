@@ -39,15 +39,27 @@ for (const dir of dirs) {
   if (!fs.existsSync(sqlFile)) continue;
   const sql = fs.readFileSync(sqlFile, 'utf8');
   console.log('Applying migration:', dir);
-  try {
+
+  // Extract expected tables/indexes from migration SQL to verify completeness
+  const expectedTables = [...sql.matchAll(/CREATE TABLE\s+"(\w+)"/gi)].map(m => m[1]);
+  const expectedIndexes = [...sql.matchAll(/CREATE (?:UNIQUE )?INDEX\s+"(\w+)"/gi)].map(m => m[1]);
+
+  // Check if all objects already exist (bootstrap case: tables created but migration not tracked)
+  const allTablesExist = expectedTables.length > 0 && expectedTables.every(t => {
+    const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(t);
+    return !!row;
+  });
+  const allIndexesExist = expectedIndexes.every(i => {
+    const row = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name=?").get(i);
+    return !!row;
+  });
+
+  if (allTablesExist && allIndexesExist) {
+    console.log('All schema objects already exist, marking migration as applied:', dir);
+  } else {
     db.exec(sql);
-  } catch (e) {
-    if (e.message && e.message.includes('already exists')) {
-      console.log('Tables already exist, marking migration as applied:', dir);
-    } else {
-      throw e;
-    }
   }
+
   db.prepare(
     "INSERT INTO _prisma_migrations (id, checksum, finished_at, migration_name, applied_steps_count) VALUES (?, ?, datetime('now'), ?, 1)"
   ).run(
