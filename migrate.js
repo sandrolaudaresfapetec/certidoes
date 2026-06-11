@@ -39,7 +39,15 @@ for (const dir of dirs) {
   if (!fs.existsSync(sqlFile)) continue;
   const sql = fs.readFileSync(sqlFile, 'utf8');
   console.log('Applying migration:', dir);
-  db.exec(sql);
+  try {
+    db.exec(sql);
+  } catch (e) {
+    if (e.message && e.message.includes('already exists')) {
+      console.log('Tables already exist, marking migration as applied:', dir);
+    } else {
+      throw e;
+    }
+  }
   db.prepare(
     "INSERT INTO _prisma_migrations (id, checksum, finished_at, migration_name, applied_steps_count) VALUES (?, ?, datetime('now'), ?, 1)"
   ).run(
