@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      String   // ADMIN, GERENTE, DIRETOR, TECNICO, CONFERENTE, SDTC
+  department String? // CATDT, CG, SDTC
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  processesResponsible  Process[]      @relation("TecnicoResponsavel")
+  processesConference   Process[]      @relation("TecnicoConferencia")
+  processesCreated      Process[]      @relation("CriadoPor")
+  notifications         Notification[]
+  workflowActions       WorkflowAction[]
+}
+
+model Process {
+  id                String   @id @default(cuid())
+  ordem             Int      @unique
+  anoEntrada        Int
+  tipoServico       String   // Certidao, Drenagem, Parecer, Tracado de Divisa
+  expediente        String?  // SEI number
+  dtAbertoSei       DateTime?
+  dtCompile         DateTime?
+  
+  // Client Info
+  tipo              String   // Comum-CPF, Comum-CNPJ, Orgao-Publico, Justica, idoso
+  interessado       String
+  email             String?
+  telefone          String?
+  cpfCnpj           String?
+  
+  // Elderly priority
+  dtNascimentoIdoso DateTime?
+  idadeTrava        Float?
+  
+  // Location
+  pasta             String?
+  utm               String?
+  municipio         String?
+  ra                String?  // Regiao Administrativa
+  dra               String?
+  divisaDificuldade String?
+  
+  // Workflow Status
+  situacao          String   @default("entrada_sdtc") // entrance stage
+  nivelPrioridade   String?
+  statusEscritorio  String?
+  observacaoEntrada String?
+  diasTranscorridos Int      @default(0)
+  
+  // Technical Assignment
+  tecnicoRespId     String?
+  tecnicoResp       User?    @relation("TecnicoResponsavel", fields: [tecnicoRespId], references: [id])
+  quemVaiAssinar    String?
+  dtEmail           DateTime?
+  dtVisita1         DateTime?
+  observacoesTecnico String?
+  
+  // Conference
+  tecnicoConfId     String?
+  tecnicoConf       User?    @relation("TecnicoConferencia", fields: [tecnicoConfId], references: [id])
+  observacoesConferencia String?
+  dtConf            DateTime?
+  
+  // Output
+  numeroSaidaIGC    String?
+  stGabineteP1      Float?   @default(0)
+  stGabineteP2      Float?   @default(0)
+  stCampo           Float?   @default(0)
+  
+  // Signatures
+  dtAssTecnico      DateTime?
+  dtAssGerente      DateTime?
+  dtAssDiretor      DateTime?
+  dtUpadoSei        DateTime?
+  
+  // Suspension
+  dtInicioSobrestado DateTime?
+  dtFimSobrestado    DateTime?
+  
+  // Cancellation
+  dtCancelado       DateTime?
+  motivoCancelamento String?
+  
+  // Financial
+  taxaAbertura      Float?   @default(0)
+  servicoTecGabinete Float?  @default(0)
+  taxaVistoria      Float?   @default(0)
+  servicoTecCampo   Float?   @default(0)
+  total             Float?   @default(0)
+  
+  // Base map reference
+  base              String?  // 10k, 50k, MDT 2023, Ortomosaico 2010
+  departamento      String?  // CATDT, CG
+  
+  // Metadata
+  criadoPorId       String?
+  criadoPor         User?    @relation("CriadoPor", fields: [criadoPorId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  notifications     Notification[]
+  workflowActions   WorkflowAction[]
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  type        String   // NOVA_ENTRADA, ATRIBUICAO, AGUARDANDO_CLIENTE, ANALISE_COMPLETA, CONFERENCIA_COMPLETA, ASSINATURA_PENDENTE, PROCESSO_CONCLUIDO, PRAZO_VENCIDO
+  title       String
+  message     String
+  read        Boolean  @default(false)
+  
+  processId   String?
+  process     Process? @relation(fields: [processId], references: [id])
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+model WorkflowAction {
+  id          String   @id @default(cuid())
+  processId   String
+  process     Process  @relation(fields: [processId], references: [id])
+  
+  fromStatus  String
+  toStatus    String
+  action      String   // Description of action taken
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
