@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fluxo de Certidão — IGC SP</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #f0f4f8;
+    color: #1a202c;
+    min-height: 100vh;
+  }
+
+  .header {
+    background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+    color: white;
+    padding: 24px 40px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .header img { height: 48px; }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header p { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+  .header .gov-logo { margin-left: auto; height: 28px; filter: brightness(0) invert(1); }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px 60px;
+  }
+
+  .intro {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 28px;
+    margin-bottom: 32px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    border-left: 4px solid #1565c0;
+  }
+  .intro h2 { font-size: 16px; color: #1565c0; margin-bottom: 6px; }
+  .intro p { font-size: 14px; color: #4a5568; line-height: 1.6; }
+  .intro a { color: #1565c0; text-decoration: none; font-weight: 600; }
+  .intro a:hover { text-decoration: underline; }
+
+  .swimlane {
+    position: relative;
+    margin-bottom: 8px;
+  }
+
+  .lane {
+    display: flex;
+    align-items: stretch;
+    min-height: 120px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  .lane-label {
+    width: 160px;
+    min-width: 160px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .lane-label .icon { font-size: 24px; margin-bottom: 6px; }
+  .lane-label .sublabel { font-size: 10px; font-weight: 400; opacity: 0.85; margin-top: 4px; }
+
+  .lane-content {
+    flex: 1;
+    background: white;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .step-card {
+    display: block;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px 18px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    min-width: 200px;
+    max-width: 280px;
+    flex: 1;
+  }
+  .step-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border-color: currentColor;
+  }
+  .step-card:active { transform: translateY(-1px); }
+
+  .step-card .step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 800;
+    color: white;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  .step-card .step-title {
+    font-size: 14px;
+    font-weight: 700;
+    display: inline;
+    vertical-align: middle;
+  }
+
+  .step-card .step-desc {
+    font-size: 12px;
+    color: #718096;
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  .step-card .step-link {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: inherit;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .step-card:hover .step-link { opacity: 1; }
+
+  /* Arrow connectors */
+  .arrow-down {
+    display: flex;
+    justify-content: center;
+    padding: 4px 0;
+  }
+  .arrow-down svg { width: 32px; height: 24px; }
+
+  /* Lane colors */
+  .lane-cliente .lane-label { background: linear-gradient(135deg, #1565c0, #1976d2); }
+  .lane-cliente .step-card { border-color: #bbdefb; color: #1565c0; }
+  .lane-cliente .step-card .step-number { background: #1565c0; }
+
+  .lane-sdtc .lane-label { background: linear-gradient(135deg, #1565c0, #42a5f5); }
+  .lane-sdtc .step-card { border-color: #bbdefb; color: #1565c0; }
+  .lane-sdtc .step-card .step-number { background: #1565c0; }
+
+  .lane-gdat .lane-label { background: linear-gradient(135deg, #3949ab, #5c6bc0); }
+  .lane-gdat .step-card { border-color: #c5cae9; color: #3949ab; }
+  .lane-gdat .step-card .step-number { background: #3949ab; }
+
+  .lane-tecnico .lane-label { background: linear-gradient(135deg, #f9a825, #fbc02d); }
+  .lane-tecnico .step-card { border-color: #fff9c4; color: #f57f17; }
+  .lane-tecnico .step-card .step-number { background: #f9a825; }
+
+  .lane-conferente .lane-label { background: linear-gradient(135deg, #ef6c00, #fb8c00); }
+  .lane-conferente .step-card { border-color: #ffe0b2; color: #e65100; }
+  .lane-conferente .step-card .step-number { background: #ef6c00; }
+
+  .lane-assinaturas .lane-label { background: linear-gradient(135deg, #8e24aa, #ab47bc); }
+  .lane-assinaturas .step-card.ass-tec { border-color: #e1bee7; color: #8e24aa; }
+  .lane-assinaturas .step-card.ass-tec .step-number { background: #8e24aa; }
+  .lane-assinaturas .step-card.ass-ger { border-color: #f8bbd0; color: #c2185b; }
+  .lane-assinaturas .step-card.ass-ger .step-number { background: #c2185b; }
+  .lane-assinaturas .step-card.ass-dir { border-color: #ffcdd2; color: #c62828; }
+  .lane-assinaturas .step-card.ass-dir .step-number { background: #c62828; }
+
+  .lane-saida .lane-label { background: linear-gradient(135deg, #2e7d32, #43a047); }
+  .lane-saida .step-card { border-color: #c8e6c9; color: #2e7d32; }
+  .lane-saida .step-card .step-number { background: #2e7d32; }
+
+  /* Inner arrows between cards */
+  .inner-arrow {
+    font-size: 24px;
+    color: #a0aec0;
+    display: flex;
+    align-items: center;
+    user-select: none;
+  }
+
+  /* Alternative flows section */
+  .alt-flows {
+    margin-top: 24px;
+    display: flex;
+    gap: 16px;
+  }
+  .alt-card {
+    flex: 1;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .alt-card h3 { font-size: 14px; margin-bottom: 6px; }
+  .alt-card p { font-size: 12px; line-height: 1.5; }
+  .alt-sobrestado { background: #f5f5f5; border: 2px dashed #9e9e9e; }
+  .alt-sobrestado h3 { color: #616161; }
+  .alt-cancelado { background: #fff3f3; border: 2px dashed #ef5350; }
+  .alt-cancelado h3 { color: #c62828; }
+
+  /* Legend */
+  .legend {
+    margin-top: 24px;
+    background: white;
+    border-radius: 12px;
+    padding: 16px 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .legend h3 { font-size: 14px; color: #4a5568; margin-bottom: 10px; }
+  .legend-items { display: flex; gap: 20px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #718096; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+  .footer {
+    text-align: center;
+    margin-top: 32px;
+    font-size: 12px;
+    color: #a0aec0;
+  }
+  .footer a { color: #1565c0; text-decoration: none; }
+
+  /* Tooltip */
+  .step-card::after {
+    content: 'Clique para abrir no sistema →';
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a202c;
+    color: white;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 10;
+  }
+  .step-card:hover::after { opacity: 0.9; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .lane { flex-direction: column; }
+    .lane-label { width: 100%; min-width: 100%; padding: 10px; flex-direction: row; gap: 8px; }
+    .lane-label .icon { font-size: 18px; margin-bottom: 0; }
+    .lane-content { flex-direction: column; }
+    .step-card { max-width: 100%; min-width: 100%; }
+    .inner-arrow { transform: rotate(90deg); }
+    .alt-flows { flex-direction: column; }
+    .header { flex-wrap: wrap; }
+    .header .gov-logo { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>IGC SP — Instituto Geográfico e Cartográfico</h1>
+    <p>Fluxo do Processo de Certidão</p>
+  </div>
+  <img class="gov-logo" src="https://www.igc.sp.gov.br/statics/img/logo-gov.png" alt="Governo do Estado de São Paulo">
+</div>
+
+<div class="container">
+
+  <div class="intro">
+    <h2>Como funciona o processo de certidão?</h2>
+    <p>
+      O diagrama abaixo apresenta todas as etapas do fluxo, desde a abertura do processo pelo cliente até a emissão final da certidão.
+      <strong>Clique em qualquer caixa</strong> para ir diretamente à tela correspondente no
+      <a href="/" target="_blank">Sistema de Certidões</a>.
+    </p>
+  </div>
+
+  <!-- CLIENTE / SEI -->
+  <div class="swimlane">
+    <div class="lane lane-cliente">
+      <div class="lane-label">
+        <span class="icon">🏢</span>
+        CLIENTE / SEI
+        <span class="sublabel">Sistema Eletrônico de Informações</span>
+      </div>
+      <div class="lane-content">
+        <a href="/processos/novo" target="_blank" class="step-card">
+          <span class="step-number">0</span>
+          <span class="step-title">Abertura do Processo</span>
+          <div class="step-desc">
+            O cliente solicita a certidão via SEI.<br>
+            Documentos: requerimento, docs pessoais, planta/croqui, comprovantes.
+          </div>
+          <span class="step-link">→ Novo Processo</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-down">
+    <svg viewBox="0 0 32 24"><path d="M16 0 L16 18 M8 12 L16 20 L24 12" stroke="#90a4ae" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <!-- SDTC -->
+  <div class="swimlane">
+    <div class="lane lane-sdtc">
+      <div class="lane-label">
+        <span class="icon">📁</span>
+        SDTC
+        <span class="sublabel">Seção de Documentação<br>Técnica e Cartográfica</span>
+      </div>
+      <div class="lane-content">
+        <a href="/processos" target="_blank" class="step-card">
+          <span class="step-number">1</span>
+          <span class="step-title">Entrada SDTC</span>
+          <div class="step-desc">
+            Registro do processo no sistema.<br>
+            • Número de ordem atribuído<br>
+            • Verificação de documentos<br>
+            • Classificação: tipo de serviço e cliente<br>
+            • Dados: município, expediente SEI
+          </div>
+          <span class="step-link">→ Lista de Processos</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-down">
+    <svg viewBox="0 0 32 24"><path d="M16 0 L16 18 M8 12 L16 20 L24 12" stroke="#90a4ae" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <!-- GDAT -->
+  <div class="swimlane">
+    <div class="lane lane-gdat">
+      <div class="lane-label">
+        <span class="icon">👔</span>
+        GDAT
+        <span class="sublabel">Gerência de Divisas<br>Administrativas Territoriais</span>
+      </div>
+      <div class="lane-content">
+        <a href="/quadro" target="_blank" class="step-card">
+          <span class="step-number">2</span>
+          <span class="step-title">Distribuição GDAT</span>
+          <div class="step-desc">
+            Gerente analisa e distribui o processo.<br>
+            • Designa técnico responsável<br>
+            • Define prioridade (Idoso = urgente)<br>
+            • Atribui base cartográfica<br>
+            &nbsp;&nbsp;(10k, 50k, MDT 2023, Ortomosaico)
+          </div>
+          <span class="step-link">→ Quadro Kanban</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-down">
+    <svg viewBox="0 0 32 24"><path d="M16 0 L16 18 M8 12 L16 20 L24 12" stroke="#90a4ae" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <!-- TÉCNICO -->
+  <div class="swimlane">
+    <div class="lane lane-tecnico">
+      <div class="lane-label">
+        <span class="icon">🔧</span>
+        TÉCNICO
+        <span class="sublabel">Técnico designado</span>
+      </div>
+      <div class="lane-content">
+        <a href="/processos" target="_blank" class="step-card">
+          <span class="step-number">3</span>
+          <span class="step-title">Análise Técnica</span>
+          <div class="step-desc">
+            <strong>Gabinete:</strong><br>
+            • Análise de imagens aéreas (QGIS)<br>
+            • Verificação de limites municipais<br>
+            • Consulta MapServer<br>
+            • Elaboração de parecer técnico<br><br>
+            <strong>Campo</strong> (se necessário):<br>
+            • Vistoria in loco<br>
+            • Levantamento topográfico
+          </div>
+          <span class="step-link">→ Ver Processos</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-down">
+    <svg viewBox="0 0 32 24"><path d="M16 0 L16 18 M8 12 L16 20 L24 12" stroke="#90a4ae" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <!-- CONFERENTE -->
+  <div class="swimlane">
+    <div class="lane lane-conferente">
+      <div class="lane-label">
+        <span class="icon">🔍</span>
+        CONFERENTE
+        <span class="sublabel">Técnico conferente</span>
+      </div>
+      <div class="lane-content">
+        <a href="/processos" target="_blank" class="step-card">
+          <span class="step-number">4</span>
+          <span class="step-title">Conferência</span>
+          <div class="step-desc">
+            • Revisão do trabalho técnico<br>
+            • Validação de cálculos e medições<br>
+            • Verificação de conformidade<br>
+            <br>
+            <em>Se reprovado → volta para Análise Técnica</em>
+          </div>
+          <span class="step-link">→ Ver Processos</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-down">
+    <svg viewBox="0 0 32 24"><path d="M16 0 L16 18 M8 12 L16 20 L24 12" stroke="#90a4ae" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <!-- ASSINATURAS -->
+  <div class="swimlane">
+    <div class="lane lane-assinaturas">
+      <div class="lane-label">
+        <span class="icon">✍️</span>
+        ASSINATURAS
+        <span class="sublabel">Cadeia de aprovação</span>
+      </div>
+      <div class="lane-content">
+        <a href="/quadro" target="_blank" class="step-card ass-tec">
+          <span class="step-number">5</span>
+          <span class="step-title">Assinatura Técnico</span>
+          <div class="step-desc">
+            Técnico assina o documento técnico.<br>
+            <em>Pode devolver para Conferência.</em>
+          </div>
+          <span class="step-link">→ Quadro</span>
+        </a>
+        <span class="inner-arrow">→</span>
+        <a href="/quadro" target="_blank" class="step-card ass-ger">
+          <span class="step-number">6</span>
+          <span class="step-title">Assinatura Gerente</span>
+          <div class="step-desc">
+            Gerente revisa e assina.<br>
+            <em>Pode devolver ao Técnico.</em>
+          </div>
+          <span class="step-link">→ Quadro</span>
+        </a>
+        <span class="inner-arrow">→</span>
+        <a href="/quadro" target="_blank" class="step-card ass-dir">
+          <span class="step-number">7</span>
+          <span class="step-title">Assinatura Diretor</span>
+          <div class="step-desc">
+            Diretor aprova e assina final.<br>
+            <em>Pode devolver ao Gerente.</em>
+          </div>
+          <span class="step-link">→ Quadro</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-down">
+    <svg viewBox="0 0 32 24"><path d="M16 0 L16 18 M8 12 L16 20 L24 12" stroke="#90a4ae" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <!-- SAÍDA -->
+  <div class="swimlane">
+    <div class="lane lane-saida">
+      <div class="lane-label">
+        <span class="icon">📤</span>
+        SAÍDA
+        <span class="sublabel">Emissão da certidão</span>
+      </div>
+      <div class="lane-content">
+        <a href="/quadro" target="_blank" class="step-card">
+          <span class="step-number">8</span>
+          <span class="step-title">Upload SEI</span>
+          <div class="step-desc">
+            • Upload da certidão no sistema SEI<br>
+            • Número de saída IGC gerado<br>
+            • Notificação ao cliente
+          </div>
+          <span class="step-link">→ Quadro</span>
+        </a>
+        <span class="inner-arrow">→</span>
+        <a href="/" target="_blank" class="step-card" style="border-color: #66bb6a; border-width: 3px;">
+          <span class="step-number" style="background: #2e7d32; width: 28px; height: 28px;">9</span>
+          <span class="step-title" style="color: #2e7d32;">FINALIZADO</span>
+          <div class="step-desc">
+            <strong>Certidão emitida!</strong><br>
+            Processo concluído com sucesso.<br>
+            Disponível ao cliente via SEI.
+          </div>
+          <span class="step-link">→ Dashboard</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLUXOS ALTERNATIVOS -->
+  <div class="alt-flows">
+    <div class="alt-card alt-sobrestado">
+      <h3>⏸️ Sobrestado (Suspenso)</h3>
+      <p>
+        O processo pode ser <strong>suspenso temporariamente</strong> em qualquer etapa
+        (da Distribuição GDAT até Assinatura Gerente).<br><br>
+        Quando retomado, volta para a etapa adequada: Distribuição, Análise Técnica ou Conferência.
+      </p>
+    </div>
+    <div class="alt-card alt-cancelado">
+      <h3>❌ Cancelado</h3>
+      <p>
+        O processo pode ser <strong>cancelado</strong> a qualquer momento.<br><br>
+        <strong>Motivos:</strong> Duplicidade de entrada | A pedido do cliente |
+        Atribuição errônea ao IGC | Cliente não responde | Problemas no SEI
+      </p>
+    </div>
+  </div>
+
+  <!-- LEGENDA -->
+  <div class="legend">
+    <h3>Legenda de Cores (Setores)</h3>
+    <div class="legend-items">
+      <div class="legend-item"><span class="legend-dot" style="background: #1565c0;"></span> SDTC — Documentação</div>
+      <div class="legend-item"><span class="legend-dot" style="background: #3949ab;"></span> GDAT — Gerência</div>
+      <div class="legend-item"><span class="legend-dot" style="background: #f9a825;"></span> Técnico</div>
+      <div class="legend-item"><span class="legend-dot" style="background: #ef6c00;"></span> Conferente</div>
+      <div class="legend-item"><span class="legend-dot" style="background: #8e24aa;"></span> Assinatura Técnico</div>
+      <div class="legend-item"><span class="legend-dot" style="background: #c2185b;"></span> Assinatura Gerente</div>
+      <div class="legend-item"><span class="legend-dot" style="background: #c62828;"></span> Assinatura Diretor</div>
+      <div class="legend-item"><span class="legend-dot" style="background: #2e7d32;"></span> Saída / Finalizado</div>
+    </div>
+  </div>
+
+  <div class="legend" style="margin-top: 12px;">
+    <h3>Tipos de Serviço</h3>
+    <div class="legend-items">
+      <div class="legend-item">📜 Certidão</div>
+      <div class="legend-item">🌊 Drenagem</div>
+      <div class="legend-item">📋 Parecer</div>
+      <div class="legend-item">📐 Traçado de Divisa em Planta</div>
+      <div class="legend-item">ℹ️ Informação Técnica</div>
+    </div>
+  </div>
+
+  <div class="legend" style="margin-top: 12px;">
+    <h3>Tipos de Cliente</h3>
+    <div class="legend-items">
+      <div class="legend-item">👤 Comum-CPF</div>
+      <div class="legend-item">🏢 Comum-CNPJ</div>
+      <div class="legend-item">🏛️ Órgão Público</div>
+      <div class="legend-item">⚖️ Justiça</div>
+      <div class="legend-item">👴 Idoso <strong>(prioridade)</strong></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>
+      <a href="/" target="_blank">Acessar Sistema de Certidões</a> ·
+      <a href="https://www.igc.sp.gov.br/habit_igc" target="_blank">IGC SP</a> ·
+      Instituto Geográfico e Cartográfico — Governo do Estado de São Paulo
+    </p>
+  </div>
+
+</div>
+
+</body>
+</html>

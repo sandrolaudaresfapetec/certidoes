@@ -11,6 +11,7 @@ import {
   PlusCircle,
   Users,
   Settings,
+  GitBranch,
 } from "lucide-react";
 
 const navigation = [
@@ -21,6 +22,7 @@ const navigation = [
   { name: "Notificacoes", href: "/notificacoes", icon: Bell },
   { name: "Usuarios", href: "/usuarios", icon: Users },
   { name: "Configuracoes", href: "/configuracoes", icon: Settings },
+  { name: "Fluxo", href: "/fluxo", icon: GitBranch },
 ];
 
 export function Sidebar() {
