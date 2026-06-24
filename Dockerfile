@@ -31,7 +31,7 @@ RUN npm prune --omit=dev
 FROM base
 
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y openssl && \
+    apt-get install --no-install-recommends -y openssl postgresql postgresql-client && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 COPY --from=build /app /app
