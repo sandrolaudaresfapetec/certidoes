@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e
 
+PG_BIN="/usr/lib/postgresql/15/bin"
 PGDATA="/data/postgresql"
 PGRUN="/var/run/postgresql"
 
@@ -14,7 +15,7 @@ if [ ! -f "$PGDATA/PG_VERSION" ]; then
   mkdir -p "$PGDATA"
   chown postgres:postgres "$PGDATA"
   chmod 700 "$PGDATA"
-  su postgres -c "initdb -D $PGDATA --encoding=UTF8 --locale=C"
+  su postgres -c "$PG_BIN/initdb -D $PGDATA --encoding=UTF8 --locale=C"
 
   # Configure pg_hba.conf for local trust auth
   echo "local all all trust" > "$PGDATA/pg_hba.conf"
@@ -22,17 +23,19 @@ if [ ! -f "$PGDATA/PG_VERSION" ]; then
   echo "host all all ::1/128 trust" >> "$PGDATA/pg_hba.conf"
 
   # Configure postgresql.conf
-  echo "listen_addresses = '127.0.0.1'" >> "$PGDATA/postgresql.conf"
-  echo "port = 5432" >> "$PGDATA/postgresql.conf"
-  echo "unix_socket_directories = '$PGRUN'" >> "$PGDATA/postgresql.conf"
-  echo "shared_buffers = 64MB" >> "$PGDATA/postgresql.conf"
-  echo "work_mem = 4MB" >> "$PGDATA/postgresql.conf"
-  echo "max_connections = 20" >> "$PGDATA/postgresql.conf"
+  cat >> "$PGDATA/postgresql.conf" <<EOF
+listen_addresses = '127.0.0.1'
+port = 5432
+unix_socket_directories = '$PGRUN'
+shared_buffers = 64MB
+work_mem = 4MB
+max_connections = 20
+EOF
 fi
 
 # Start PostgreSQL
 echo "Starting PostgreSQL..."
-su postgres -c "pg_ctl -D $PGDATA -l /data/postgresql.log start -w -t 30"
+su postgres -c "$PG_BIN/pg_ctl -D $PGDATA -l /data/postgresql.log start -w -t 30"
 
 # Create database and user if they don't exist
 su postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='certidoes'\" | grep -q 1 || psql -c \"CREATE USER certidoes WITH PASSWORD 'certidoes2026';\""
