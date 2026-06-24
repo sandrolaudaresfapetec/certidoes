@@ -44,31 +44,29 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#071D41] to-[#0C2D6B] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-2xl overflow-hidden">
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
           {/* Header */}
-          <div className="bg-[#071D41] px-8 py-6 text-center">
-            <div className="flex justify-center items-center gap-4 mb-4">
+          <div className="px-8 py-8 text-center border-b border-gray-200">
+            <div className="flex justify-center items-center gap-5 mb-4">
+              <Image
+                src="/images/logoIGC.png"
+                alt="IGC - Instituto Geografico e Cartografico"
+                width={72}
+                height={72}
+              />
               <Image
                 src="/images/logoSP.png"
                 alt="Governo SP"
-                width={60}
-                height={60}
-                className="rounded-full bg-white p-1"
-              />
-              <Image
-                src="/images/igc-logo.png"
-                alt="IGC SP"
-                width={60}
-                height={60}
-                className="rounded-full bg-white p-1"
+                width={52}
+                height={52}
               />
             </div>
-            <h1 className="text-xl font-bold text-white">
+            <h1 className="text-xl font-bold text-gray-800">
               Sistema de Certidoes
             </h1>
-            <p className="text-blue-200 text-sm mt-1">
+            <p className="text-gray-500 text-sm mt-1">
               Instituto Geografico e Cartografico de Sao Paulo
             </p>
           </div>
@@ -77,7 +75,7 @@ export default function LoginPage() {
             {/* Gov.br Login Button */}
             <button
               onClick={handleGovBr}
-              className="w-full flex items-center justify-center gap-3 bg-[#1351B4] hover:bg-[#0C326F] text-white font-semibold py-3 px-4 rounded-lg transition-colors mb-6"
+              className="w-full flex items-center justify-center gap-3 bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-lg transition-colors mb-6"
             >
               <Shield className="h-5 w-5" />
               Entrar com Gov.br
@@ -85,7 +83,7 @@ export default function LoginPage() {
 
             <div className="relative mb-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
+                <div className="w-full border-t border-gray-200" />
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-4 bg-white text-gray-500">
@@ -115,7 +113,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1351B4] focus:border-transparent outline-none transition"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent outline-none transition"
                   placeholder="usuario@igc.sp.gov.br"
                 />
               </div>
@@ -133,7 +131,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1351B4] focus:border-transparent outline-none transition"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent outline-none transition"
                   placeholder="••••••••"
                 />
               </div>
@@ -141,7 +139,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-[#071D41] hover:bg-[#0C2D6B] text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-800 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
               >
                 {loading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -154,7 +152,7 @@ export default function LoginPage() {
           </div>
 
           {/* Footer */}
-          <div className="bg-gray-50 px-8 py-4 text-center border-t">
+          <div className="px-8 py-4 text-center border-t border-gray-200">
             <p className="text-xs text-gray-500">
               Governo do Estado de Sao Paulo
             </p>

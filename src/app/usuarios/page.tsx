@@ -35,7 +35,7 @@ export default async function UsuariosPage() {
   return (
     <div className="p-6 lg:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#071D41] flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
           <Users className="h-6 w-6" />
           Usuarios
         </h1>
@@ -71,7 +71,7 @@ export default async function UsuariosPage() {
               <tr key={user.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#1351B4] flex items-center justify-center text-white text-sm font-medium">
+                    <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-white text-sm font-medium">
                       {user.name.charAt(0)}
                     </div>
                     <span className="text-sm font-medium text-gray-900">

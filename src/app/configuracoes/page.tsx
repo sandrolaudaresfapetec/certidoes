@@ -8,7 +8,7 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-2xl">
-      <h1 className="text-2xl font-bold text-[#071D41] flex items-center gap-2 mb-6">
+      <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2 mb-6">
         <Settings className="h-6 w-6" />
         Configuracoes
       </h1>

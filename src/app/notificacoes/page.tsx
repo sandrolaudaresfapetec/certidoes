@@ -44,7 +44,7 @@ export default async function NotificacoesPage() {
     <div className="p-6 lg:p-8 max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#071D41] flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <Bell className="h-6 w-6" />
             Notificacoes
           </h1>
@@ -70,7 +70,7 @@ export default async function NotificacoesPage() {
               className={`bg-white rounded-lg border p-4 flex items-start gap-4 ${
                 notif.read
                   ? "border-gray-200"
-                  : "border-[#1351B4]/30 bg-blue-50/30"
+                  : "border-gray-400/30 bg-gray-50/50"
               }`}
             >
               <div className="mt-0.5">{icon}</div>
@@ -80,7 +80,7 @@ export default async function NotificacoesPage() {
                     {notif.title}
                   </h3>
                   {!notif.read && (
-                    <span className="w-2 h-2 rounded-full bg-[#1351B4]" />
+                    <span className="w-2 h-2 rounded-full bg-gray-700" />
                   )}
                 </div>
                 <p className="text-sm text-gray-600 mt-0.5">{notif.message}</p>
@@ -91,7 +91,7 @@ export default async function NotificacoesPage() {
                   {notif.process && (
                     <Link
                       href={`/processos/${notif.process.id}`}
-                      className="text-xs text-[#1351B4] hover:underline"
+                      className="text-xs text-gray-600 hover:underline"
                     >
                       Ver processo #{notif.process.ordem}
                     </Link>

@@ -54,7 +54,7 @@ export default async function DashboardPage() {
   return (
     <div className="p-6 lg:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[#071D41]">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
         <p className="text-gray-500 mt-1">
           Visao geral dos processos de certidao IGC SP
         </p>
@@ -64,7 +64,7 @@ export default async function DashboardPage() {
         <StatCard
           title="Total de Processos"
           value={totalProcessos}
-          icon={<FileText className="h-6 w-6 text-[#1351B4]" />}
+          icon={<FileText className="h-6 w-6 text-gray-600" />}
           bgColor="bg-blue-50"
         />
         <StatCard
@@ -89,12 +89,12 @@ export default async function DashboardPage() {
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-[#071D41]">
+          <h2 className="text-lg font-semibold text-gray-800">
             Distribuicao por Etapa
           </h2>
           <Link
             href="/quadro"
-            className="text-sm text-[#1351B4] hover:text-[#071D41] flex items-center gap-1"
+            className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
           >
             Ver Quadro <ArrowRight className="h-4 w-4" />
           </Link>
@@ -120,12 +120,12 @@ export default async function DashboardPage() {
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#071D41]">
+          <h2 className="text-lg font-semibold text-gray-800">
             Processos Recentes
           </h2>
           <Link
             href="/processos"
-            className="text-sm text-[#1351B4] hover:text-[#071D41] flex items-center gap-1"
+            className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
           >
             Ver Todos <ArrowRight className="h-4 w-4" />
           </Link>
@@ -160,7 +160,7 @@ export default async function DashboardPage() {
                     <td className="px-6 py-3 text-sm font-medium text-gray-900">
                       <Link
                         href={`/processos/${proc.id}`}
-                        className="text-[#1351B4] hover:underline"
+                        className="text-gray-700 hover:underline font-medium"
                       >
                         #{proc.ordem}
                       </Link>
@@ -197,7 +197,7 @@ export default async function DashboardPage() {
                     <br />
                     <Link
                       href="/processos/novo"
-                      className="text-[#1351B4] hover:underline mt-1 inline-block"
+                      className="text-gray-700 hover:underline mt-1 inline-block"
                     >
                       Criar primeiro processo
                     </Link>
@@ -228,7 +228,7 @@ function StatCard({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-3xl font-bold text-[#071D41] mt-1">{value}</p>
+          <p className="text-3xl font-bold text-gray-800 mt-1">{value}</p>
         </div>
         <div className={`${bgColor} rounded-full p-3`}>{icon}</div>
       </div>

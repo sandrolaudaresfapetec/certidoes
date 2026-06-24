@@ -9,7 +9,7 @@ const stages = [
     description: "Registro do processo, verificacao de documentos, abertura no SEI",
     responsible: "Funcionario SDTC",
     icon: FileText,
-    color: "#1351B4",
+    color: "#555555",
     href: "/processos?situacao=entrada_sdtc",
   },
   {
@@ -27,7 +27,7 @@ const stages = [
     description: "Trabalho de gabinete (QGIS), visita de campo se necessario",
     responsible: "Tecnico",
     icon: Search,
-    color: "#0C326F",
+    color: "#444444",
     href: "/processos?situacao=analise_tecnica",
   },
   {
@@ -45,7 +45,7 @@ const stages = [
     description: "Assinatura do tecnico responsavel pela analise",
     responsible: "Tecnico",
     icon: PenTool,
-    color: "#1351B4",
+    color: "#555555",
     href: "/processos?situacao=assinatura_tecnico",
   },
   {
@@ -54,7 +54,7 @@ const stages = [
     description: "Assinatura do gerente da area tecnica",
     responsible: "Gerente",
     icon: PenTool,
-    color: "#0C326F",
+    color: "#444444",
     href: "/processos?situacao=assinatura_gerente",
   },
   {
@@ -63,7 +63,7 @@ const stages = [
     description: "Assinatura final do diretor do IGC",
     responsible: "Diretor",
     icon: PenTool,
-    color: "#071D41",
+    color: "#333333",
     href: "/processos?situacao=assinatura_diretor",
   },
   {
@@ -109,7 +109,7 @@ export default async function FluxoPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-[#071D41]">
+        <h1 className="text-2xl font-bold text-gray-800">
           Fluxo de Certidao
         </h1>
         <p className="text-gray-600 mt-1">
@@ -119,7 +119,7 @@ export default async function FluxoPage() {
 
       {/* Main flow */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-[#071D41] mb-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-6">
           Fluxo Principal
         </h2>
         <div className="space-y-3">
@@ -129,7 +129,7 @@ export default async function FluxoPage() {
               <div key={stage.id}>
                 <Link
                   href={stage.href}
-                  className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 hover:border-[#1351B4] hover:shadow-md transition-all group"
+                  className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-400 hover:shadow-md transition-all group"
                 >
                   <div
                     className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
@@ -138,17 +138,17 @@ export default async function FluxoPage() {
                     <Icon className="h-6 w-6 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-[#071D41] group-hover:text-[#1351B4] transition-colors">
+                    <h3 className="font-semibold text-gray-800 group-hover:text-gray-600 transition-colors">
                       {stage.name}
                     </h3>
                     <p className="text-sm text-gray-600 mt-0.5">
                       {stage.description}
                     </p>
-                    <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-[#1351B4] font-medium">
+                    <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
                       {stage.responsible}
                     </span>
                   </div>
-                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-[#1351B4] shrink-0 mt-3 transition-colors" />
+                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 shrink-0 mt-3 transition-colors" />
                 </Link>
                 {index < stages.length - 1 && (
                   <div className="flex justify-center py-1">
@@ -163,7 +163,7 @@ export default async function FluxoPage() {
 
       {/* Alternative flows */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-[#071D41] mb-4">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">
           Fluxos Alternativos
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -195,8 +195,8 @@ export default async function FluxoPage() {
       </div>
 
       {/* Legend */}
-      <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
-        <h3 className="text-sm font-semibold text-[#071D41] mb-2">
+      <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+        <h3 className="text-sm font-semibold text-gray-800 mb-2">
           Informacoes
         </h3>
         <ul className="text-sm text-gray-700 space-y-1">

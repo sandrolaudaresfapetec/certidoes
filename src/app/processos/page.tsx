@@ -71,13 +71,13 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
     <div className="p-6 lg:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#071D41]">Processos</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Processos</h1>
           <p className="text-gray-500 mt-1">{total} processos encontrados</p>
         </div>
         {showCreateButton && (
           <Link
             href="/processos/novo"
-            className="flex items-center gap-2 bg-[#1351B4] text-white px-4 py-2 rounded-lg hover:bg-[#071D41] transition-colors text-sm font-medium"
+            className="flex items-center gap-2 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
           >
             <PlusCircle className="h-4 w-4" />
             Novo Processo
@@ -94,13 +94,13 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
               name="search"
               defaultValue={search}
               placeholder="Buscar por interessado, expediente ou municipio..."
-              className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1351B4]"
+              className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
             />
             {situacao && <input type="hidden" name="situacao" value={situacao} />}
             {tipoServico && <input type="hidden" name="tipoServico" value={tipoServico} />}
             <button
               type="submit"
-              className="bg-[#071D41] text-white px-3 py-1.5 rounded-md text-sm hover:bg-[#1351B4]"
+              className="bg-gray-700 text-white px-3 py-1.5 rounded-md text-sm hover:bg-gray-800"
             >
               Buscar
             </button>
@@ -110,7 +110,7 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
             <div className="flex flex-wrap gap-2">
               <Link
                 href={buildUrl({ situacao: undefined, page: "1" })}
-                className={`px-3 py-1 rounded-full text-xs font-medium ${!situacao ? "bg-[#1351B4] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                className={`px-3 py-1 rounded-full text-xs font-medium ${!situacao ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >
                 Todos
               </Link>
@@ -170,7 +170,7 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
                     <td className="px-4 py-3 text-sm">
                       <Link
                         href={`/processos/${proc.id}`}
-                        className="font-medium text-[#1351B4] hover:underline"
+                        className="font-medium text-gray-700 hover:underline"
                       >
                         #{proc.ordem}
                       </Link>

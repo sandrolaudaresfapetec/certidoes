@@ -33,7 +33,7 @@ export default async function QuadroPage() {
   return (
     <div className="p-6 lg:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#071D41]">Quadro de Processos</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Quadro de Processos</h1>
         <p className="text-gray-500 mt-1">
           Visao Kanban do fluxo de trabalho
         </p>
@@ -89,7 +89,7 @@ export default async function QuadroPage() {
                     )}
                     {proc.tecnicoResp && (
                       <div className="mt-2 flex items-center gap-1">
-                        <div className="w-4 h-4 rounded-full bg-[#1351B4] flex items-center justify-center text-[10px] text-white font-medium">
+                        <div className="w-4 h-4 rounded-full bg-gray-500 flex items-center justify-center text-[10px] text-white font-medium">
                           {proc.tecnicoResp.name.charAt(0)}
                         </div>
                         <span className="text-xs text-gray-500">
