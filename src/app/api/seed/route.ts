@@ -1,91 +1,122 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 export async function POST() {
-  // Create users
+  const defaultPassword = await bcrypt.hash("igc2026", 10);
+
   const users = await Promise.all([
     prisma.user.upsert({
       where: { email: "admin@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword },
       create: {
         name: "Administrador",
         email: "admin@igc.sp.gov.br",
         role: "ADMIN",
         department: "CATDT",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "gerente@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword },
       create: {
         name: "Carlos Silva",
         email: "gerente@igc.sp.gov.br",
         role: "GERENTE",
         department: "CATDT",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "diretor@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword },
       create: {
         name: "Roberto Santos",
         email: "diretor@igc.sp.gov.br",
         role: "DIRETOR",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "thiago@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword },
       create: {
         name: "Thiago Barrocal",
         email: "thiago@igc.sp.gov.br",
         role: "TECNICO",
         department: "CATDT",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "ana@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword },
       create: {
         name: "Ana Oliveira",
         email: "ana@igc.sp.gov.br",
         role: "TECNICO",
         department: "CATDT",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "marcos@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword },
       create: {
         name: "Marcos Pereira",
         email: "marcos@igc.sp.gov.br",
         role: "CONFERENTE",
         department: "CATDT",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "sdtc@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword },
       create: {
         name: "Maria SDTC",
         email: "sdtc@igc.sp.gov.br",
         role: "SDTC",
         department: "SDTC",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "pedro@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword },
       create: {
         name: "Pedro Costa",
         email: "pedro@igc.sp.gov.br",
         role: "TECNICO",
         department: "CG",
+        passwordHash: defaultPassword,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "gdtac@igc.sp.gov.br" },
+      update: { passwordHash: defaultPassword },
+      create: {
+        name: "Lucia GDTAC",
+        email: "gdtac@igc.sp.gov.br",
+        role: "GDTAC",
+        department: "GDTAC",
+        passwordHash: defaultPassword,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "cliente@email.com" },
+      update: { passwordHash: defaultPassword },
+      create: {
+        name: "Jose da Silva (Cliente)",
+        email: "cliente@email.com",
+        role: "CLIENTE",
+        cpf: "123.456.789-00",
+        passwordHash: defaultPassword,
       },
     }),
   ]);
 
-  // Create sample processes
   const sampleProcesses = [
     {
       ordem: 1,
@@ -103,6 +134,7 @@ export async function POST() {
       base: "10k",
       departamento: "CATDT",
       criadoPorId: users[6].id,
+      clienteId: users[9].id,
     },
     {
       ordem: 2,
@@ -250,7 +282,7 @@ export async function POST() {
   }
 
   return NextResponse.json({
-    message: "Seed completed",
+    message: "Seed completed. Default password: igc2026",
     users: users.length,
     processes: existingCount === 0 ? sampleProcesses.length : 0,
   });

@@ -3,22 +3,27 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  role      String   // ADMIN, GERENTE, DIRETOR, TECNICO, CONFERENTE, SDTC
-  department String? // CATDT, CG, SDTC
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String?
+  role          String   // ADMIN, GERENTE, DIRETOR, TECNICO, CONFERENTE, SDTC, GDTAC, CLIENTE
+  department    String?  // CATDT, CG, SDTC, GDTAC
+  cpf           String?  @unique
+  govBrSub      String?  @unique
+  phone         String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   processesResponsible  Process[]      @relation("TecnicoResponsavel")
   processesConference   Process[]      @relation("TecnicoConferencia")
   processesCreated      Process[]      @relation("CriadoPor")
+  processesClient       Process[]      @relation("ClienteProcesso")
   notifications         Notification[]
   workflowActions       WorkflowAction[]
 }
@@ -50,6 +55,11 @@ model Process {
   ra                String?  // Regiao Administrativa
   dra               String?
   divisaDificuldade String?
+  
+  // SIGEF Integration
+  codigoSigef       String?
+  areaSigef         Float?
+  statusSigef       String?
   
   // Workflow Status
   situacao          String   @default("entrada_sdtc") // entrance stage
@@ -102,6 +112,10 @@ model Process {
   // Base map reference
   base              String?  // 10k, 50k, MDT 2023, Ortomosaico 2010
   departamento      String?  // CATDT, CG
+  
+  // Client relation
+  clienteId         String?
+  cliente           User?    @relation("ClienteProcesso", fields: [clienteId], references: [id])
   
   // Metadata
   criadoPorId       String?

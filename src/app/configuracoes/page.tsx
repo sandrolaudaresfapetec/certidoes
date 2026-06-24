@@ -1,9 +1,14 @@
+import { requireRole } from "@/lib/auth";
 import { Settings } from "lucide-react";
 
-export default function ConfiguracoesPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ConfiguracoesPage() {
+  await requireRole("ADMIN");
+
   return (
-    <div className="p-8 max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 mb-6">
+    <div className="p-6 lg:p-8 max-w-2xl">
+      <h1 className="text-2xl font-bold text-[#071D41] flex items-center gap-2 mb-6">
         <Settings className="h-6 w-6" />
         Configuracoes
       </h1>
@@ -12,7 +17,6 @@ export default function ConfiguracoesPage() {
           Configuracoes do sistema serao implementadas em versoes futuras.
         </p>
         <ul className="mt-4 space-y-2 text-sm text-gray-500">
-          <li>- Gerenciamento de usuarios</li>
           <li>- Configuracoes de notificacoes por email</li>
           <li>- Regras de prazo e prioridade</li>
           <li>- Integracao com SEI</li>

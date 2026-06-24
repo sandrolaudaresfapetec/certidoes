@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth, getProcessFilter } from "@/lib/auth";
 import { WORKFLOW_STAGES, KANBAN_STAGES, type WorkflowStage } from "@/lib/workflow";
 import Link from "next/link";
 import {
@@ -12,7 +13,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
-async function getDashboardData() {
+export default async function DashboardPage() {
+  const user = await requireAuth();
+  const filter = getProcessFilter(user.id, user.role);
+
   const [
     totalProcessos,
     processosPorSituacao,
@@ -21,21 +25,23 @@ async function getDashboardData() {
     processosSobrestados,
     processosCancelados,
   ] = await Promise.all([
-    prisma.process.count(),
+    prisma.process.count({ where: filter }),
     prisma.process.groupBy({
       by: ["situacao"],
+      where: filter,
       _count: { situacao: true },
     }),
     prisma.process.findMany({
+      where: filter,
       orderBy: { createdAt: "desc" },
       take: 10,
       include: {
         tecnicoResp: { select: { name: true } },
       },
     }),
-    prisma.process.count({ where: { situacao: "finalizado" } }),
-    prisma.process.count({ where: { situacao: "sobrestado" } }),
-    prisma.process.count({ where: { situacao: "cancelado" } }),
+    prisma.process.count({ where: { ...filter, situacao: "finalizado" } }),
+    prisma.process.count({ where: { ...filter, situacao: "sobrestado" } }),
+    prisma.process.count({ where: { ...filter, situacao: "cancelado" } }),
   ]);
 
   const ativos = totalProcessos - processosFinalizados - processosCancelados;
@@ -45,66 +51,50 @@ async function getDashboardData() {
     situacaoMap[item.situacao] = item._count.situacao;
   });
 
-  return {
-    totalProcessos,
-    ativos,
-    processosFinalizados,
-    processosSobrestados,
-    processosCancelados,
-    situacaoMap,
-    processosRecentes,
-  };
-}
-
-export default async function DashboardPage() {
-  const data = await getDashboardData();
-
   return (
-    <div className="p-8">
+    <div className="p-6 lg:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-[#071D41]">Dashboard</h1>
         <p className="text-gray-500 mt-1">
           Visao geral dos processos de certidao IGC SP
         </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <StatCard
           title="Total de Processos"
-          value={data.totalProcessos}
-          icon={<FileText className="h-6 w-6 text-blue-600" />}
+          value={totalProcessos}
+          icon={<FileText className="h-6 w-6 text-[#1351B4]" />}
           bgColor="bg-blue-50"
         />
         <StatCard
           title="Processos Ativos"
-          value={data.ativos}
+          value={ativos}
           icon={<Clock className="h-6 w-6 text-yellow-600" />}
           bgColor="bg-yellow-50"
         />
         <StatCard
           title="Finalizados"
-          value={data.processosFinalizados}
+          value={processosFinalizados}
           icon={<CheckCircle className="h-6 w-6 text-green-600" />}
           bgColor="bg-green-50"
         />
         <StatCard
           title="Sobrestados"
-          value={data.processosSobrestados}
+          value={processosSobrestados}
           icon={<AlertTriangle className="h-6 w-6 text-orange-600" />}
           bgColor="bg-orange-50"
         />
       </div>
 
-      {/* Workflow Stage Distribution */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-[#071D41]">
             Distribuicao por Etapa
           </h2>
           <Link
             href="/quadro"
-            className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            className="text-sm text-[#1351B4] hover:text-[#071D41] flex items-center gap-1"
           >
             Ver Quadro <ArrowRight className="h-4 w-4" />
           </Link>
@@ -112,7 +102,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           {KANBAN_STAGES.map((stage) => {
             const config = WORKFLOW_STAGES[stage];
-            const count = data.situacaoMap[stage] || 0;
+            const count = situacaoMap[stage] || 0;
             return (
               <div
                 key={stage}
@@ -128,15 +118,14 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent Processes */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-[#071D41]">
             Processos Recentes
           </h2>
           <Link
             href="/processos"
-            className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            className="text-sm text-[#1351B4] hover:text-[#071D41] flex items-center gap-1"
           >
             Ver Todos <ArrowRight className="h-4 w-4" />
           </Link>
@@ -163,7 +152,7 @@ export default async function DashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {data.processosRecentes.map((proc) => {
+              {processosRecentes.map((proc) => {
                 const stageConfig =
                   WORKFLOW_STAGES[proc.situacao as WorkflowStage];
                 return (
@@ -171,7 +160,7 @@ export default async function DashboardPage() {
                     <td className="px-6 py-3 text-sm font-medium text-gray-900">
                       <Link
                         href={`/processos/${proc.id}`}
-                        className="text-blue-600 hover:underline"
+                        className="text-[#1351B4] hover:underline"
                       >
                         #{proc.ordem}
                       </Link>
@@ -197,18 +186,18 @@ export default async function DashboardPage() {
                   </tr>
                 );
               })}
-              {data.processosRecentes.length === 0 && (
+              {processosRecentes.length === 0 && (
                 <tr>
                   <td
                     colSpan={5}
                     className="px-6 py-12 text-center text-sm text-gray-500"
                   >
                     <TrendingUp className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                    Nenhum processo cadastrado ainda.
+                    Nenhum processo encontrado.
                     <br />
                     <Link
                       href="/processos/novo"
-                      className="text-blue-600 hover:underline mt-1 inline-block"
+                      className="text-[#1351B4] hover:underline mt-1 inline-block"
                     >
                       Criar primeiro processo
                     </Link>
@@ -239,7 +228,7 @@ function StatCard({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
+          <p className="text-3xl font-bold text-[#071D41] mt-1">{value}</p>
         </div>
         <div className={`${bgColor} rounded-full p-3`}>{icon}</div>
       </div>

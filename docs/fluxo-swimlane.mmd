@@ -1,0 +1,104 @@
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: "#e3f2fd"
+    primaryTextColor: "#1a237e"
+    primaryBorderColor: "#1565c0"
+    lineColor: "#424242"
+    secondaryColor: "#f3e5f5"
+    tertiaryColor: "#e8f5e9"
+    fontSize: "14px"
+---
+block-beta
+  columns 7
+
+  block:HEADER:7
+    columns 7
+    title["FLUXO DE CERTIDÃO — IGC SP"]
+  end
+
+  space:7
+
+  block:ROW_SDTC:7
+    columns 7
+    sdtc_label["SDTC"]
+    e1["① Entrada SDTC\nRegistro do processo\nVerificação de docs\nClassificação"]
+    space
+    space
+    space
+    space
+    space
+  end
+
+  space:7
+
+  block:ROW_GDAT:7
+    columns 7
+    gdat_label["GDAT\nGerência"]
+    space
+    e2["② Distribuição GDAT\nDesigna técnico\nDefine prioridade\nAtribui base cartográfica"]
+    space
+    space
+    space
+    space
+  end
+
+  space:7
+
+  block:ROW_TEC:7
+    columns 7
+    tec_label["Técnico"]
+    space
+    space
+    e3["③ Análise Técnica\nGabinete: QGIS, limites\nCampo: vistoria\nParecer técnico"]
+    space
+    space
+    space
+  end
+
+  space:7
+
+  block:ROW_CONF:7
+    columns 7
+    conf_label["Conferente"]
+    space
+    space
+    space
+    e4["④ Conferência\nRevisão técnica\nValidação\nAprovar/Reprovar"]
+    space
+    space
+  end
+
+  space:7
+
+  block:ROW_ASS:7
+    columns 7
+    ass_label["Assinaturas"]
+    space
+    space
+    space
+    space
+    e5["⑤ Técnico → ⑥ Gerente → ⑦ Diretor\nCadeia de assinaturas"]
+    space
+  end
+
+  space:7
+
+  block:ROW_SAIDA:7
+    columns 7
+    saida_label["Saída"]
+    space
+    space
+    space
+    space
+    space
+    e6["⑧ Upload SEI\n⑨ Finalizado\nCertidão emitida"]
+  end
+
+  e1 --> e2
+  e2 --> e3
+  e3 --> e4
+  e4 --> e5
+  e5 --> e6
+  e4 -- "Reprovar" --> e3

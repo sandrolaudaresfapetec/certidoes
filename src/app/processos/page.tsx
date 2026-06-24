@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth, getProcessFilter, canCreateProcess } from "@/lib/auth";
 import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
@@ -16,6 +17,7 @@ interface PageProps {
 }
 
 export default async function ProcessosPage({ searchParams }: PageProps) {
+  const user = await requireAuth();
   const params = await searchParams;
   const situacao = params.situacao;
   const tipoServico = params.tipoServico;
@@ -23,14 +25,20 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
   const page = parseInt(params.page || "1");
   const limit = 25;
 
-  const where: Record<string, unknown> = {};
+  const roleFilter = getProcessFilter(user.id, user.role);
+  const where: Record<string, unknown> = { ...roleFilter };
   if (situacao) where.situacao = situacao;
   if (tipoServico) where.tipoServico = tipoServico;
   if (search) {
-    where.OR = [
-      { interessado: { contains: search } },
-      { expediente: { contains: search } },
-      { municipio: { contains: search } },
+    where.AND = [
+      ...(Array.isArray(where.AND) ? (where.AND as Record<string, unknown>[]) : []),
+      {
+        OR: [
+          { interessado: { contains: search } },
+          { expediente: { contains: search } },
+          { municipio: { contains: search } },
+        ],
+      },
     ];
   }
 
@@ -48,6 +56,7 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
   ]);
 
   const totalPages = Math.ceil(total / limit);
+  const showCreateButton = canCreateProcess(user.role);
 
   function buildUrl(newParams: Record<string, string | undefined>) {
     const p = new URLSearchParams();
@@ -59,22 +68,23 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-6 lg:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Processos</h1>
+          <h1 className="text-2xl font-bold text-[#071D41]">Processos</h1>
           <p className="text-gray-500 mt-1">{total} processos encontrados</p>
         </div>
-        <Link
-          href="/processos/novo"
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-        >
-          <PlusCircle className="h-4 w-4" />
-          Novo Processo
-        </Link>
+        {showCreateButton && (
+          <Link
+            href="/processos/novo"
+            className="flex items-center gap-2 bg-[#1351B4] text-white px-4 py-2 rounded-lg hover:bg-[#071D41] transition-colors text-sm font-medium"
+          >
+            <PlusCircle className="h-4 w-4" />
+            Novo Processo
+          </Link>
+        )}
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
         <div className="flex flex-wrap items-center gap-4">
           <form className="flex items-center gap-2 flex-1 min-w-[200px]">
@@ -84,13 +94,13 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
               name="search"
               defaultValue={search}
               placeholder="Buscar por interessado, expediente ou municipio..."
-              className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1351B4]"
             />
             {situacao && <input type="hidden" name="situacao" value={situacao} />}
             {tipoServico && <input type="hidden" name="tipoServico" value={tipoServico} />}
             <button
               type="submit"
-              className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-200"
+              className="bg-[#071D41] text-white px-3 py-1.5 rounded-md text-sm hover:bg-[#1351B4]"
             >
               Buscar
             </button>
@@ -100,7 +110,7 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
             <div className="flex flex-wrap gap-2">
               <Link
                 href={buildUrl({ situacao: undefined, page: "1" })}
-                className={`px-3 py-1 rounded-full text-xs font-medium ${!situacao ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                className={`px-3 py-1 rounded-full text-xs font-medium ${!situacao ? "bg-[#1351B4] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >
                 Todos
               </Link>
@@ -121,7 +131,6 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -161,7 +170,7 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
                     <td className="px-4 py-3 text-sm">
                       <Link
                         href={`/processos/${proc.id}`}
-                        className="font-medium text-blue-600 hover:underline"
+                        className="font-medium text-[#1351B4] hover:underline"
                       >
                         #{proc.ordem}
                       </Link>
@@ -212,7 +221,6 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
             <p className="text-sm text-gray-500">

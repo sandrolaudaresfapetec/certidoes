@@ -1,7 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
+import { getProcessFilter } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "Nao autenticado" }, { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const situacao = searchParams.get("situacao");
   const tipoServico = searchParams.get("tipoServico");
@@ -9,7 +16,8 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "50");
 
-  const where: Record<string, unknown> = {};
+  const roleFilter = getProcessFilter(session.userId, session.role);
+  const where: Record<string, unknown> = { ...roleFilter };
 
   if (situacao) {
     where.situacao = situacao;
@@ -18,11 +26,16 @@ export async function GET(request: NextRequest) {
     where.tipoServico = tipoServico;
   }
   if (search) {
-    where.OR = [
-      { interessado: { contains: search } },
-      { expediente: { contains: search } },
-      { municipio: { contains: search } },
-      { email: { contains: search } },
+    where.AND = [
+      ...(Array.isArray(where.AND) ? (where.AND as Record<string, unknown>[]) : []),
+      {
+        OR: [
+          { interessado: { contains: search } },
+          { expediente: { contains: search } },
+          { municipio: { contains: search } },
+          { email: { contains: search } },
+        ],
+      },
     ];
   }
 
@@ -33,6 +46,7 @@ export async function GET(request: NextRequest) {
         tecnicoResp: { select: { id: true, name: true } },
         tecnicoConf: { select: { id: true, name: true } },
         criadoPor: { select: { id: true, name: true } },
+        cliente: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
@@ -41,10 +55,22 @@ export async function GET(request: NextRequest) {
     prisma.process.count({ where }),
   ]);
 
-  return NextResponse.json({ processes, total, page, limit });
+  return Response.json({ processes, total, page, limit });
 }
 
 export async function POST(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "Nao autenticado" }, { status: 401 });
+  }
+
+  if (!["ADMIN", "SDTC"].includes(session.role)) {
+    return Response.json(
+      { error: "Apenas SDTC pode abrir processos" },
+      { status: 403 }
+    );
+  }
+
   const body = await request.json();
 
   const maxOrdem = await prisma.process.findFirst({
@@ -77,7 +103,9 @@ export async function POST(request: NextRequest) {
       base: body.base,
       departamento: body.departamento,
       situacao: "entrada_sdtc",
-      criadoPorId: body.criadoPorId,
+      criadoPorId: session.userId,
+      clienteId: body.clienteId || null,
+      codigoSigef: body.codigoSigef || null,
     },
     include: {
       tecnicoResp: { select: { id: true, name: true } },
@@ -85,26 +113,29 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Create notification for all GDAT users about new entry
   const gdatUsers = await prisma.user.findMany({
     where: {
+      active: true,
       OR: [
         { role: "ADMIN" },
         { role: "GERENTE" },
+        { role: "GDTAC" },
         { department: { in: ["CATDT", "CG"] } },
       ],
     },
   });
 
-  await prisma.notification.createMany({
-    data: gdatUsers.map((user) => ({
-      type: "NOVA_ENTRADA",
-      title: "Novo Processo Registrado",
-      message: `Processo ${processo.expediente || processo.ordem} - ${processo.interessado} - ${processo.tipoServico}`,
-      processId: processo.id,
-      userId: user.id,
-    })),
-  });
+  if (gdatUsers.length > 0) {
+    await prisma.notification.createMany({
+      data: gdatUsers.map((user) => ({
+        type: "NOVA_ENTRADA",
+        title: "Novo Processo Registrado",
+        message: `Processo ${processo.expediente || processo.ordem} - ${processo.interessado} - ${processo.tipoServico}`,
+        processId: processo.id,
+        userId: user.id,
+      })),
+    });
+  }
 
-  return NextResponse.json(processo, { status: 201 });
+  return Response.json(processo, { status: 201 });
 }

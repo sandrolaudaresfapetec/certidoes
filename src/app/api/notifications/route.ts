@@ -1,19 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const userId = searchParams.get("userId");
-  const unreadOnly = searchParams.get("unreadOnly") === "true";
-
-  if (!userId) {
-    return NextResponse.json(
-      { error: "userId e obrigatorio" },
-      { status: 400 }
-    );
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  const where: Record<string, unknown> = { userId };
+  const searchParams = request.nextUrl.searchParams;
+  const unreadOnly = searchParams.get("unreadOnly") === "true";
+
+  const where: Record<string, unknown> = { userId: session.userId };
   if (unreadOnly) {
     where.read = false;
   }
@@ -36,28 +34,36 @@ export async function GET(request: NextRequest) {
       take: 50,
     }),
     prisma.notification.count({
-      where: { userId, read: false },
+      where: { userId: session.userId, read: false },
     }),
   ]);
 
-  return NextResponse.json({ notifications, unreadCount });
+  return Response.json({ notifications, unreadCount });
 }
 
 export async function PATCH(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "Nao autenticado" }, { status: 401 });
+  }
+
   const body = await request.json();
   const { notificationIds, read } = body;
 
   if (!notificationIds || notificationIds.length === 0) {
-    return NextResponse.json(
+    return Response.json(
       { error: "notificationIds sao obrigatorios" },
       { status: 400 }
     );
   }
 
   await prisma.notification.updateMany({
-    where: { id: { in: notificationIds } },
+    where: {
+      id: { in: notificationIds },
+      userId: session.userId,
+    },
     data: { read: read ?? true },
   });
 
-  return NextResponse.json({ success: true });
+  return Response.json({ success: true });
 }

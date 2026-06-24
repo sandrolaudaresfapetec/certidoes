@@ -1,9 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { requireRole, ROLE_LABELS } from "@/lib/auth";
+import type { UserRole } from "@/lib/auth";
 import { Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsuariosPage() {
+  await requireRole("ADMIN");
+
   const users = await prisma.user.findMany({
     orderBy: { name: "asc" },
     include: {
@@ -24,16 +28,18 @@ export default async function UsuariosPage() {
     TECNICO: "bg-blue-100 text-blue-700",
     CONFERENTE: "bg-orange-100 text-orange-700",
     SDTC: "bg-teal-100 text-teal-700",
+    GDTAC: "bg-cyan-100 text-cyan-700",
+    CLIENTE: "bg-green-100 text-green-700",
   };
 
   return (
-    <div className="p-8">
+    <div className="p-6 lg:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-[#071D41] flex items-center gap-2">
           <Users className="h-6 w-6" />
           Usuarios
         </h1>
-        <p className="text-gray-500 mt-1">Equipe do sistema</p>
+        <p className="text-gray-500 mt-1">Gerenciamento de usuarios do sistema</p>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -65,7 +71,7 @@ export default async function UsuariosPage() {
               <tr key={user.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+                    <div className="w-8 h-8 rounded-full bg-[#1351B4] flex items-center justify-center text-white text-sm font-medium">
                       {user.name.charAt(0)}
                     </div>
                     <span className="text-sm font-medium text-gray-900">
@@ -78,7 +84,7 @@ export default async function UsuariosPage() {
                   <span
                     className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${roleColors[user.role] || "bg-gray-100 text-gray-700"}`}
                   >
-                    {user.role}
+                    {ROLE_LABELS[user.role as UserRole] || user.role}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600">

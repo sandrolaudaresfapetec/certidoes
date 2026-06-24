@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-
+import { requireAuth } from "@/lib/auth";
 import { formatDateTime } from "@/lib/utils";
 import Link from "next/link";
 import { Bell, CheckCircle, Clock, FileText, UserCheck, AlertTriangle } from "lucide-react";
@@ -19,7 +19,10 @@ const typeIcons: Record<string, React.ReactNode> = {
 };
 
 export default async function NotificacoesPage() {
+  const user = await requireAuth();
+
   const notifications = await prisma.notification.findMany({
+    where: { userId: user.id },
     include: {
       process: {
         select: {
@@ -30,7 +33,6 @@ export default async function NotificacoesPage() {
           situacao: true,
         },
       },
-      user: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -39,10 +41,10 @@ export default async function NotificacoesPage() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-6 lg:p-8 max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-[#071D41] flex items-center gap-2">
             <Bell className="h-6 w-6" />
             Notificacoes
           </h1>
@@ -68,7 +70,7 @@ export default async function NotificacoesPage() {
               className={`bg-white rounded-lg border p-4 flex items-start gap-4 ${
                 notif.read
                   ? "border-gray-200"
-                  : "border-blue-200 bg-blue-50/30"
+                  : "border-[#1351B4]/30 bg-blue-50/30"
               }`}
             >
               <div className="mt-0.5">{icon}</div>
@@ -78,7 +80,7 @@ export default async function NotificacoesPage() {
                     {notif.title}
                   </h3>
                   {!notif.read && (
-                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span className="w-2 h-2 rounded-full bg-[#1351B4]" />
                   )}
                 </div>
                 <p className="text-sm text-gray-600 mt-0.5">{notif.message}</p>
@@ -86,13 +88,10 @@ export default async function NotificacoesPage() {
                   <span className="text-xs text-gray-400">
                     {formatDateTime(notif.createdAt)}
                   </span>
-                  <span className="text-xs text-gray-400">
-                    Para: {notif.user.name}
-                  </span>
                   {notif.process && (
                     <Link
                       href={`/processos/${notif.process.id}`}
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs text-[#1351B4] hover:underline"
                     >
                       Ver processo #{notif.process.ordem}
                     </Link>

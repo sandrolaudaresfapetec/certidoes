@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 import { WORKFLOW_STAGES, ALLOWED_TRANSITIONS, type WorkflowStage } from "@/lib/workflow";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import Link from "next/link";
@@ -13,6 +14,7 @@ interface PageProps {
 }
 
 export default async function ProcessoDetailPage({ params }: PageProps) {
+  await requireAuth();
   const { id } = await params;
 
   const processo = await prisma.process.findUnique({
