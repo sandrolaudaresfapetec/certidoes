@@ -1,16 +1,35 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { LogIn, Shield, Loader2 } from "lucide-react";
 
-export default function LoginPage() {
+const GOV_BR_ERRORS: Record<string, string> = {
+  govbr_nao_configurado:
+    "Login Gov.br nao configurado. Contate o administrador.",
+  token_invalido: "Erro ao autenticar com Gov.br. Tente novamente.",
+  userinfo_falhou: "Erro ao obter dados do Gov.br. Tente novamente.",
+  state_invalido: "Sessao expirada. Tente novamente.",
+  sessao_expirada: "Sessao expirada. Tente novamente.",
+  sem_codigo: "Autorizacao negada ou cancelada.",
+  erro_interno: "Erro interno. Tente novamente.",
+};
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam) {
+      setError(GOV_BR_ERRORS[errorParam] || `Erro: ${errorParam}`);
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -160,5 +179,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
