@@ -156,9 +156,6 @@ export default function LoginPage() {
             <p className="text-xs text-gray-500">
               Governo do Estado de Sao Paulo
             </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Secretaria de Meio Ambiente, Infraestrutura e Logistica
-            </p>
           </div>
         </div>
       </div>

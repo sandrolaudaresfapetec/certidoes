@@ -151,9 +151,6 @@ export function Sidebar() {
         <p className="text-[10px] text-gray-400 text-center">
           Governo do Estado de Sao Paulo
         </p>
-        <p className="text-[10px] text-gray-400 text-center">
-          SEMIL - Sec. Meio Ambiente
-        </p>
       </div>
     </div>
   );
