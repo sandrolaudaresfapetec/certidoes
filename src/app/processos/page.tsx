@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth, getProcessFilter, canCreateProcess } from "@/lib/auth";
-import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
+import { WORKFLOW_STAGES, SERVICE_TYPES, type WorkflowStage } from "@/lib/workflow";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { Search, Filter, PlusCircle } from "lucide-react";
+import { Search, Filter, PlusCircle, Layers } from "lucide-react";
+import { BatchActions } from "@/components/batch-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
   const tipoServico = params.tipoServico;
   const search = params.search;
   const page = parseInt(params.page || "1");
-  const limit = 25;
+  const limit = 50;
 
   const roleFilter = getProcessFilter(user.id, user.role);
   const where: Record<string, unknown> = { ...roleFilter };
@@ -34,9 +35,9 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
       ...(Array.isArray(where.AND) ? (where.AND as Record<string, unknown>[]) : []),
       {
         OR: [
-          { interessado: { contains: search } },
-          { expediente: { contains: search } },
-          { municipio: { contains: search } },
+          { interessado: { contains: search, mode: "insensitive" } },
+          { expediente: { contains: search, mode: "insensitive" } },
+          { municipio: { contains: search, mode: "insensitive" } },
         ],
       },
     ];
@@ -57,6 +58,7 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
 
   const totalPages = Math.ceil(total / limit);
   const showCreateButton = canCreateProcess(user.role);
+  const canBatch = ["ADMIN", "GERENTE", "DIRETOR"].includes(user.role);
 
   function buildUrl(newParams: Record<string, string | undefined>) {
     const p = new URLSearchParams();
@@ -105,31 +107,67 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
               Buscar
             </button>
           </form>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <div className="flex flex-wrap gap-2">
+        </div>
+
+        {/* Stage filters */}
+        <div className="flex items-center gap-2 mt-3">
+          <Filter className="h-4 w-4 text-gray-400 shrink-0" />
+          <div className="flex flex-wrap gap-1.5">
+            <Link
+              href={buildUrl({ situacao: undefined, page: "1" })}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium ${!situacao ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+            >
+              Todos
+            </Link>
+            {(Object.keys(WORKFLOW_STAGES) as WorkflowStage[]).map((stage) => {
+              const config = WORKFLOW_STAGES[stage];
+              return (
+                <Link
+                  key={stage}
+                  href={buildUrl({ situacao: stage, page: "1" })}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium ${situacao === stage ? `${config.bgLight} ${config.textColor}` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                >
+                  {config.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Service type filters */}
+        <div className="flex items-center gap-2 mt-2">
+          <Layers className="h-4 w-4 text-gray-400 shrink-0" />
+          <div className="flex flex-wrap gap-1.5">
+            <Link
+              href={buildUrl({ tipoServico: undefined, page: "1" })}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium ${!tipoServico ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+            >
+              Todos
+            </Link>
+            {SERVICE_TYPES.map((svc) => (
               <Link
-                href={buildUrl({ situacao: undefined, page: "1" })}
-                className={`px-3 py-1 rounded-full text-xs font-medium ${!situacao ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                key={svc}
+                href={buildUrl({ tipoServico: svc, page: "1" })}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium ${tipoServico === svc ? "bg-gray-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >
-                Todos
+                {svc}
               </Link>
-              {(Object.keys(WORKFLOW_STAGES) as WorkflowStage[]).map((stage) => {
-                const config = WORKFLOW_STAGES[stage];
-                return (
-                  <Link
-                    key={stage}
-                    href={buildUrl({ situacao: stage, page: "1" })}
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${situacao === stage ? `${config.bgLight} ${config.textColor}` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-                  >
-                    {config.label}
-                  </Link>
-                );
-              })}
-            </div>
+            ))}
           </div>
         </div>
       </div>
+
+      {/* Batch actions (for ADMIN, GERENTE, DIRETOR) */}
+      {canBatch && (
+        <BatchActions
+          processes={processes.map((p) => ({
+            id: p.id,
+            ordem: p.ordem,
+            interessado: p.interessado,
+            situacao: p.situacao,
+          }))}
+        />
+      )}
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
@@ -224,7 +262,7 @@ export default async function ProcessosPage({ searchParams }: PageProps) {
         {totalPages > 1 && (
           <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
             <p className="text-sm text-gray-500">
-              Pagina {page} de {totalPages}
+              Pagina {page} de {totalPages} ({total} registros)
             </p>
             <div className="flex gap-2">
               {page > 1 && (

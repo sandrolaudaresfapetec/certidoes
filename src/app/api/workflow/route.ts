@@ -201,5 +201,47 @@ export async function POST(request: NextRequest) {
     await prisma.notification.createMany({ data: notificationsToCreate });
   }
 
+  // Auto-transition: analise_tecnica -> conferencia when parecer is attached
+  if (
+    toStatus === "analise_tecnica" &&
+    body.autoAdvance &&
+    body.observacoesTecnico
+  ) {
+    const conferentesAvailable = await prisma.user.findMany({
+      where: { role: "CONFERENTE", active: true },
+      select: { id: true },
+    });
+    if (conferentesAvailable.length > 0) {
+      const autoUpdated = await prisma.process.update({
+        where: { id: processId },
+        data: {
+          situacao: "conferencia",
+          observacoesTecnico: body.observacoesTecnico,
+          dtConf: new Date(),
+          tecnicoConfId: conferentesAvailable[0].id,
+        },
+      });
+      await prisma.workflowAction.create({
+        data: {
+          processId,
+          fromStatus: "analise_tecnica",
+          toStatus: "conferencia",
+          action: "Transicao automatica: parecer tecnico anexado",
+          userId: session.userId,
+        },
+      });
+      await prisma.notification.create({
+        data: {
+          type: "ANALISE_COMPLETA",
+          title: "Processo Pronto para Conferencia (automatico)",
+          message: notifMessage,
+          processId,
+          userId: conferentesAvailable[0].id,
+        },
+      });
+      return Response.json(autoUpdated);
+    }
+  }
+
   return Response.json(updated);
 }

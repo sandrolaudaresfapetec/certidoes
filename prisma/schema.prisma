@@ -60,6 +60,28 @@ model Process {
   codigoSigef       String?
   areaSigef         Float?
   statusSigef       String?
+  nomeFazenda       String?
+  matriculaSigef    String?
+  detentorSigef     String?
+  municipioSigef    String?
+  ufSigef           String?
+  representanteTecnico String?
+  dataRegistroSigef DateTime?
+  poligonoSigef     Json?
+  
+  // Document Validation (SDTC checklist)
+  docRequerimento   Boolean  @default(false)
+  docIdentidade     Boolean  @default(false)
+  docProcuracao     Boolean  @default(false)
+  docComprovante    Boolean  @default(false)
+  docPlanta         Boolean  @default(false)
+  docMatricula      Boolean  @default(false)
+  docArt            Boolean  @default(false)
+  docsValidados     Boolean  @default(false)
+  obsDocumentos     String?
+  
+  // Internal process number (generated after doc validation)
+  numeroProcessoInterno String?
   
   // Workflow Status
   situacao          String   @default("entrada_sdtc") // entrance stage

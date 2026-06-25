@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { LogIn, Shield, Loader2 } from "lucide-react";
@@ -19,17 +19,14 @@ const GOV_BR_ERRORS: Record<string, string> = {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const errorParam = searchParams.get("error");
+  const initialError = errorParam
+    ? GOV_BR_ERRORS[errorParam] || `Erro: ${errorParam}`
+    : "";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const errorParam = searchParams.get("error");
-    if (errorParam) {
-      setError(GOV_BR_ERRORS[errorParam] || `Erro: ${errorParam}`);
-    }
-  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
