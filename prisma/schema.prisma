@@ -155,6 +155,7 @@ model Notification {
   title       String
   message     String
   read        Boolean  @default(false)
+  whatsappSent Boolean @default(false)
   
   processId   String?
   process     Process? @relation(fields: [processId], references: [id])

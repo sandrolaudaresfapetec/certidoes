@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole, ROLE_LABELS } from "@/lib/auth";
 import type { UserRole } from "@/lib/auth";
-import { Users } from "lucide-react";
+import { Users, Phone } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,17 @@ export default async function UsuariosPage() {
     CLIENTE: "bg-green-100 text-green-700",
   };
 
+  function formatPhone(phone: string): string {
+    const d = phone.replace(/\D/g, "");
+    if (d.length === 11) {
+      return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+    }
+    if (d.length === 13 && d.startsWith("55")) {
+      return `+55 (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9)}`;
+    }
+    return phone;
+  }
+
   return (
     <div className="p-6 lg:p-8">
       <div className="mb-6">
@@ -51,6 +62,12 @@ export default async function UsuariosPage() {
               </th>
               <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase text-left">
                 Email
+              </th>
+              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase text-left">
+                <span className="flex items-center gap-1">
+                  <Phone className="h-3 w-3" />
+                  WhatsApp
+                </span>
               </th>
               <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase text-left">
                 Funcao
@@ -80,6 +97,16 @@ export default async function UsuariosPage() {
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {user.phone ? (
+                    <span className="flex items-center gap-1">
+                      <Phone className="h-3 w-3 text-green-600" />
+                      {formatPhone(user.phone)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 italic">Nao informado</span>
+                  )}
+                </td>
                 <td className="px-6 py-4">
                   <span
                     className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${roleColors[user.role] || "bg-gray-100 text-gray-700"}`}
@@ -104,7 +131,7 @@ export default async function UsuariosPage() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">
                   Nenhum usuario cadastrado. Use a rota /api/seed para criar dados iniciais.
                 </td>
               </tr>

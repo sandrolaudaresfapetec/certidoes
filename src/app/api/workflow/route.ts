@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { ALLOWED_TRANSITIONS, type WorkflowStage } from "@/lib/workflow";
+import { notifyUsersOnTransition } from "@/lib/whatsapp";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -199,6 +200,19 @@ export async function POST(request: NextRequest) {
 
   if (notificationsToCreate.length > 0) {
     await prisma.notification.createMany({ data: notificationsToCreate });
+
+    const whatsappUserIds = notificationsToCreate.map((n) => n.userId);
+    notifyUsersOnTransition({
+      userIds: whatsappUserIds,
+      processOrdem: updated.ordem,
+      expediente: updated.expediente,
+      interessado: updated.interessado,
+      fromStage: fromStatus,
+      toStage: toStatus as string,
+      prisma,
+    }).catch((err) =>
+      console.error("[WhatsApp] Erro ao notificar:", err)
+    );
   }
 
   // Auto-transition: analise_tecnica -> conferencia when parecer is attached

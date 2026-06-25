@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { ALLOWED_TRANSITIONS, type WorkflowStage } from "@/lib/workflow";
+import { notifyUsersOnTransition } from "@/lib/whatsapp";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -117,6 +118,43 @@ export async function POST(request: NextRequest) {
 
   const successCount = results.filter((r) => r.success).length;
   const failCount = results.filter((r) => !r.success).length;
+
+  const succeededProcs = processes.filter((p) =>
+    results.some((r) => r.id === p.id && r.success)
+  );
+  if (succeededProcs.length > 0) {
+    const roleMap: Record<string, string[]> = {
+      distribuicao_gdat: ["GERENTE", "ADMIN", "GDTAC"],
+      analise_tecnica: ["TECNICO"],
+      conferencia: ["CONFERENTE"],
+      assinatura_tecnico: ["TECNICO"],
+      assinatura_gerente: ["GERENTE"],
+      assinatura_diretor: ["DIRETOR"],
+      upload_sei: ["SDTC"],
+      finalizado: ["ADMIN", "GERENTE"],
+    };
+    const targetRoles = roleMap[toStatus as string] || [];
+    if (targetRoles.length > 0) {
+      const targetUsers = await prisma.user.findMany({
+        where: { role: { in: targetRoles }, active: true },
+        select: { id: true },
+      });
+      const userIds = targetUsers.map((u) => u.id);
+      for (const proc of succeededProcs) {
+        notifyUsersOnTransition({
+          userIds,
+          processOrdem: proc.ordem,
+          expediente: proc.expediente,
+          interessado: proc.interessado,
+          fromStage: proc.situacao,
+          toStage: toStatus as string,
+          prisma,
+        }).catch((err) =>
+          console.error("[WhatsApp] Erro batch:", err)
+        );
+      }
+    }
+  }
 
   return Response.json({
     total: results.length,
