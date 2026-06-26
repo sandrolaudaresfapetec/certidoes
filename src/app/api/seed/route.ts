@@ -291,9 +291,75 @@ export async function POST() {
     }
   }
 
+  // Sample Solicitacoes
+  const existingSolicitacoes = await prisma.solicitacao.count();
+  let solicitacoesCreated = 0;
+  if (existingSolicitacoes === 0) {
+    const sampleSolicitacoes = [
+      {
+        tipoServico: "Certidao",
+        interessado: "Jose da Silva",
+        email: "jose@email.com",
+        telefone: "11999990010",
+        cpfCnpj: "123.456.789-00",
+        tipo: "Comum-CPF",
+        municipio: "Sao Paulo",
+        ra: "RA-1",
+        codigoSigef: "35-23-0285-000012-3",
+        areaSigef: 125.5,
+        statusSigef: "Certificado",
+        nomeFazenda: "Fazenda Boa Vista",
+        matriculaSigef: "MAT-2026-001",
+        detentorSigef: "Jose da Silva",
+        municipioSigef: "Sao Paulo",
+        ufSigef: "SP",
+        representanteTecnico: "Eng. Paulo Ribeiro",
+        docRequerimento: true,
+        docIdentidade: true,
+        docProcuracao: false,
+        docComprovante: true,
+        docPlanta: true,
+        docMatricula: true,
+        docArt: true,
+        arquivoGeo: "parcela_35230285_001.shp",
+        status: "pendente",
+        clienteId: users[9].id,
+      },
+      {
+        tipoServico: "Informacao",
+        interessado: "Jose da Silva",
+        email: "jose@email.com",
+        telefone: "11999990010",
+        cpfCnpj: "123.456.789-00",
+        tipo: "Comum-CPF",
+        municipio: "Campinas",
+        codigoSigef: "35-23-0285-000045-7",
+        areaSigef: 50.2,
+        statusSigef: "Certificado",
+        nomeFazenda: "Sitio Santa Maria",
+        municipioSigef: "Campinas",
+        ufSigef: "SP",
+        docRequerimento: true,
+        docIdentidade: true,
+        docComprovante: false,
+        docPlanta: false,
+        docMatricula: false,
+        status: "devolvida",
+        observacaoSDTC: "Faltam comprovante de pagamento, planta e matricula do imovel.",
+        clienteId: users[9].id,
+      },
+    ];
+
+    for (const sol of sampleSolicitacoes) {
+      await prisma.solicitacao.create({ data: sol });
+      solicitacoesCreated++;
+    }
+  }
+
   return NextResponse.json({
     message: "Seed completed. Default password: igc2026",
     users: users.length,
     processes: existingCount === 0 ? sampleProcesses.length : 0,
+    solicitacoes: solicitacoesCreated,
   });
 }

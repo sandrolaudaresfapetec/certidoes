@@ -9,13 +9,184 @@ import {
   AlertTriangle,
   ArrowRight,
   TrendingUp,
+  ClipboardList,
+  PlusCircle,
+  Send,
+  RotateCcw,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
+const SOLICITACAO_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  pendente: { label: "Pendente", color: "text-yellow-700", bg: "bg-yellow-50" },
+  em_analise: { label: "Em Analise", color: "text-blue-700", bg: "bg-blue-50" },
+  aprovada: { label: "Aprovada", color: "text-green-700", bg: "bg-green-50" },
+  devolvida: { label: "Devolvida", color: "text-orange-700", bg: "bg-orange-50" },
+  rejeitada: { label: "Rejeitada", color: "text-red-700", bg: "bg-red-50" },
+};
+
 export default async function DashboardPage() {
   const user = await requireAuth();
-  const filter = getProcessFilter(user.id, user.role);
+
+  if (user.role === "CLIENTE") {
+    return <ClienteDashboard userId={user.id} userName={user.name} />;
+  }
+
+  return <InternalDashboard userId={user.id} role={user.role} />;
+}
+
+async function ClienteDashboard({ userId, userName }: { userId: string; userName: string }) {
+  const [
+    solicitacoes,
+    totalSolicitacoes,
+    pendentes,
+    emAnalise,
+    aprovadas,
+    devolvidas,
+  ] = await Promise.all([
+    prisma.solicitacao.findMany({
+      where: { clienteId: userId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
+    prisma.solicitacao.count({ where: { clienteId: userId } }),
+    prisma.solicitacao.count({ where: { clienteId: userId, status: "pendente" } }),
+    prisma.solicitacao.count({ where: { clienteId: userId, status: "em_analise" } }),
+    prisma.solicitacao.count({ where: { clienteId: userId, status: "aprovada" } }),
+    prisma.solicitacao.count({ where: { clienteId: userId, status: "devolvida" } }),
+  ]);
+
+  return (
+    <div className="p-6 lg:p-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-800">
+          Bem-vindo, {userName}
+        </h1>
+        <p className="text-gray-500 mt-1">
+          Acompanhe suas solicitacoes de certidao junto ao IGC SP
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        <StatCard
+          title="Total de Solicitacoes"
+          value={totalSolicitacoes}
+          icon={<ClipboardList className="h-6 w-6 text-gray-600" />}
+          bgColor="bg-blue-50"
+        />
+        <StatCard
+          title="Pendentes"
+          value={pendentes}
+          icon={<Clock className="h-6 w-6 text-yellow-600" />}
+          bgColor="bg-yellow-50"
+        />
+        <StatCard
+          title="Aprovadas"
+          value={aprovadas}
+          icon={<CheckCircle className="h-6 w-6 text-green-600" />}
+          bgColor="bg-green-50"
+        />
+        <StatCard
+          title="Devolvidas"
+          value={devolvidas}
+          icon={<RotateCcw className="h-6 w-6 text-orange-600" />}
+          bgColor="bg-orange-50"
+        />
+      </div>
+
+      {totalSolicitacoes === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <Send className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-gray-700 mb-2">
+            Nenhuma solicitacao ainda
+          </h2>
+          <p className="text-gray-500 mb-6 max-w-md mx-auto">
+            Para solicitar uma certidao cartografica, preencha o formulario com
+            seus dados pessoais e as informacoes do imovel (arquivo georreferenciado SIGEF).
+          </p>
+          <Link
+            href="/solicitacoes/nova"
+            className="inline-flex items-center gap-2 bg-gray-700 text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+          >
+            <PlusCircle className="h-5 w-5" />
+            Nova Solicitacao
+          </Link>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-800">
+              Minhas Solicitacoes
+            </h2>
+            <Link
+              href="/solicitacoes"
+              className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+            >
+              Ver Todas <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100 text-left">
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                    Servico
+                  </th>
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                    Municipio
+                  </th>
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                    Data
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {solicitacoes.map((sol) => {
+                  const statusConfig = SOLICITACAO_STATUS_LABELS[sol.status] || {
+                    label: sol.status,
+                    color: "text-gray-700",
+                    bg: "bg-gray-50",
+                  };
+                  return (
+                    <tr key={sol.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-3 text-sm font-medium text-gray-900">
+                        <Link
+                          href={`/solicitacoes/${sol.id}`}
+                          className="text-gray-700 hover:underline"
+                        >
+                          {sol.tipoServico}
+                        </Link>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-700">
+                        {sol.municipio || sol.municipioSigef || "-"}
+                      </td>
+                      <td className="px-6 py-3">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}
+                        >
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-500">
+                        {sol.createdAt.toLocaleDateString("pt-BR")}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+async function InternalDashboard({ userId, role }: { userId: string; role: string }) {
+  const filter = getProcessFilter(userId, role);
 
   const [
     totalProcessos,
@@ -50,6 +221,11 @@ export default async function DashboardPage() {
   processosPorSituacao.forEach((item) => {
     situacaoMap[item.situacao] = item._count.situacao;
   });
+
+  // For SDTC, also show pending solicitacoes count
+  const pendingSolicitacoes = ["ADMIN", "SDTC"].includes(role)
+    ? await prisma.solicitacao.count({ where: { status: { in: ["pendente", "em_analise"] } } })
+    : 0;
 
   return (
     <div className="p-6 lg:p-8">
@@ -86,6 +262,29 @@ export default async function DashboardPage() {
           bgColor="bg-orange-50"
         />
       </div>
+
+      {/* Pending solicitacoes alert for SDTC/ADMIN */}
+      {pendingSolicitacoes > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ClipboardList className="h-5 w-5 text-amber-600" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">
+                {pendingSolicitacoes} solicitacao(oes) aguardando analise
+              </p>
+              <p className="text-xs text-amber-600">
+                Clientes enviaram solicitacoes que precisam de verificacao documental
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/solicitacoes"
+            className="text-sm font-medium text-amber-700 hover:text-amber-900 flex items-center gap-1"
+          >
+            Ver Solicitacoes <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
         <div className="flex items-center justify-between mb-4">

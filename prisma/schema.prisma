@@ -24,6 +24,7 @@ model User {
   processesConference   Process[]      @relation("TecnicoConferencia")
   processesCreated      Process[]      @relation("CriadoPor")
   processesClient       Process[]      @relation("ClienteProcesso")
+  solicitacoes          Solicitacao[]   @relation("ClienteSolicitacao")
   notifications         Notification[]
   workflowActions       WorkflowAction[]
 }
@@ -145,8 +146,66 @@ model Process {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   
+  solicitacao       Solicitacao?
   notifications     Notification[]
   workflowActions   WorkflowAction[]
+}
+
+model Solicitacao {
+  id                String   @id @default(cuid())
+
+  // Status: pendente, em_analise, aprovada, devolvida, rejeitada
+  status            String   @default("pendente")
+
+  // Service type requested
+  tipoServico       String
+
+  // Client data
+  interessado       String
+  email             String?
+  telefone          String?
+  cpfCnpj           String?
+  tipo              String   // Comum-CPF, Comum-CNPJ, Orgao-Publico, Justica, idoso
+  dtNascimentoIdoso DateTime?
+
+  // Location
+  municipio         String?
+  ra                String?
+
+  // SIGEF data
+  codigoSigef       String?
+  areaSigef         Float?
+  statusSigef       String?
+  nomeFazenda       String?
+  matriculaSigef    String?
+  detentorSigef     String?
+  municipioSigef    String?
+  ufSigef           String?
+  representanteTecnico String?
+
+  // Document checklist (client uploads)
+  docRequerimento   Boolean  @default(false)
+  docIdentidade     Boolean  @default(false)
+  docProcuracao     Boolean  @default(false)
+  docComprovante    Boolean  @default(false)
+  docPlanta         Boolean  @default(false)
+  docMatricula      Boolean  @default(false)
+  docArt            Boolean  @default(false)
+  arquivoGeo        String?  // georeferenced file name/path
+
+  // SDTC review notes
+  observacaoSDTC    String?
+
+  // Relations
+  clienteId         String
+  cliente           User     @relation("ClienteSolicitacao", fields: [clienteId], references: [id])
+
+  // Converted process reference
+  processId         String?  @unique
+  process           Process? @relation(fields: [processId], references: [id])
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Notification {

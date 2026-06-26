@@ -15,6 +15,7 @@ import {
   LogOut,
   GitBranch,
   MapPin,
+  ClipboardList,
 } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -35,10 +36,20 @@ interface NavItem {
   roles?: string[];
 }
 
+const INTERNAL_ROLES = ["ADMIN", "GERENTE", "DIRETOR", "TECNICO", "CONFERENTE", "SDTC", "GDTAC"];
+
 const navigation: NavItem[] = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Processos", href: "/processos", icon: FileText },
-  { name: "Quadro", href: "/quadro", icon: Columns3 },
+  { name: "Minhas Solicitacoes", href: "/solicitacoes", icon: ClipboardList, roles: ["CLIENTE"] },
+  {
+    name: "Nova Solicitacao",
+    href: "/solicitacoes/nova",
+    icon: PlusCircle,
+    roles: ["CLIENTE"],
+  },
+  { name: "Processos", href: "/processos", icon: FileText, roles: INTERNAL_ROLES },
+  { name: "Solicitacoes", href: "/solicitacoes", icon: ClipboardList, roles: ["ADMIN", "SDTC"] },
+  { name: "Quadro", href: "/quadro", icon: Columns3, roles: INTERNAL_ROLES },
   {
     name: "Novo Processo",
     href: "/processos/novo",
@@ -46,7 +57,7 @@ const navigation: NavItem[] = [
     roles: ["ADMIN", "SDTC"],
   },
   { name: "Notificacoes", href: "/notificacoes", icon: Bell },
-  { name: "Fluxo", href: "/fluxo", icon: GitBranch },
+  { name: "Fluxo", href: "/fluxo", icon: GitBranch, roles: INTERNAL_ROLES },
   { name: "SIGEF", href: "/sigef", icon: MapPin, roles: ["ADMIN", "SDTC", "GDTAC", "TECNICO", "GERENTE", "DIRETOR"] },
   {
     name: "Usuarios",
