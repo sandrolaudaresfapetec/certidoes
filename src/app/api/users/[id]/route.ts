@@ -1,11 +1,25 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 import bcrypt from "bcryptjs";
+
+async function requireAdmin() {
+  const session = await getSession();
+  if (!session || session.role !== "ADMIN") {
+    return false;
+  }
+  return true;
+}
 
 export async function PATCH(
   request: NextRequest,
   ctx: RouteContext<"/api/users/[id]">
 ) {
+  const isAdmin = await requireAdmin();
+  if (!isAdmin) {
+    return Response.json({ error: "Acesso negado" }, { status: 403 });
+  }
+
   const { id } = await ctx.params;
   const body = await request.json();
 
@@ -43,6 +57,11 @@ export async function DELETE(
   _request: NextRequest,
   ctx: RouteContext<"/api/users/[id]">
 ) {
+  const isAdmin = await requireAdmin();
+  if (!isAdmin) {
+    return Response.json({ error: "Acesso negado" }, { status: 403 });
+  }
+
   const { id } = await ctx.params;
 
   await prisma.user.update({

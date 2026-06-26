@@ -1,8 +1,21 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 import bcrypt from "bcryptjs";
 
+async function requireAdmin() {
+  const session = await getSession();
+  if (!session || session.role !== "ADMIN") {
+    return false;
+  }
+  return true;
+}
+
 export async function GET(request: NextRequest) {
+  const isAdmin = await requireAdmin();
+  if (!isAdmin) {
+    return Response.json({ error: "Acesso negado" }, { status: 403 });
+  }
   const role = request.nextUrl.searchParams.get("role");
   const where: Record<string, unknown> = {};
   if (role) where.role = role;
@@ -27,6 +40,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const isAdmin = await requireAdmin();
+  if (!isAdmin) {
+    return Response.json({ error: "Acesso negado" }, { status: 403 });
+  }
   const body = await request.json();
   const { name, email, password, role, department, cpf, phone } = body;
 
