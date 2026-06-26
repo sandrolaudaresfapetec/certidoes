@@ -113,7 +113,7 @@ export default function SolicitacaoDetailPage({
         setObservacao(solData.observacaoSDTC || "");
         if (meRes.ok) {
           const meData = await meRes.json();
-          setUserRole(meData.role);
+          setUserRole(meData.user?.role || "");
         }
       } catch {
         setError("Erro ao carregar dados");
