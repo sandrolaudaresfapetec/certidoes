@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export async function POST() {
+  try {
   const defaultPassword = await bcrypt.hash("igc2026", 10);
 
   const users = await Promise.all([
@@ -362,4 +363,9 @@ export async function POST() {
     processes: existingCount === 0 ? sampleProcesses.length : 0,
     solicitacoes: solicitacoesCreated,
   });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    return NextResponse.json({ error: message, stack }, { status: 500 });
+  }
 }
