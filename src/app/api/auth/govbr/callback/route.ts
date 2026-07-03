@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userInfo = await userInfoRes.json();
-    const cpf = userInfo.sub;
+    const cpf = userInfo.preferred_username || userInfo.sub;
     const name =
       userInfo.name || userInfo.preferred_username || "Cliente Gov.br";
     const email = userInfo.email || `${cpf}@govbr.user`;
