@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   "/api/auth/govbr",
   "/api/auth/govbr/callback",
   "/api/seed",
+  "/api/health",
   "/fluxo-interativo.html",
 ];
 
