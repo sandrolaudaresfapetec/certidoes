@@ -13,21 +13,11 @@ export async function GET() {
   let dbError = null;
 
   try {
-    const { PrismaPg } = await import("@prisma/adapter-pg");
     const { PrismaClient } = await import("@prisma/client");
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      dbStatus = "no DATABASE_URL";
-    } else {
-      const adapter = new PrismaPg({
-        connectionString,
-        ssl: { rejectUnauthorized: false },
-      });
-      const prisma = new PrismaClient({ adapter });
-      const result = await prisma.$queryRawUnsafe("SELECT 1 as ok");
-      dbStatus = "connected";
-      await prisma.$disconnect();
-    }
+    const prisma = new PrismaClient();
+    const result = await prisma.$queryRawUnsafe("SELECT 1 as ok");
+    dbStatus = "connected";
+    await prisma.$disconnect();
   } catch (error: unknown) {
     dbStatus = "error";
     dbError = error instanceof Error ? error.message : String(error);

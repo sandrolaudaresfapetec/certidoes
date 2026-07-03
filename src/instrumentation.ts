@@ -1,8 +1,5 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    // Allow RDS self-signed certificates
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
     try {
       const fs = await import("fs");
       const path = await import("path");
