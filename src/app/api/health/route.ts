@@ -24,7 +24,7 @@ export async function GET() {
         connectionString,
         ssl: { rejectUnauthorized: false },
       });
-      const adapter = new PrismaPg({ pool });
+      const adapter = new PrismaPg(pool);
       const prisma = new PrismaClient({ adapter });
       const result = await prisma.$queryRawUnsafe("SELECT 1 as ok");
       dbStatus = "connected";
