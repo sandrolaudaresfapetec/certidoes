@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: clientId,
-    scope: "openid email profile govbr_confiabilidades",
+    scope: "openid email profile",
     redirect_uri: redirectUri,
     nonce,
     state,
