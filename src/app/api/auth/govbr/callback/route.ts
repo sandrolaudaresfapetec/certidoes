@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const state = request.nextUrl.searchParams.get("state");
   const error = request.nextUrl.searchParams.get("error");
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+  const baseUrl = (process.env.GOVBR_REDIRECT_URI || "").replace(/\/api\/auth\/govbr\/callback$/, "") || request.nextUrl.origin;
 
   if (error || !code) {
     return Response.redirect(
