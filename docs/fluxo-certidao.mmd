@@ -1,0 +1,76 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px', 'primaryColor': '#e3f2fd', 'primaryTextColor': '#1a237e', 'primaryBorderColor': '#1565c0', 'lineColor': '#37474f', 'secondaryColor': '#f3e5f5', 'tertiaryColor': '#e8f5e9'}}}%%
+flowchart TD
+    subgraph CLIENTE["🏢 CLIENTE / SEI"]
+        A["📋 Abertura do processo no SEI\n• Requerimento\n• Documentos pessoais\n• Planta/croqui"]
+    end
+
+    subgraph SDTC["📁 SDTC — Seção de Documentação Técnica"]
+        B["① ENTRADA SDTC\n• Registro do processo\n• Número de ordem\n• Verificação de documentos\n• Classificação: tipo serviço / cliente\n• Dados: município, expediente SEI"]
+    end
+
+    subgraph GDAT["👔 GDAT — Gerência de Divisas"]
+        C["② DISTRIBUIÇÃO GDAT\n• Gerente analisa o processo\n• Designa técnico responsável\n• Define prioridade (Idoso = urgente)\n• Atribui base cartográfica\n  (10k, 50k, MDT 2023, Ortomosaico)"]
+    end
+
+    subgraph TECNICO["🔧 TÉCNICO"]
+        D["③ ANÁLISE TÉCNICA\n\nGabinete:\n• Análise de imagens aéreas (QGIS)\n• Verificação de limites municipais\n• Consulta MapServer\n• Elaboração de parecer técnico\n\nCampo (se necessário):\n• Vistoria in loco\n• Levantamento topográfico"]
+    end
+
+    subgraph CONFERENTE["🔍 CONFERENTE"]
+        E["④ CONFERÊNCIA\n• Revisão do trabalho técnico\n• Validação de cálculos e medições\n• Verificação de conformidade"]
+    end
+
+    subgraph ASSINATURAS["✍️ CADEIA DE ASSINATURAS"]
+        F["⑤ ASSINATURA TÉCNICO\nTécnico assina o\ndocumento técnico"]
+        G["⑥ ASSINATURA GERENTE\nGerente revisa e\nassina"]
+        H["⑦ ASSINATURA DIRETOR\nDiretor aprova e\nassina final"]
+        F --> G --> H
+    end
+
+    subgraph SAIDA["📤 SAÍDA / EMISSÃO"]
+        I["⑧ UPLOAD SEI\n• Upload da certidão no SEI\n• Número de saída IGC gerado\n• Notificação ao cliente"]
+        J["⑨ FINALIZADO\n✅ Certidão emitida\nProcesso concluído\nDisponível ao cliente via SEI"]
+        I --> J
+    end
+
+    subgraph ALTERNATIVOS["⚠️ FLUXOS ALTERNATIVOS"]
+        K["⏸️ SOBRESTADO\nProcesso suspenso\ntemporariamente"]
+        L["❌ CANCELADO\nMotivos: Duplicidade |\nPedido do cliente |\nAtribuição errada |\nCliente não responde"]
+    end
+
+    A ==> B
+    B ==>|"Docs OK"| C
+    C ==> D
+    D ==> E
+    E ==>|"Aprovado"| F
+    H ==> I
+
+    E -.->|"Reprovado\n(retrabalho)"| D
+    F -.->|"Devolver"| E
+    G -.->|"Devolver"| F
+    H -.->|"Devolver"| G
+
+    C -.->|"Suspender"| K
+    D -.->|"Suspender"| K
+    E -.->|"Suspender"| K
+
+    K -.->|"Retomar"| C
+    K -.->|"Retomar"| D
+
+    B -.->|"Cancelar"| L
+    C -.->|"Cancelar"| L
+    D -.->|"Cancelar"| L
+    E -.->|"Cancelar"| L
+
+    style A fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style B fill:#bbdefb,stroke:#1565c0,stroke-width:2px
+    style C fill:#c5cae9,stroke:#3949ab,stroke-width:2px
+    style D fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    style E fill:#ffe0b2,stroke:#ef6c00,stroke-width:2px
+    style F fill:#e1bee7,stroke:#8e24aa,stroke-width:2px
+    style G fill:#f8bbd0,stroke:#c2185b,stroke-width:2px
+    style H fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    style I fill:#b2dfdb,stroke:#00695c,stroke-width:2px
+    style J fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style K fill:#f5f5f5,stroke:#757575,stroke-width:2px,stroke-dasharray: 5 5
+    style L fill:#ffebee,stroke:#b71c1c,stroke-width:2px,stroke-dasharray: 5 5

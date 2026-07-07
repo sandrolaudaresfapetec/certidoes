@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 import { WORKFLOW_STAGES, ALLOWED_TRANSITIONS, type WorkflowStage } from "@/lib/workflow";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, User, FileText, MapPin } from "lucide-react";
+import { ArrowLeft, Clock, User, FileText, MapPin, Shield, CheckSquare } from "lucide-react";
 import { WorkflowActions } from "@/components/workflow-actions";
+import { DocValidation } from "@/components/doc-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,7 @@ interface PageProps {
 }
 
 export default async function ProcessoDetailPage({ params }: PageProps) {
+  const currentUser = await requireAuth();
   const { id } = await params;
 
   const processo = await prisma.process.findUnique({
@@ -40,6 +43,8 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
     select: { id: true, name: true, role: true },
   });
 
+  const canValidateDocs = ["ADMIN", "SDTC"].includes(currentUser.role);
+
   return (
     <div className="p-8">
       <div className="mb-6">
@@ -63,6 +68,11 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
           {processo.tipo === "idoso" && (
             <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-medium">
               Prioridade Idoso
+            </span>
+          )}
+          {processo.docsValidados && (
+            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+              <CheckSquare className="h-3 w-3" /> Docs OK
             </span>
           )}
         </div>
@@ -129,6 +139,28 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
               <InfoField label="Dificuldade de Divisa" value={processo.divisaDificuldade} />
             </div>
           </div>
+
+          {/* SIGEF Data */}
+          {(processo.codigoSigef || processo.matriculaSigef || processo.nomeFazenda) && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Shield className="h-5 w-5 text-gray-400" />
+                Dados SIGEF/INCRA
+              </h2>
+              <div className="grid grid-cols-2 gap-4">
+                <InfoField label="Codigo Parcela SIGEF" value={processo.codigoSigef} />
+                <InfoField label="Status SIGEF" value={processo.statusSigef} />
+                <InfoField label="Area (ha)" value={processo.areaSigef ? `${processo.areaSigef} ha` : null} />
+                <InfoField label="Matricula" value={processo.matriculaSigef} />
+                <InfoField label="Detentor" value={processo.detentorSigef} />
+                <InfoField label="Municipio SIGEF" value={processo.municipioSigef} />
+                <InfoField label="UF SIGEF" value={processo.ufSigef} />
+                <InfoField label="Nome da Fazenda" value={processo.nomeFazenda} />
+                <InfoField label="Representante Tecnico" value={processo.representanteTecnico} />
+                <InfoField label="Data Registro SIGEF" value={formatDate(processo.dataRegistroSigef)} />
+              </div>
+            </div>
+          )}
 
           {/* Technical Work */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -228,7 +260,7 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Sidebar - Workflow Actions */}
+        {/* Sidebar */}
         <div className="space-y-6">
           <WorkflowActions
             processId={processo.id}
@@ -236,6 +268,35 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
             allowedTransitions={allowedNext}
             users={users}
           />
+
+          {/* Document Validation (SDTC only) */}
+          {canValidateDocs && processo.situacao === "entrada_sdtc" && (
+            <DocValidation
+              processId={processo.id}
+              docRequerimento={processo.docRequerimento}
+              docIdentidade={processo.docIdentidade}
+              docProcuracao={processo.docProcuracao}
+              docComprovante={processo.docComprovante}
+              docPlanta={processo.docPlanta}
+              docMatricula={processo.docMatricula}
+              docArt={processo.docArt}
+              docsValidados={processo.docsValidados}
+              obsDocumentos={processo.obsDocumentos}
+            />
+          )}
+
+          {/* Doc validation status (read-only for non-SDTC) */}
+          {!canValidateDocs && processo.docsValidados && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <CheckSquare className="h-4 w-4 text-green-600" />
+                Documentacao Validada
+              </h2>
+              <p className="text-xs text-green-700">
+                Todos os documentos obrigatorios foram verificados pelo SDTC.
+              </p>
+            </div>
+          )}
 
           {/* Financial */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/sidebar";
+import { AuthProvider } from "@/components/auth-provider";
+import { AppShell } from "@/components/app-shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sistema de Certidoes IGC SP",
-  description: "Sistema de gestao de processos e certidoes do IGC SP",
+  title: "Sistema de Certidoes - IGC SP",
+  description:
+    "Sistema de gestao de processos e certidoes do Instituto Geografico e Cartografico de Sao Paulo",
 };
 
 export default function RootLayout({
@@ -28,11 +30,10 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex">
-        <Sidebar />
-        <main className="flex-1 ml-64 bg-gray-50 min-h-screen">
-          {children}
-        </main>
+      <body className="min-h-full">
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

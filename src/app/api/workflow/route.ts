@@ -1,14 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 import { ALLOWED_TRANSITIONS, type WorkflowStage } from "@/lib/workflow";
+import { notifyUsersOnTransition } from "@/lib/whatsapp";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { processId, toStatus, userId, action } = body;
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "Nao autenticado" }, { status: 401 });
+  }
 
-  if (!processId || !toStatus || !userId) {
-    return NextResponse.json(
-      { error: "processId, toStatus e userId sao obrigatorios" },
+  const body = await request.json();
+  const { processId, toStatus, action } = body;
+
+  if (!processId || !toStatus) {
+    return Response.json(
+      { error: "processId e toStatus sao obrigatorios" },
       { status: 400 }
     );
   }
@@ -18,7 +25,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (!processo) {
-    return NextResponse.json(
+    return Response.json(
       { error: "Processo nao encontrado" },
       { status: 404 }
     );
@@ -28,7 +35,7 @@ export async function POST(request: NextRequest) {
   const allowedNext = ALLOWED_TRANSITIONS[fromStatus] || [];
 
   if (!allowedNext.includes(toStatus as WorkflowStage)) {
-    return NextResponse.json(
+    return Response.json(
       {
         error: `Transicao de ${fromStatus} para ${toStatus} nao permitida`,
         allowedTransitions: allowedNext,
@@ -41,7 +48,6 @@ export async function POST(request: NextRequest) {
     situacao: toStatus,
   };
 
-  // Auto-populate dates based on transitions
   const now = new Date();
   switch (toStatus) {
     case "assinatura_tecnico":
@@ -67,9 +73,15 @@ export async function POST(request: NextRequest) {
       break;
   }
 
-  // If coming back from sobrestado, record end date
   if (fromStatus === "sobrestado") {
     updateData.dtFimSobrestado = now;
+  }
+
+  if (body.tecnicoRespId) {
+    updateData.tecnicoRespId = body.tecnicoRespId;
+  }
+  if (body.tecnicoConfId) {
+    updateData.tecnicoConfId = body.tecnicoConfId;
   }
 
   const [updated] = await prisma.$transaction([
@@ -87,12 +99,11 @@ export async function POST(request: NextRequest) {
         fromStatus,
         toStatus,
         action: action || `Processo movido de ${fromStatus} para ${toStatus}`,
-        userId,
+        userId: session.userId,
       },
     }),
   ]);
 
-  // Create notifications based on transition
   const notificationsToCreate: Array<{
     type: string;
     title: string;
@@ -105,7 +116,7 @@ export async function POST(request: NextRequest) {
 
   if (toStatus === "distribuicao_gdat") {
     const managers = await prisma.user.findMany({
-      where: { role: { in: ["GERENTE", "ADMIN"] } },
+      where: { role: { in: ["GERENTE", "ADMIN", "GDTAC"] }, active: true },
     });
     managers.forEach((m) => {
       notificationsToCreate.push({
@@ -149,7 +160,7 @@ export async function POST(request: NextRequest) {
       assinatura_diretor: "DIRETOR",
     };
     const signers = await prisma.user.findMany({
-      where: { role: roleMap[toStatus] },
+      where: { role: roleMap[toStatus], active: true },
     });
     signers.forEach((s) => {
       notificationsToCreate.push({
@@ -164,7 +175,7 @@ export async function POST(request: NextRequest) {
 
   if (toStatus === "finalizado") {
     const admins = await prisma.user.findMany({
-      where: { role: { in: ["ADMIN", "GERENTE"] } },
+      where: { role: { in: ["ADMIN", "GERENTE"] }, active: true },
     });
     admins.forEach((a) => {
       notificationsToCreate.push({
@@ -175,11 +186,76 @@ export async function POST(request: NextRequest) {
         userId: a.id,
       });
     });
+
+    if (updated.clienteId) {
+      notificationsToCreate.push({
+        type: "PROCESSO_CONCLUIDO",
+        title: "Sua Certidao foi Emitida",
+        message: notifMessage,
+        processId,
+        userId: updated.clienteId,
+      });
+    }
   }
 
   if (notificationsToCreate.length > 0) {
     await prisma.notification.createMany({ data: notificationsToCreate });
+
+    const whatsappUserIds = notificationsToCreate.map((n) => n.userId);
+    notifyUsersOnTransition({
+      userIds: whatsappUserIds,
+      processOrdem: updated.ordem,
+      expediente: updated.expediente,
+      interessado: updated.interessado,
+      fromStage: fromStatus,
+      toStage: toStatus as string,
+      prisma,
+    }).catch((err) =>
+      console.error("[WhatsApp] Erro ao notificar:", err)
+    );
   }
 
-  return NextResponse.json(updated);
+  // Auto-transition: analise_tecnica -> conferencia when parecer is attached
+  if (
+    toStatus === "analise_tecnica" &&
+    body.autoAdvance &&
+    body.observacoesTecnico
+  ) {
+    const conferentesAvailable = await prisma.user.findMany({
+      where: { role: "CONFERENTE", active: true },
+      select: { id: true },
+    });
+    if (conferentesAvailable.length > 0) {
+      const autoUpdated = await prisma.process.update({
+        where: { id: processId },
+        data: {
+          situacao: "conferencia",
+          observacoesTecnico: body.observacoesTecnico,
+          dtConf: new Date(),
+          tecnicoConfId: conferentesAvailable[0].id,
+        },
+      });
+      await prisma.workflowAction.create({
+        data: {
+          processId,
+          fromStatus: "analise_tecnica",
+          toStatus: "conferencia",
+          action: "Transicao automatica: parecer tecnico anexado",
+          userId: session.userId,
+        },
+      });
+      await prisma.notification.create({
+        data: {
+          type: "ANALISE_COMPLETA",
+          title: "Processo Pronto para Conferencia (automatico)",
+          message: notifMessage,
+          processId,
+          userId: conferentesAvailable[0].id,
+        },
+      });
+      return Response.json(autoUpdated);
+    }
+  }
+
+  return Response.json(updated);
 }

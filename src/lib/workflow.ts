@@ -209,4 +209,8 @@ export const NOTIFICATION_TYPES = {
     label: "Transicao de Etapa",
     description: "Processo movido para nova etapa",
   },
+  WHATSAPP_ENVIADO: {
+    label: "WhatsApp Enviado",
+    description: "Notificacao enviada via WhatsApp",
+  },
 } as const;

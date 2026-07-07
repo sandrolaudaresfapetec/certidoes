@@ -1,91 +1,133 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 export async function POST() {
-  // Create users
+  try {
+  const defaultPassword = await bcrypt.hash("igc2026", 10);
+
   const users = await Promise.all([
     prisma.user.upsert({
       where: { email: "admin@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword, phone: "31998085422" },
       create: {
         name: "Administrador",
         email: "admin@igc.sp.gov.br",
         role: "ADMIN",
         department: "CATDT",
+        phone: "31998085422",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "gerente@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword, phone: "31998085422" },
       create: {
         name: "Carlos Silva",
         email: "gerente@igc.sp.gov.br",
         role: "GERENTE",
         department: "CATDT",
+        phone: "31998085422",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "diretor@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword, phone: "31998085422" },
       create: {
         name: "Roberto Santos",
         email: "diretor@igc.sp.gov.br",
         role: "DIRETOR",
+        phone: "31998085422",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "thiago@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword, phone: "31998085422" },
       create: {
         name: "Thiago Barrocal",
         email: "thiago@igc.sp.gov.br",
         role: "TECNICO",
         department: "CATDT",
+        phone: "31998085422",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "ana@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword, phone: "11999990005" },
       create: {
         name: "Ana Oliveira",
         email: "ana@igc.sp.gov.br",
         role: "TECNICO",
         department: "CATDT",
+        phone: "11999990005",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "marcos@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword, phone: "31998085422" },
       create: {
         name: "Marcos Pereira",
         email: "marcos@igc.sp.gov.br",
         role: "CONFERENTE",
         department: "CATDT",
+        phone: "31998085422",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "sdtc@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword, phone: "31998085422" },
       create: {
         name: "Maria SDTC",
         email: "sdtc@igc.sp.gov.br",
         role: "SDTC",
         department: "SDTC",
+        phone: "31998085422",
+        passwordHash: defaultPassword,
       },
     }),
     prisma.user.upsert({
       where: { email: "pedro@igc.sp.gov.br" },
-      update: {},
+      update: { passwordHash: defaultPassword, phone: "11999990008" },
       create: {
         name: "Pedro Costa",
         email: "pedro@igc.sp.gov.br",
         role: "TECNICO",
         department: "CG",
+        phone: "11999990008",
+        passwordHash: defaultPassword,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "gdtac@igc.sp.gov.br" },
+      update: { passwordHash: defaultPassword, phone: "31998085422" },
+      create: {
+        name: "Lucia GDTAC",
+        email: "gdtac@igc.sp.gov.br",
+        role: "GDTAC",
+        department: "GDTAC",
+        phone: "31998085422",
+        passwordHash: defaultPassword,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "cliente@email.com" },
+      update: { passwordHash: defaultPassword, phone: "11999990010" },
+      create: {
+        name: "Jose da Silva (Cliente)",
+        email: "cliente@email.com",
+        role: "CLIENTE",
+        cpf: "123.456.789-00",
+        phone: "11999990010",
+        passwordHash: defaultPassword,
       },
     }),
   ]);
 
-  // Create sample processes
   const sampleProcesses = [
     {
       ordem: 1,
@@ -103,6 +145,7 @@ export async function POST() {
       base: "10k",
       departamento: "CATDT",
       criadoPorId: users[6].id,
+      clienteId: users[9].id,
     },
     {
       ordem: 2,
@@ -249,9 +292,80 @@ export async function POST() {
     }
   }
 
+  // Sample Solicitacoes
+  const existingSolicitacoes = await prisma.solicitacao.count();
+  let solicitacoesCreated = 0;
+  if (existingSolicitacoes === 0) {
+    const sampleSolicitacoes = [
+      {
+        tipoServico: "Certidao",
+        interessado: "Jose da Silva",
+        email: "jose@email.com",
+        telefone: "11999990010",
+        cpfCnpj: "123.456.789-00",
+        tipo: "Comum-CPF",
+        municipio: "Sao Paulo",
+        ra: "RA-1",
+        codigoSigef: "35-23-0285-000012-3",
+        areaSigef: 125.5,
+        statusSigef: "Certificado",
+        nomeFazenda: "Fazenda Boa Vista",
+        matriculaSigef: "MAT-2026-001",
+        detentorSigef: "Jose da Silva",
+        municipioSigef: "Sao Paulo",
+        ufSigef: "SP",
+        representanteTecnico: "Eng. Paulo Ribeiro",
+        docRequerimento: true,
+        docIdentidade: true,
+        docProcuracao: false,
+        docComprovante: true,
+        docPlanta: true,
+        docMatricula: true,
+        docArt: true,
+        arquivoGeo: "parcela_35230285_001.shp",
+        status: "pendente",
+        clienteId: users[9].id,
+      },
+      {
+        tipoServico: "Informacao",
+        interessado: "Jose da Silva",
+        email: "jose@email.com",
+        telefone: "11999990010",
+        cpfCnpj: "123.456.789-00",
+        tipo: "Comum-CPF",
+        municipio: "Campinas",
+        codigoSigef: "35-23-0285-000045-7",
+        areaSigef: 50.2,
+        statusSigef: "Certificado",
+        nomeFazenda: "Sitio Santa Maria",
+        municipioSigef: "Campinas",
+        ufSigef: "SP",
+        docRequerimento: true,
+        docIdentidade: true,
+        docComprovante: false,
+        docPlanta: false,
+        docMatricula: false,
+        status: "devolvida",
+        observacaoSDTC: "Faltam comprovante de pagamento, planta e matricula do imovel.",
+        clienteId: users[9].id,
+      },
+    ];
+
+    for (const sol of sampleSolicitacoes) {
+      await prisma.solicitacao.create({ data: sol });
+      solicitacoesCreated++;
+    }
+  }
+
   return NextResponse.json({
-    message: "Seed completed",
+    message: "Seed completed. Default password: igc2026",
     users: users.length,
     processes: existingCount === 0 ? sampleProcesses.length : 0,
+    solicitacoes: solicitacoesCreated,
   });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    return NextResponse.json({ error: message, stack }, { status: 500 });
+  }
 }
