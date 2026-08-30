@@ -4,32 +4,18 @@ const { spawn } = require('node:child_process')
 
 const env = { ...process.env }
 
-;(async() => {
-  // If running the web server then migrate existing database
-  if (process.argv.slice(-3).join(' ') === 'npm run start') {
-
-    // prepare database
-    await exec('npx prisma migrate deploy')
-    await exec('npx next build --experimental-build-mode generate')
-  }
-
-  // launch application
-  if (process.env.BUCKET_NAME) {
-    await exec(`litestream replicate -config litestream.yml -exec ${JSON.stringify(process.argv.slice(2).join(' '))}`)
-  } else {
-    await exec(process.argv.slice(2).join(' '))
-  }
+// Migrations NAO rodam mais aqui — sao executadas pelo release_command do
+// fly.toml (VM de release descartavel, antes do deploy entrar no ar).
+// Para comandos pontuais (ex.: db push), use scripts/fly-db-push.sh.
+;(async () => {
+  await exec(process.argv.slice(2).join(' '))
 })()
 
 function exec(command) {
   const child = spawn(command, { shell: true, stdio: 'inherit', env })
   return new Promise((resolve, reject) => {
     child.on('exit', code => {
-      if (code === 0) {
-        resolve()
-      } else {
-        reject(new Error(`${command} failed rc=${code}`))
-      }
+      if (code === 0) { resolve() } else { reject(new Error(`${command} failed rc=${code}`)) }
     })
   })
 }

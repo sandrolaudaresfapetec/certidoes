@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { SERVICE_TYPES, CLIENT_TYPES, BASES, DEPARTMENTS } from "@/lib/workflow";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
+import SigefConsulta from "@/components/sigef-consulta";
 
 export default function NovoProcessoPage() {
   const router = useRouter();
@@ -164,6 +165,9 @@ export default function NovoProcessoPage() {
             </FormField>
           </div>
         </div>
+
+        {/* SIGEF/INCRA Integration */}
+        <SigefConsulta />
 
         {/* Location */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

@@ -78,6 +78,17 @@ export async function POST(request: NextRequest) {
       departamento: body.departamento,
       situacao: "entrada_sdtc",
       criadoPorId: body.criadoPorId,
+      // Dados da propriedade vindos da consulta ao SIGEF/INCRA
+      sigefCodigoImovel: body.sigefCodigoImovel || null,
+      sigefParcelaCodigo: body.sigefParcelaCodigo || null,
+      sigefAreaHectares: body.sigefAreaHectares
+        ? parseFloat(body.sigefAreaHectares)
+        : null,
+      sigefMunicipio: body.sigefMunicipio || null,
+      sigefUf: body.sigefUf || null,
+      sigefStatus: body.sigefStatus || null,
+      sigefOrigem: body.sigefOrigem || null,
+      sigefConsultadoEm: body.sigefCodigoImovel ? new Date() : null,
     },
     include: {
       tecnicoResp: { select: { id: true, name: true } },
