@@ -61,6 +61,8 @@ export default function GeometriaPage() {
   const selecaoRef = useRef<any>(null);
   const mostrarCarRef = useRef(false);
   const modoCliqueRef = useRef(false);
+  const pedidoBboxRef = useRef(0);
+  const pedidoPontoRef = useRef(0);
 
   useEffect(() => {
     if (!document.getElementById("leaflet-css")) {
@@ -105,10 +107,12 @@ export default function GeometriaPage() {
   async function atualizarCamadaCar() {
     const L = (window as any).L;
     const map = mapRef.current;
+    const pedido = ++pedidoBboxRef.current;
     if (!map || !mostrarCarRef.current) return;
     if (map.getZoom() < ZOOM_MIN_CAR) {
       carLayerRef.current?.clearLayers();
       setTotalCarVisivel(null);
+      setCarregandoCar(false);
       return;
     }
     const b = map.getBounds();
@@ -118,7 +122,7 @@ export default function GeometriaPage() {
       const res = await fetch(`/api/car/imoveis?bbox=${bbox}&limite=300`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Falha ao consultar o CAR");
-      if (!mostrarCarRef.current) return;
+      if (pedido !== pedidoBboxRef.current || !mostrarCarRef.current) return;
       const grupo = carLayerRef.current;
       grupo.clearLayers();
       (data.imoveis ?? []).forEach((imovel: any) => {
@@ -133,9 +137,9 @@ export default function GeometriaPage() {
       });
       setTotalCarVisivel((data.imoveis ?? []).length);
     } catch (e) {
-      setErro((e as Error).message);
+      if (pedido === pedidoBboxRef.current) setErro((e as Error).message);
     } finally {
-      setCarregandoCar(false);
+      if (pedido === pedidoBboxRef.current) setCarregandoCar(false);
     }
   }
 
@@ -158,6 +162,8 @@ export default function GeometriaPage() {
       carLayerRef.current.addTo(map);
       atualizarCamadaCar();
     } else {
+      pedidoBboxRef.current++;
+      setCarregandoCar(false);
       if (wmsRef.current) map.removeLayer(wmsRef.current);
       if (carLayerRef.current) {
         carLayerRef.current.clearLayers();
@@ -170,17 +176,19 @@ export default function GeometriaPage() {
   /** Clique no mapa: o WFS devolve a feicao que contem o ponto. */
   async function selecionarPorClique(lat: number, lon: number) {
     if (!modoCliqueRef.current) return;
+    const pedido = ++pedidoPontoRef.current;
     setCarregandoPonto(true);
     setErro(null);
     try {
       const res = await fetch(`/api/car/imoveis?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}`);
       const data = await res.json();
+      if (pedido !== pedidoPontoRef.current || !modoCliqueRef.current) return;
       if (!res.ok) throw new Error(data.error || "Falha ao consultar o CAR");
       usarImovel(data.imoveis[0], false);
     } catch (e) {
-      setErro((e as Error).message);
+      if (pedido === pedidoPontoRef.current) setErro((e as Error).message);
     } finally {
-      setCarregandoPonto(false);
+      if (pedido === pedidoPontoRef.current) setCarregandoPonto(false);
     }
   }
 
@@ -226,7 +234,6 @@ export default function GeometriaPage() {
   async function carregarCar(codigo?: string) {
     setCarregandoCar(true);
     setErro(null);
-    setCarInfo(null);
     try {
       const url = codigo && codigo.trim()
         ? `/api/car/imoveis?codigo=${encodeURIComponent(codigo.trim())}`
@@ -295,6 +302,7 @@ export default function GeometriaPage() {
                 onChange={(e) => {
                   setModoClique(e.target.checked);
                   modoCliqueRef.current = e.target.checked;
+                  if (!e.target.checked) pedidoPontoRef.current++;
                 }}
                 className="accent-orange-600"
               />

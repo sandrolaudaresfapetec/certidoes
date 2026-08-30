@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ fonte: FONTE, uf, imoveis });
   } catch (e) {
     const msg = (e as Error).message;
-    const status = msg.includes("Formato invalido") ? 400 : 502;
+    const status = /invalid[ao]/i.test(msg) ? 400 : 502;
     return NextResponse.json({ error: msg }, { status });
   }
 }

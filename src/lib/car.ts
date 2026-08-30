@@ -22,6 +22,25 @@ const CAR_WFS =
 
 const LAYER_PADRAO = "sicar:sicar_imoveis_sp";
 
+/** UFs com camada publicada no GeoServer do SICAR que o sistema consulta. */
+const UFS_SUPORTADAS = ["SP", "MG", "PR", "MS", "RJ", "GO"];
+
+/** Impede que uma UF arbitraria da querystring vire nome de camada no WFS. */
+function camada(uf: string): string {
+  const sigla = uf.trim().toUpperCase();
+  if (!UFS_SUPORTADAS.includes(sigla)) {
+    throw new Error(`UF invalida. Suportadas: ${UFS_SUPORTADAS.join(", ")}`);
+  }
+  return `sicar:sicar_imoveis_${sigla.toLowerCase()}`;
+}
+
+function coordenada(valor: number, limite: number, nome: string): number {
+  if (!Number.isFinite(valor) || Math.abs(valor) > limite) {
+    throw new Error(`${nome} invalido (esperado entre -${limite} e ${limite}).`);
+  }
+  return valor;
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function mapear(f: any): CarImovel {
   return {
@@ -63,7 +82,7 @@ export async function buscarImoveisCar(
   uf: string = "SP",
   quantidade: number = 2
 ): Promise<CarImovel[]> {
-  const layer = `sicar:sicar_imoveis_${uf.toLowerCase()}`;
+  const layer = camada(uf);
   const offset = Math.floor(Math.random() * 2000);
   const cql = encodeURIComponent(
     "status_imovel='AT' AND area >= 4 AND area <= 500"
@@ -92,11 +111,19 @@ export async function buscarImoveisPorBbox(
   limite: number = 250,
   uf: string = "SP"
 ): Promise<CarImovel[]> {
-  const layer = `sicar:sicar_imoveis_${uf.toLowerCase()}`;
+  const layer = camada(uf);
+  const oeste = coordenada(minLon, 180, "minLon");
+  const sul = coordenada(minLat, 90, "minLat");
+  const leste = coordenada(maxLon, 180, "maxLon");
+  const norte = coordenada(maxLat, 90, "maxLat");
+  if (oeste >= leste || sul >= norte) {
+    throw new Error("bbox invalido: minLon/minLat devem ser menores que maxLon/maxLat.");
+  }
+  const count = Math.min(Math.max(Math.trunc(limite) || 1, 1), 500);
   const url =
     `${CAR_WFS}?service=WFS&version=2.0.0&request=GetFeature` +
-    `&typeNames=${layer}&count=${limite}&outputFormat=application/json` +
-    `&bbox=${minLat},${minLon},${maxLat},${maxLon}`;
+    `&typeNames=${layer}&count=${count}&outputFormat=application/json` +
+    `&bbox=${sul},${oeste},${norte},${leste}`;
 
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`CAR WFS respondeu HTTP ${res.status}`);
@@ -110,9 +137,11 @@ export async function buscarImovelNoPonto(
   lat: number,
   uf: string = "SP"
 ): Promise<CarImovel | null> {
-  const layer = `sicar:sicar_imoveis_${uf.toLowerCase()}`;
+  const layer = camada(uf);
+  const x = coordenada(lon, 180, "lon");
+  const y = coordenada(lat, 90, "lat");
   const cql = encodeURIComponent(
-    `INTERSECTS(geo_area_imovel, POINT(${lat} ${lon}))`
+    `INTERSECTS(geo_area_imovel, POINT(${y} ${x}))`
   );
   const url =
     `${CAR_WFS}?service=WFS&version=2.0.0&request=GetFeature` +
