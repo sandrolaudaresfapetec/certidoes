@@ -1,5 +1,5 @@
-app = 'certidoes'
-primary_region = 'gru'
+app = 'certidoes-app'
+primary_region = 'iad'
 
 [build]
 
