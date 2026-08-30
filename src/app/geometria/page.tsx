@@ -40,6 +40,25 @@ function popupImovel(imovel: any) {
   );
 }
 
+function popupParcela(parcela: any) {
+  const linha = (rotulo: string, valor: string) =>
+    `<div style="display:flex;gap:6px"><span style="color:#6b7280">${rotulo}</span><b>${valor}</b></div>`;
+  const area = parcela.areaHa === null ? "—" : `${Number(parcela.areaHa).toLocaleString("pt-BR", { maximumFractionDigits: 4 })} ha`;
+  return (
+    `<div style="font-size:12px;line-height:1.5;min-width:230px">` +
+    `<div style="font-family:monospace;font-weight:700;margin-bottom:4px">${parcela.codigoParcela}</div>` +
+    linha("Area/imovel:", parcela.nomeArea || "—") +
+    linha("Municipio:", `${parcela.municipio || parcela.municipioIbge || "—"}/${parcela.uf}`) +
+    linha("Area:", area) +
+    linha("Situacao:", parcela.situacaoImovel || "—") +
+    linha("Status:", parcela.status || "—") +
+    linha("Resp. tecnico:", parcela.rt || "—") +
+    linha("ART:", parcela.art || "—") +
+    linha("Matricula:", parcela.matricula || "—") +
+    `<div style="color:#9ca3af;margin-top:4px">Fonte: SIGEF/INCRA (acervo importado)</div></div>`
+  );
+}
+
 export default function GeometriaPage() {
   const mapRef = useRef<any>(null);
   const layersRef = useRef<any[]>([]);
@@ -57,13 +76,20 @@ export default function GeometriaPage() {
   const [modoClique, setModoClique] = useState(false);
   const [carregandoPonto, setCarregandoPonto] = useState(false);
   const [totalCarVisivel, setTotalCarVisivel] = useState<number | null>(null);
+  const [mostrarSigef, setMostrarSigef] = useState(false);
+  const [carregandoSigef, setCarregandoSigef] = useState(false);
+  const [totalSigefVisivel, setTotalSigefVisivel] = useState<number | null>(null);
+  const [totalSigefImportado, setTotalSigefImportado] = useState<number | null>(null);
   const wmsRef = useRef<any>(null);
   const carLayerRef = useRef<any>(null);
+  const sigefLayerRef = useRef<any>(null);
   const selecaoRef = useRef<any>(null);
   const mostrarCarRef = useRef(false);
+  const mostrarSigefRef = useRef(false);
   const modoCliqueRef = useRef(false);
   const pedidoBboxRef = useRef(0);
   const pedidoPontoRef = useRef(0);
+  const pedidoSigefRef = useRef(0);
 
   useEffect(() => {
     if (!document.getElementById("leaflet-css")) {
@@ -82,7 +108,10 @@ export default function GeometriaPage() {
         attribution: "© OpenStreetMap",
       }).addTo(map);
       mapRef.current = map;
-      map.on("moveend", () => atualizarCamadaCar());
+      map.on("moveend", () => {
+        atualizarCamadaCar();
+        atualizarCamadaSigef();
+      });
       map.on("click", (e: any) => selecionarPorClique(e.latlng.lat, e.latlng.lng));
       await fetch("/api/geometria/seed", { method: "POST" });
       // O mapa abre so com o limite estadual: a cobertura e todo o estado de SP.
@@ -174,6 +203,76 @@ export default function GeometriaPage() {
     }
   }
 
+  /**
+   * Parcelas do SIGEF da janela atual. Vem da tabela SigefParcela (shapefile do
+   * acervo do INCRA importado), porque o acervo nao responde fora do Brasil.
+   */
+  async function atualizarCamadaSigef() {
+    const L = (window as any).L;
+    const map = mapRef.current;
+    const pedido = ++pedidoSigefRef.current;
+    if (!map || !mostrarSigefRef.current) return;
+    if (map.getZoom() < ZOOM_MIN_CAR) {
+      sigefLayerRef.current?.clearLayers();
+      setTotalSigefVisivel(null);
+      setCarregandoSigef(false);
+      return;
+    }
+    const b = map.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n: number) => n.toFixed(6)).join(",");
+    setCarregandoSigef(true);
+    try {
+      const res = await fetch(`/api/sigef/parcelas?bbox=${bbox}&limite=300`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha ao consultar as parcelas do SIGEF");
+      if (pedido !== pedidoSigefRef.current || !mostrarSigefRef.current) return;
+      const grupo = sigefLayerRef.current;
+      grupo.clearLayers();
+      (data.parcelas ?? []).forEach((parcela: any) => {
+        L.geoJSON({ type: "Feature", properties: {}, geometry: parcela.geometria }, {
+          style: { color: "#7c3aed", weight: 1.5, fillColor: "#7c3aed", fillOpacity: 0.05 },
+        })
+          .bindPopup(popupParcela(parcela))
+          .on("click", () => {
+            if (modoCliqueRef.current) usarParcela(parcela);
+          })
+          .addTo(grupo);
+      });
+      setTotalSigefVisivel((data.parcelas ?? []).length);
+    } catch (e) {
+      if (pedido === pedidoSigefRef.current) setErro((e as Error).message);
+    } finally {
+      if (pedido === pedidoSigefRef.current) setCarregandoSigef(false);
+    }
+  }
+
+  async function alternarCamadaSigef(ativo: boolean) {
+    const L = (window as any).L;
+    const map = mapRef.current;
+    setMostrarSigef(ativo);
+    mostrarSigefRef.current = ativo;
+    if (!map) return;
+    if (ativo) {
+      sigefLayerRef.current ??= L.layerGroup();
+      sigefLayerRef.current.addTo(map);
+      atualizarCamadaSigef();
+      try {
+        const total = await (await fetch("/api/sigef/parcelas?uf=SP")).json();
+        setTotalSigefImportado(total.total ?? null);
+      } catch {
+        setTotalSigefImportado(null);
+      }
+    } else {
+      pedidoSigefRef.current++;
+      setCarregandoSigef(false);
+      if (sigefLayerRef.current) {
+        sigefLayerRef.current.clearLayers();
+        map.removeLayer(sigefLayerRef.current);
+      }
+      setTotalSigefVisivel(null);
+    }
+  }
+
   /** Clique no mapa: o WFS devolve a feicao que contem o ponto. */
   async function selecionarPorClique(lat: number, lon: number) {
     if (!modoCliqueRef.current) return;
@@ -222,6 +321,39 @@ export default function GeometriaPage() {
     const bounds = layer.getBounds();
     if (voar) map.flyToBounds(bounds.pad(0.3), { duration: 1 });
     else map.fitBounds(bounds.pad(0.3));
+    layer.openPopup(bounds.getCenter());
+  }
+
+  /** Mesma funcao de usarImovel, para os atributos da parcela do SIGEF. */
+  function usarParcela(parcela: any) {
+    const L = (window as any).L;
+    const map = mapRef.current;
+    setGeojson(JSON.stringify({
+      type: "Feature",
+      properties: {
+        nome: parcela.codigoParcela,
+        nomeArea: parcela.nomeArea,
+        municipio: parcela.municipio,
+        uf: parcela.uf,
+        areaHa: parcela.areaHa,
+        matricula: parcela.matricula,
+      },
+      geometry: parcela.geometria,
+    }, null, 2));
+    setCarInfo(
+      `SIGEF ${parcela.codigoParcela} — ${parcela.municipio || parcela.municipioIbge || "—"}/${parcela.uf}` +
+      (parcela.areaHa === null ? "" : ` · ${Number(parcela.areaHa).toLocaleString("pt-BR")} ha`) +
+      (parcela.status ? ` · ${parcela.status}` : "")
+    );
+    if (selecaoRef.current) map.removeLayer(selecaoRef.current);
+    const layer = L.geoJSON({ type: "Feature", properties: {}, geometry: parcela.geometria }, {
+      style: { color: "#6366f1", weight: 3, fillColor: "#6366f1", fillOpacity: 0.2 },
+    })
+      .bindPopup(popupParcela(parcela))
+      .addTo(map);
+    selecaoRef.current = layer;
+    const bounds = layer.getBounds();
+    map.fitBounds(bounds.pad(0.3));
     layer.openPopup(bounds.getCenter());
   }
 
@@ -321,9 +453,30 @@ export default function GeometriaPage() {
                   : `${totalCarVisivel} imoveis nesta janela — contorno laranja, direto do geoserver.car.gov.br.`}
               </p>
             )}
+            <label className="flex items-center gap-2 text-xs font-medium text-violet-900 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={mostrarSigef}
+                disabled={!pronto}
+                onChange={(e) => alternarCamadaSigef(e.target.checked)}
+                className="accent-violet-600"
+              />
+              Mostrar parcelas SIGEF (SP)
+              {carregandoSigef && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            </label>
+            {mostrarSigef && (
+              <p className="text-[11px] text-violet-700">
+                {totalSigefImportado === 0
+                  ? "Nenhuma parcela importada — rode scripts/import-sigef-shp.ts com o shapefile do acervo do INCRA."
+                  : totalSigefVisivel === null
+                    ? `Aproxime o mapa (zoom ${ZOOM_MIN_CAR}+) para carregar as parcelas do SIGEF.`
+                    : `${totalSigefVisivel} parcelas nesta janela — contorno violeta` +
+                      (totalSigefImportado === null ? "." : `, de ${totalSigefImportado.toLocaleString("pt-BR")} importadas de SP.`)}
+              </p>
+            )}
             {modoClique && (
               <p className="text-[11px] text-orange-700">
-                Clique sobre uma propriedade: o WFS devolve a feicao que contem o ponto e ela vira o poligono de analise.
+                Clique sobre uma propriedade: a feicao que contem o ponto (CAR pelo WFS, ou parcela do SIGEF) vira o poligono de analise.
               </p>
             )}
           </div>
