@@ -39,7 +39,7 @@ export default async function CertidaoPage({ params }: PageProps) {
     },
   });
 
-  if (!processo) {
+  if (!processo || !/certid/i.test(processo.tipoServico)) {
     notFound();
   }
 
@@ -79,8 +79,21 @@ export default async function CertidaoPage({ params }: PageProps) {
     }
   }
 
+  const conteudoAssinado = JSON.stringify({
+    id: processo.id,
+    protocolo: processo.solicitacao?.protocolo ?? null,
+    interessado: processo.interessado,
+    cpfCnpj: processo.cpfCnpj,
+    sigefCodigoImovel: processo.sigefCodigoImovel,
+    sigefParcelaCodigo: processo.sigefParcelaCodigo,
+    sigefAreaHectares: processo.sigefAreaHectares,
+    fragmentos,
+    dtAssTecnico: processo.dtAssTecnico?.toISOString() ?? null,
+    dtAssGerente: processo.dtAssGerente?.toISOString() ?? null,
+    dtAssDiretor: processo.dtAssDiretor?.toISOString() ?? null,
+  });
   const codigoVerificacao = createHash("sha256")
-    .update(`${processo.id}|${processo.dtAssDiretor?.toISOString() ?? ""}`)
+    .update(conteudoAssinado)
     .digest("hex")
     .slice(0, 16)
     .toUpperCase();

@@ -65,13 +65,15 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
               Prioridade Idoso
             </span>
           )}
-          <Link
-            href={`/processos/${processo.id}/certidao`}
-            className="ml-auto inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
-          >
-            <FileCheck className="h-4 w-4" />
-            {processo.dtAssDiretor ? "Ver Certidao" : "Minuta da Certidao"}
-          </Link>
+          {/certid/i.test(processo.tipoServico) && (
+            <Link
+              href={`/processos/${processo.id}/certidao`}
+              className="ml-auto inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <FileCheck className="h-4 w-4" />
+              {processo.dtAssDiretor ? "Ver Certidao" : "Minuta da Certidao"}
+            </Link>
+          )}
         </div>
       </div>
 
