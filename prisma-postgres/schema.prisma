@@ -278,3 +278,36 @@ model CorteDivisa {
   linhaDivisaId   String?
   linhaDivisa     LinhaDivisa? @relation(fields: [linhaDivisaId], references: [id])
 }
+
+// Parcelas certificadas do SIGEF importadas do shapefile por UF do Acervo
+// Fundiario (INCRA). O acervo nao e acessivel em tempo real fora do Brasil, por
+// isso os dados ficam no banco: GeoJSON em TEXT + bbox indexado para filtrar a
+// janela do mapa (mesmo padrao das demais geometrias do projeto).
+model SigefParcela {
+  id             String    @id @default(cuid())
+  codigoParcela  String    @unique
+  nomeArea       String?
+  codigoImovel   String?
+  municipioIbge  Int?
+  municipio      String?
+  uf             String
+  areaHa         Float?
+  situacaoImovel String?
+  status         String?
+  rt             String?
+  art            String?
+  matricula      String?
+  dataSubmissao  DateTime?
+  dataAprovacao  DateTime?
+  geometria      String
+  minLon         Float
+  minLat         Float
+  maxLon         Float
+  maxLat         Float
+  fonte          String
+  importadoEm    DateTime  @default(now())
+
+  @@index([uf, minLon, maxLon])
+  @@index([uf, minLat, maxLat])
+  @@index([municipioIbge])
+}
