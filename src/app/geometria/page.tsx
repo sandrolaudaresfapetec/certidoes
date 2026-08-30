@@ -320,7 +320,7 @@ export default function GeometriaPage() {
       geometry: imovel.geometria,
     }, null, 2));
     setCarInfo(
-      `${imovel.codImovel} — ${imovel.municipio}/${imovel.uf} · ` +
+      `CAR/SICAR (SP) · ${imovel.codImovel} — ${imovel.municipio}/${imovel.uf} · ` +
       `${Number(imovel.areaHa).toLocaleString("pt-BR")} ha · ${imovel.modulosFiscais} MF · ${imovel.statusImovel}`
     );
     if (selecaoRef.current) map.removeLayer(selecaoRef.current);
@@ -517,7 +517,7 @@ export default function GeometriaPage() {
             </div>
           </div>
           <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded p-2">
-            Poligono em analise: {carInfo ? `CAR/SICAR (SP) · ${carInfo}` : ROTULO_EXEMPLO}
+            Poligono em analise: {carInfo ?? ROTULO_EXEMPLO}
           </p>
           <input
             value={processId}
