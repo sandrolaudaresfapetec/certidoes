@@ -50,6 +50,7 @@ export default function GeometriaPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [resultado, setResultado] = useState<any>(null);
   const [carregandoCar, setCarregandoCar] = useState(false);
+  const [carregandoCamada, setCarregandoCamada] = useState(false);
   const [carInfo, setCarInfo] = useState<string | null>(null);
   const [codigoCar, setCodigoCar] = useState("");
   const [mostrarCar, setMostrarCar] = useState(false);
@@ -112,12 +113,12 @@ export default function GeometriaPage() {
     if (map.getZoom() < ZOOM_MIN_CAR) {
       carLayerRef.current?.clearLayers();
       setTotalCarVisivel(null);
-      setCarregandoCar(false);
+      setCarregandoCamada(false);
       return;
     }
     const b = map.getBounds();
     const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n: number) => n.toFixed(6)).join(",");
-    setCarregandoCar(true);
+    setCarregandoCamada(true);
     try {
       const res = await fetch(`/api/car/imoveis?bbox=${bbox}&limite=300`);
       const data = await res.json();
@@ -139,7 +140,7 @@ export default function GeometriaPage() {
     } catch (e) {
       if (pedido === pedidoBboxRef.current) setErro((e as Error).message);
     } finally {
-      if (pedido === pedidoBboxRef.current) setCarregandoCar(false);
+      if (pedido === pedidoBboxRef.current) setCarregandoCamada(false);
     }
   }
 
@@ -163,7 +164,7 @@ export default function GeometriaPage() {
       atualizarCamadaCar();
     } else {
       pedidoBboxRef.current++;
-      setCarregandoCar(false);
+      setCarregandoCamada(false);
       if (wmsRef.current) map.removeLayer(wmsRef.current);
       if (carLayerRef.current) {
         carLayerRef.current.clearLayers();
@@ -292,7 +293,7 @@ export default function GeometriaPage() {
                 className="accent-orange-600"
               />
               Mostrar imoveis CAR (SP)
-              {carregandoCar && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {carregandoCamada && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             </label>
             <label className="flex items-center gap-2 text-xs font-medium text-orange-900 cursor-pointer">
               <input
@@ -302,7 +303,10 @@ export default function GeometriaPage() {
                 onChange={(e) => {
                   setModoClique(e.target.checked);
                   modoCliqueRef.current = e.target.checked;
-                  if (!e.target.checked) pedidoPontoRef.current++;
+                  if (!e.target.checked) {
+                    pedidoPontoRef.current++;
+                    setCarregandoPonto(false);
+                  }
                 }}
                 className="accent-orange-600"
               />
