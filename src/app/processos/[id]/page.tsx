@@ -130,6 +130,46 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
             </div>
           </div>
 
+          {/* SIGEF/INCRA */}
+          {processo.sigefCodigoImovel && (
+            <div className="bg-white rounded-lg shadow-sm border border-emerald-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-emerald-600" />
+                Dados da Propriedade - SIGEF/INCRA
+                <span
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${
+                    processo.sigefOrigem === "SIGEF_REAL"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {processo.sigefOrigem === "SIGEF_REAL"
+                    ? "SIGEF (oficial)"
+                    : "Dados simulados"}
+                </span>
+              </h2>
+              <div className="grid grid-cols-2 gap-4">
+                <InfoField label="Codigo do Imovel" value={processo.sigefCodigoImovel} />
+                <InfoField label="Codigo da Parcela" value={processo.sigefParcelaCodigo} />
+                <InfoField
+                  label="Area (ha)"
+                  value={
+                    processo.sigefAreaHectares != null
+                      ? processo.sigefAreaHectares.toLocaleString("pt-BR")
+                      : null
+                  }
+                />
+                <InfoField label="Situacao no SIGEF" value={processo.sigefStatus} />
+                <InfoField label="Municipio (SIGEF)" value={processo.sigefMunicipio} />
+                <InfoField label="UF (SIGEF)" value={processo.sigefUf} />
+                <InfoField
+                  label="Consultado em"
+                  value={formatDate(processo.sigefConsultadoEm)}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Technical Work */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">

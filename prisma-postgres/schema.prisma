@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      String   // ADMIN, GERENTE, DIRETOR, TECNICO, CONFERENTE, SDTC
+  department String? // CATDT, CG, SDTC
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  processesResponsible  Process[]      @relation("TecnicoResponsavel")
+  processesConference   Process[]      @relation("TecnicoConferencia")
+  processesCreated      Process[]      @relation("CriadoPor")
+  notifications         Notification[]
+  workflowActions       WorkflowAction[]
+}
+
+// Solicitante (cidadao) autenticado via gov.br
+// NOTA: por decisao da reuniao com clientes (31/07/2026), o cadastro do
+// solicitante NAO contem municipio/RA — a localizacao pertence ao IMOVEL
+// (vinculada a cada certidao), nao a pessoa.
+model Solicitante {
+  id            String    @id @default(cuid())
+  cpf           String    @unique // somente digitos, obtido do login gov.br
+  nome          String
+  email         String?   // complemento de cadastro (contato)
+  telefone      String?   // complemento de cadastro (contato)
+  cadastroCompleto Boolean @default(false) // true apos informar email+telefone
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  solicitacoes  Solicitacao[]
+}
+
+// Solicitacao feita pelo cidadao no portal (vira Process no backoffice)
+model Solicitacao {
+  id                String   @id @default(cuid())
+  protocolo         String   @unique // ex.: CERT-2026-000123
+  status            String   @default("PENDENTE") // PENDENTE, EM_ANALISE, APROVADA, DEVOLVIDA, CONCLUIDA
+  tipoViaSigef      Boolean  @default(true) // true = imovel selecionado do SIGEF; false = sem registro INCRA (preenchimento interno)
+
+  // Dados do imovel selecionado via SIGEF (quando tipoViaSigef = true)
+  sigefCodigoImovel  String?
+  sigefParcelaCodigo String?
+  sigefNomeArea      String?
+  sigefAreaHectares  Float?
+  sigefMunicipio     String?
+  sigefUf            String?
+  sigefStatus        String?
+  sigefOrigem        String? // SIGEF_REAL | SIMULADO
+
+  // Representacao (procurador): CPF de quem esta sendo representado
+  emNomeDeCpf       String?
+  emNomeDeNome      String?
+
+  observacao        String?
+
+  solicitanteId     String
+  solicitante       Solicitante @relation(fields: [solicitanteId], references: [id])
+
+  processId         String?  @unique
+  process           Process? @relation(fields: [processId], references: [id])
+
+  documentos        Documento[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Documentos anexados a uma solicitacao.
+// Regra da reuniao: so sao exigidos quando o imovel NAO esta no SIGEF:
+//  - PLANTA (planta do imovel)
+//  - DOC_PROPRIEDADE (comprovante de propriedade, nao precisa ser matricula)
+//  - PROCURACAO (quando o solicitante representa terceiro)
+model Documento {
+  id            String   @id @default(cuid())
+  tipo          String   // PLANTA, DOC_PROPRIEDADE, PROCURACAO
+  nomeArquivo   String
+  mimeType      String
+  tamanhoBytes  Int
+  conteudoBase64 String
+
+  solicitacaoId String
+  solicitacao   Solicitacao @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+}
+
+model Process {
+  id                String   @id @default(cuid())
+  ordem             Int      @unique
+  anoEntrada        Int
+  tipoServico       String   // Certidao, Drenagem, Parecer, Tracado de Divisa
+  expediente        String?  // SEI number
+  dtAbertoSei       DateTime?
+  dtCompile         DateTime?
+  dtUpadoSei        DateTime? // data de upload no SEI
+
+  // Client Info
+  tipo              String   // Comum-CPF, Comum-CNPJ, Orgao-Publico, Justica, idoso
+  interessado       String
+  email             String?
+  telefone          String?
+  cpfCnpj           String?
+
+  // Elderly priority
+  dtNascimentoIdoso DateTime?
+  idadeTrava        Float?
+
+  // Location
+  pasta             String?
+  utm               String?
+  municipio         String?
+  ra                String?  // Regiao Administrativa
+  dra               String?
+  divisaDificuldade String?
+
+  // Workflow Status
+  situacao          String   @default("entrada_sdtc") // entrance stage
+  nivelPrioridade   String?
+  statusEscritorio  String?
+  observacaoEntrada String?
+  diasTranscorridos Int      @default(0)
+
+  // Technical Assignment
+  tecnicoRespId     String?
+  tecnicoResp       User?    @relation("TecnicoResponsavel", fields: [tecnicoRespId], references: [id])
+  quemVaiAssinar    String?
+  dtEmail           DateTime?
+  dtVisita1         DateTime?
+  dtVisita2         DateTime?
+
+  // Conference
+  tecnicoConfId     String?
+  tecnicoConf       User?    @relation("TecnicoConferencia", fields: [tecnicoConfId], references: [id])
+  dtConf            DateTime?
+
+  // Signatures
+  dtAssTecnico      DateTime?
+  dtAssGerente      DateTime?
+  dtAssDiretor      DateTime?
+
+  // Output
+  dtSaida           DateTime?
+  formaSaida        String?  // email, fisico, SEI
+  diasTotais        Int?
+
+  // Sobrestamento / cancelamento
+  dtInicioSobrestado DateTime?
+  dtFimSobrestado    DateTime?
+  dtCancelado        DateTime?
+
+  // ST (horas padrao)
+  stGabineteP1      Float?
+  stGabineteP2      Float?
+  stCampo           Float?
+
+  observacoesTecnico String?
+
+  // Base map reference
+  base              String?  // 10k, 50k, MDT 2023, Ortomosaico 2010
+  departamento      String?  // CATDT, CG
+
+  // SIGEF/INCRA Integration
+  sigefCodigoImovel  String?
+  sigefParcelaCodigo String?
+  sigefAreaHectares  Float?
+  sigefMunicipio     String?
+  sigefUf            String?
+  sigefStatus        String?   // status da parcela no SIGEF (ex: Certificada)
+  sigefOrigem        String?   // SIGEF_REAL | SIMULADO
+  sigefConsultadoEm  DateTime?
+
+  numeroSaidaIGC    String?
+  processes    String?
+  servicoTecCampo    Float?
+  servicoTecGabinete    Float?
+  taxaAbertura    Float?
+  taxaVistoria    Float?
+  total    Float?
+  users    String?
+  sigefConsultas    SigefConsulta[]
+  cortesDivisa      CorteDivisa[]
+  solicitacao       Solicitacao?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  criadoPorId       String?
+  criadoPor         User?    @relation("CriadoPor", fields: [criadoPorId], references: [id])
+  workflowActions   WorkflowAction[]
+  notifications     Notification[]
+}
+
+model SigefConsulta {
+  id          String   @id @default(cuid())
+  cpfCnpj     String
+  origem      String   // SIGEF_REAL | SIMULADO
+  sucesso     Boolean  @default(true)
+  mensagem    String?
+  payload     String?  // JSON com as parcelas retornadas
+
+  processId   String?
+  process     Process? @relation(fields: [processId], references: [id])
+
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String   // NOVA_ENTRADA, PRAZO, ATRASO, ASSINATURA, etc.
+  title     String
+  message   String
+  read      Boolean  @default(false)
+
+  processId String?
+  process   Process? @relation(fields: [processId], references: [id])
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model WorkflowAction {
+  id         String   @id @default(cuid())
+  acao       String?  // AVANCAR, DEVOLVER, ATRIBUIR, etc.
+  action     String?  // alias legado usado pela API de workflow
+  fromStatus String?
+  toStatus   String?
+  deEtapa    String?
+  paraEtapa  String?
+  observacao String?
+
+  processId  String
+  process    Process  @relation(fields: [processId], references: [id])
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+
+  createdAt  DateTime @default(now())
+}
+
+// ===== Modulo de Geometria de Divisas =====
+// Geometrias armazenadas como GeoJSON em TEXT (funciona em SQLite e Postgres).
+// Na migracao p/ PostGIS, adicionar colunas geometry via migration SQL (ver docs/MIGRACAO-POSTGIS.md).
+
+model LinhaDivisa {
+  id            String   @id @default(cuid())
+  codigo        String   @unique
+  descricao     String?  // ex.: "Divisa Brazlandia/Planaltina"
+  tipo          String   // DIVISA_MUNICIPAL | TRIPLICE | QUADRUPLA | RIO
+  geometria     String   // GeoJSON LineString/MultiLineString
+  bancoOrigem   String   // rastreabilidade: banco de dados de origem
+  dataValidacao DateTime
+  municipios    String   // JSON array: ["Brazlandia","Planaltina"]
+  createdAt     DateTime @default(now())
+
+  cortes        CorteDivisa[]
+}
+
+model CorteDivisa {
+  id              String      @id @default(cuid())
+  classificacao   String      // FACIL | MEDIO | DIFICIL | PIOR_CASO
+  geometriaImovel String      // GeoJSON Polygon do imovel (vindo do SIGEF)
+  resultadoJson   String      // JSON: [{fragmento, areaHa, percentual, municipio, geometria}]
+  dataCorte       DateTime    @default(now())
+
+  processId       String?
+  process         Process?    @relation(fields: [processId], references: [id])
+  linhaDivisaId   String?
+  linhaDivisa     LinhaDivisa? @relation(fields: [linhaDivisaId], references: [id])
+}

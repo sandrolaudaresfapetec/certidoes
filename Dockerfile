@@ -22,11 +22,13 @@ RUN apt-get update -qq && \
 
 # Install node modules
 COPY package-lock.json package.json ./
-COPY prisma .
+COPY prisma ./prisma
+COPY prisma-postgres ./prisma-postgres
+COPY prisma.config.ts prisma.config.postgres.ts ./
 RUN npm ci --include=dev
 
-# Generate Prisma Client
-RUN npx prisma generate
+# Generate Prisma Client (schema sqlite para dev; o adapter pg e resolvido em runtime)
+RUN npx prisma generate --config prisma.config.postgres.ts
 
 # Copy application code
 COPY . .
@@ -43,25 +45,16 @@ FROM base
 
 # Install packages needed for deployment
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y ca-certificates openssl wget && \
+    apt-get install --no-install-recommends -y ca-certificates openssl && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
-
-# Install litestream
-RUN wget https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.deb && \
-    dpkg -i litestream-v0.3.13-linux-amd64.deb && \
-    rm litestream-v0.3.13-linux-amd64.deb
 
 # Copy built application
 COPY --from=build /app /app
 
-# Setup sqlite3 on a separate volume
-RUN mkdir -p /data
-VOLUME /data
-
-# Entrypoint prepares the database.
+# Entrypoint roda as migrations (postgres) e sobe o servidor.
 ENTRYPOINT [ "/app/docker-entrypoint.js" ]
 
 # Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
-ENV DATABASE_URL="file:///data/sqlite.db"
+# DATABASE_URL e injetada pelo `fly postgres attach` (postgresql://...)
 CMD [ "npm", "run", "start" ]
