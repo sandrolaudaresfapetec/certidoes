@@ -3,7 +3,7 @@ import { WORKFLOW_STAGES, ALLOWED_TRANSITIONS, type WorkflowStage } from "@/lib/
 import { formatDate, formatDateTime } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, User, FileText, MapPin } from "lucide-react";
+import { ArrowLeft, Clock, User, FileText, MapPin, FileCheck } from "lucide-react";
 import { WorkflowActions } from "@/components/workflow-actions";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +65,13 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
               Prioridade Idoso
             </span>
           )}
+          <Link
+            href={`/processos/${processo.id}/certidao`}
+            className="ml-auto inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+          >
+            <FileCheck className="h-4 w-4" />
+            {processo.dtAssDiretor ? "Ver Certidao" : "Minuta da Certidao"}
+          </Link>
         </div>
       </div>
 

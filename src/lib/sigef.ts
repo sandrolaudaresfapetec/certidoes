@@ -159,6 +159,50 @@ function mapearParcela(p: any): SigefParcela {
 }
 
 /**
+ * Vinculo simulado com imoveis REAIS: quando o acervo SIGEF/INCRA importado
+ * (tabela SigefParcela) tem dados, o CPF e associado deterministicamente a
+ * parcelas certificadas reais — atributos e geometria oficiais do shapefile.
+ */
+async function gerarParcelasDoAcervo(
+  cpfCnpjDigits: string
+): Promise<{ parcelas: SigefParcela[]; aviso: string } | null> {
+  const { prisma } = await import("@/lib/prisma");
+  const total = await prisma.sigefParcela.count();
+  if (total === 0) return null;
+
+  const h = hashString(cpfCnpjDigits || "0");
+  const qtd = (h % 2) + 1; // 1 ou 2 parcelas
+  const skip = h % Math.max(total - qtd + 1, 1);
+  const linhas = await prisma.sigefParcela.findMany({
+    skip,
+    take: qtd,
+    orderBy: { codigoParcela: "asc" },
+  });
+  if (linhas.length === 0) return null;
+
+  return {
+    parcelas: linhas.map((p) => ({
+      codigoImovel: p.codigoImovel || p.codigoParcela,
+      parcelaCodigo: p.codigoParcela,
+      nomeArea: p.nomeArea || "Imóvel rural certificado",
+      detentorNome: "Titular vinculado ao CPF (vínculo simulado)",
+      detentorCpfCnpj: cpfCnpjDigits,
+      areaHectares: p.areaHa ?? 0,
+      municipio: p.municipio || String(p.municipioIbge ?? ""),
+      uf: p.uf,
+      status: p.status || "Certificada",
+      situacaoInformada: p.situacaoImovel || undefined,
+      natureza: "Imóvel Rural",
+      registroMatricula: p.matricula || undefined,
+      dataAprovacao: p.dataAprovacao?.toISOString(),
+      geometria: JSON.parse(p.geometria),
+    })),
+    aviso:
+      "Parcelas reais do acervo SIGEF/INCRA importado (vínculo ao CPF simulado — API Conecta gov.br não configurada).",
+  };
+}
+
+/**
  * Versao enriquecida do mock: tenta buscar geometrias REAIS do CAR (SICAR)
  * e mescla com os atributos simulados (titular, codigo SIGEF). Se o CAR
  * estiver fora, cai no mock puro. Controlado por SIGEF_CAR (padrao: true).
@@ -203,6 +247,10 @@ export async function consultarParcelasSigef(
   );
 
   if (mockForcado || !temCredenciais) {
+    const acervo = await gerarParcelasDoAcervo(digits).catch(() => null);
+    if (acervo) {
+      return { origem: "SIMULADO", parcelas: acervo.parcelas, aviso: acervo.aviso };
+    }
     const mock = await gerarParcelasMockComCar(digits);
     return {
       origem: "SIMULADO",
@@ -231,6 +279,14 @@ export async function consultarParcelasSigef(
     const content: any[] = data.content ?? data._embedded?.parcelas ?? [];
     return { origem: "SIGEF_REAL", parcelas: content.map(mapearParcela) };
   } catch (err) {
+    const acervo = await gerarParcelasDoAcervo(digits).catch(() => null);
+    if (acervo) {
+      return {
+        origem: "SIMULADO",
+        parcelas: acervo.parcelas,
+        aviso: `Falha na integração real com o SIGEF (${(err as Error).message}). ${acervo.aviso}`,
+      };
+    }
     const mock = await gerarParcelasMockComCar(digits);
     return {
       origem: "SIMULADO",
