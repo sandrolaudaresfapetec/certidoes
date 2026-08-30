@@ -141,12 +141,22 @@ async function main() {
 
   const gravarLote = async () => {
     if (lote.length === 0) return;
-    // Reimportacao: sobrescreve pelo codigo da parcela.
-    await prisma.sigefParcela.deleteMany({
-      where: { codigoParcela: { in: lote.map((p) => p.codigoParcela) } },
-    });
-    await prisma.sigefParcela.createMany({ data: lote });
-    gravadas += lote.length;
+    // O acervo pode repetir parcela_co no mesmo arquivo; a ultima ocorrencia vence.
+    const unicas = [...new Map(lote.map((p) => [p.codigoParcela, p])).values()];
+    // Reimportacao: sobrescreve pelo codigo da parcela, numa transacao para nao
+    // perder as linhas existentes se a insercao falhar.
+    // Timeout generoso: o lote carrega GeoJSON grande e o Postgres de producao e
+    // acessado por tunel (`fly proxy`), bem mais lento que o SQLite local.
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.sigefParcela.deleteMany({
+          where: { codigoParcela: { in: unicas.map((p) => p.codigoParcela) } },
+        });
+        await tx.sigefParcela.createMany({ data: unicas });
+      },
+      { timeout: 120_000, maxWait: 60_000 },
+    );
+    gravadas += unicas.length;
     lote = [];
     if (gravadas % 5000 === 0) process.stdout.write(`\r${gravadas} parcelas gravadas (${lidas} lidas)`);
   };
