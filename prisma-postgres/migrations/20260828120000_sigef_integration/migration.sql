@@ -1,13 +1,13 @@
 -- Integração SIGEF/INCRA: dados da propriedade do solicitante
 
-ALTER TABLE "Process" ADD COLUMN "sigefCodigoImovel" TEXT;
-ALTER TABLE "Process" ADD COLUMN "sigefParcelaCodigo" TEXT;
-ALTER TABLE "Process" ADD COLUMN "sigefAreaHectares" DOUBLE PRECISION;
-ALTER TABLE "Process" ADD COLUMN "sigefMunicipio" TEXT;
-ALTER TABLE "Process" ADD COLUMN "sigefUf" TEXT;
-ALTER TABLE "Process" ADD COLUMN "sigefStatus" TEXT;
-ALTER TABLE "Process" ADD COLUMN "sigefOrigem" TEXT;
-ALTER TABLE "Process" ADD COLUMN "sigefConsultadoEm" TIMESTAMP(3);
+ALTER TABLE "Process" ADD COLUMN IF NOT EXISTS "sigefCodigoImovel" TEXT;
+ALTER TABLE "Process" ADD COLUMN IF NOT EXISTS "sigefParcelaCodigo" TEXT;
+ALTER TABLE "Process" ADD COLUMN IF NOT EXISTS "sigefAreaHectares" DOUBLE PRECISION;
+ALTER TABLE "Process" ADD COLUMN IF NOT EXISTS "sigefMunicipio" TEXT;
+ALTER TABLE "Process" ADD COLUMN IF NOT EXISTS "sigefUf" TEXT;
+ALTER TABLE "Process" ADD COLUMN IF NOT EXISTS "sigefStatus" TEXT;
+ALTER TABLE "Process" ADD COLUMN IF NOT EXISTS "sigefOrigem" TEXT;
+ALTER TABLE "Process" ADD COLUMN IF NOT EXISTS "sigefConsultadoEm" TIMESTAMP(3);
 
 CREATE TABLE "SigefConsulta" (
     "id" TEXT NOT NULL PRIMARY KEY,
