@@ -4,14 +4,20 @@
 import { useEffect, useRef, useState } from "react";
 import { Scissors, Loader2, Map as MapIcon, MousePointerClick, Tractor } from "lucide-react";
 
+/** Poligono de demonstracao: cobre a triplice Brotas / Torrinha / Sao Pedro (SP). */
 const IMOVEL_EXEMPLO = {
   type: "Feature",
-  properties: { nome: "Imovel de exemplo SP (cruza a divisa)" },
+  properties: {
+    nome: "Imovel de exemplo (SP)",
+    municipios: ["Brotas", "Torrinha", "Sao Pedro"],
+  },
   geometry: {
     type: "Polygon",
     coordinates: [[[-48.15, -22.40], [-48.05, -22.40], [-48.05, -22.30], [-48.15, -22.30], [-48.15, -22.40]]],
   },
 };
+
+const ROTULO_EXEMPLO = "Imovel de exemplo — Brotas / Torrinha / Sao Pedro (SP) · 11.436 ha";
 
 const CORES = ["#10b981", "#f59e0b", "#3b82f6", "#ef4444", "#8b5cf6"];
 
@@ -68,7 +74,7 @@ export default function GeometriaPage() {
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     script.onload = async () => {
       const L = (window as any).L;
-      const map = L.map("mapa-divisas").setView([-22.35, -48.1], 11);
+      const map = L.map("mapa-divisas").setView([-22.2, -48.6], 6);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap",
       }).addTo(map);
@@ -76,16 +82,15 @@ export default function GeometriaPage() {
       map.on("moveend", () => atualizarCamadaCar());
       map.on("click", (e: any) => selecionarPorClique(e.latlng.lat, e.latlng.lng));
       await fetch("/api/geometria/seed", { method: "POST" });
-      const linhas = await (await fetch("/api/geometria/linhas")).json();
-      linhas.forEach((l: any) => {
-        const layer = L.geoJSON(
-          { type: "Feature", geometry: l.geometria },
-          { style: { color: "#dc2626", weight: 3, dashArray: "6 4" } }
-        )
-          .addTo(map)
-          .bindPopup(`<b>${l.codigo}</b><br/>${l.descricao ?? ""}<br/><i>${l.bancoOrigem}</i>`);
-        layersRef.current.push(layer);
-      });
+      // O mapa abre so com o limite estadual: a cobertura e todo o estado de SP.
+      const limite = await (await fetch("/api/geometria/limite-uf?uf=SP")).json();
+      if (limite.geojson) {
+        const layer = L.geoJSON(limite.geojson, {
+          style: { color: "#047857", weight: 2, fill: false },
+          interactive: false,
+        }).addTo(map);
+        map.fitBounds(layer.getBounds());
+      }
       setPronto(true);
     };
     document.body.appendChild(script);
@@ -312,7 +317,7 @@ export default function GeometriaPage() {
           </div>
           <div className="flex items-center justify-between">
             <label className="block text-xs font-medium text-gray-600">
-              Poligono do imovel (GeoJSON — vindo do SIGEF ou CAR)
+              Imovel (SIGEF ou CAR)
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -334,17 +339,9 @@ export default function GeometriaPage() {
               </button>
             </div>
           </div>
-          {carInfo && (
-            <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded p-2">
-              CAR/SICAR (SP): {carInfo}
-            </p>
-          )}
-          <textarea
-            value={geojson}
-            onChange={(e) => setGeojson(e.target.value)}
-            rows={12}
-            className="w-full border border-gray-300 rounded-md p-2 font-mono text-xs"
-          />
+          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded p-2">
+            Poligono em analise: {carInfo ? `CAR/SICAR (SP) · ${carInfo}` : ROTULO_EXEMPLO}
+          </p>
           <input
             value={processId}
             onChange={(e) => setProcessId(e.target.value)}
