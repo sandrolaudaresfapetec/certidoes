@@ -141,12 +141,17 @@ async function main() {
 
   const gravarLote = async () => {
     if (lote.length === 0) return;
-    // Reimportacao: sobrescreve pelo codigo da parcela.
-    await prisma.sigefParcela.deleteMany({
-      where: { codigoParcela: { in: lote.map((p) => p.codigoParcela) } },
-    });
-    await prisma.sigefParcela.createMany({ data: lote });
-    gravadas += lote.length;
+    // O acervo pode repetir parcela_co no mesmo arquivo; a ultima ocorrencia vence.
+    const unicas = [...new Map(lote.map((p) => [p.codigoParcela, p])).values()];
+    // Reimportacao: sobrescreve pelo codigo da parcela, numa transacao para nao
+    // perder as linhas existentes se a insercao falhar.
+    await prisma.$transaction([
+      prisma.sigefParcela.deleteMany({
+        where: { codigoParcela: { in: unicas.map((p) => p.codigoParcela) } },
+      }),
+      prisma.sigefParcela.createMany({ data: unicas }),
+    ]);
+    gravadas += unicas.length;
     lote = [];
     if (gravadas % 5000 === 0) process.stdout.write(`\r${gravadas} parcelas gravadas (${lidas} lidas)`);
   };

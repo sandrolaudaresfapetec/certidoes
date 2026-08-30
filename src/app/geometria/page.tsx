@@ -25,12 +25,19 @@ const CAR_WMS = "https://geoserver.car.gov.br/geoserver/sicar/wms";
 /** Zoom minimo para pedir as feicoes do WFS (abaixo disso a janela e grande demais). */
 const ZOOM_MIN_CAR = 12;
 
+/** Atributos vem de fontes externas (WFS do CAR, DBF do acervo): sempre escapar. */
+function esc(valor: unknown): string {
+  return String(valor ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
+  );
+}
+
 function popupImovel(imovel: any) {
   const linha = (rotulo: string, valor: string) =>
-    `<div style="display:flex;gap:6px"><span style="color:#6b7280">${rotulo}</span><b>${valor}</b></div>`;
+    `<div style="display:flex;gap:6px"><span style="color:#6b7280">${rotulo}</span><b>${esc(valor)}</b></div>`;
   return (
     `<div style="font-size:12px;line-height:1.5;min-width:230px">` +
-    `<div style="font-family:monospace;font-weight:700;margin-bottom:4px">${imovel.codImovel}</div>` +
+    `<div style="font-family:monospace;font-weight:700;margin-bottom:4px">${esc(imovel.codImovel)}</div>` +
     linha("Municipio:", `${imovel.municipio}/${imovel.uf}`) +
     linha("Area:", `${Number(imovel.areaHa).toLocaleString("pt-BR", { maximumFractionDigits: 4 })} ha`) +
     linha("Modulos fiscais:", Number(imovel.modulosFiscais).toLocaleString("pt-BR", { maximumFractionDigits: 4 })) +
@@ -42,11 +49,11 @@ function popupImovel(imovel: any) {
 
 function popupParcela(parcela: any) {
   const linha = (rotulo: string, valor: string) =>
-    `<div style="display:flex;gap:6px"><span style="color:#6b7280">${rotulo}</span><b>${valor}</b></div>`;
+    `<div style="display:flex;gap:6px"><span style="color:#6b7280">${rotulo}</span><b>${esc(valor)}</b></div>`;
   const area = parcela.areaHa === null ? "—" : `${Number(parcela.areaHa).toLocaleString("pt-BR", { maximumFractionDigits: 4 })} ha`;
   return (
     `<div style="font-size:12px;line-height:1.5;min-width:230px">` +
-    `<div style="font-family:monospace;font-weight:700;margin-bottom:4px">${parcela.codigoParcela}</div>` +
+    `<div style="font-family:monospace;font-weight:700;margin-bottom:4px">${esc(parcela.codigoParcela)}</div>` +
     linha("Area/imovel:", parcela.nomeArea || "—") +
     linha("Municipio:", `${parcela.municipio || parcela.municipioIbge || "—"}/${parcela.uf}`) +
     linha("Area:", area) +
@@ -160,8 +167,10 @@ export default function GeometriaPage() {
           style: { color: "#f97316", weight: 1.5, fillColor: "#f97316", fillOpacity: 0.05 },
         })
           .bindPopup(popupImovel(imovel))
-          .on("click", () => {
-            if (modoCliqueRef.current) usarImovel(imovel, false);
+          .on("click", (ev: any) => {
+            if (!modoCliqueRef.current) return;
+            L.DomEvent.stopPropagation(ev);
+            usarImovel(imovel, false);
           })
           .addTo(grupo);
       });
@@ -233,8 +242,11 @@ export default function GeometriaPage() {
           style: { color: "#7c3aed", weight: 1.5, fillColor: "#7c3aed", fillOpacity: 0.05 },
         })
           .bindPopup(popupParcela(parcela))
-          .on("click", () => {
-            if (modoCliqueRef.current) usarParcela(parcela);
+          .on("click", (ev: any) => {
+            if (!modoCliqueRef.current) return;
+            // Sem isso o clique tambem chega ao mapa e a consulta do CAR sobrescreve a parcela.
+            L.DomEvent.stopPropagation(ev);
+            usarParcela(parcela);
           })
           .addTo(grupo);
       });
