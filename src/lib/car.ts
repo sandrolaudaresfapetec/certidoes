@@ -11,6 +11,8 @@ export interface CarImovel {
   uf: string;
   statusImovel: string;
   condicao: string;
+  modulosFiscais: number;
+  tipoImovel: string;
   geometria: unknown; // GeoJSON MultiPolygon
 }
 
@@ -29,6 +31,8 @@ function mapear(f: any): CarImovel {
     uf: String(f.properties?.uf ?? "SP"),
     statusImovel: String(f.properties?.status_imovel ?? ""),
     condicao: String(f.properties?.condicao ?? ""),
+    modulosFiscais: Number(f.properties?.m_fiscal ?? 0),
+    tipoImovel: String(f.properties?.tipo_imovel ?? ""),
     geometria: f.geometry,
   };
 }
@@ -73,4 +77,50 @@ export async function buscarImoveisCar(
   if (!res.ok) throw new Error(`CAR WFS respondeu HTTP ${res.status}`);
   const data = await res.json();
   return (data.features ?? []).map(mapear);
+}
+
+/**
+ * Imoveis dentro de uma janela do mapa. O WFS 2.0 do CAR usa a ordem de eixos
+ * do EPSG:4326 (lat, lon) tanto no BBOX quanto no CQL — inverter devolve zero
+ * feicoes em vez de erro.
+ */
+export async function buscarImoveisPorBbox(
+  minLon: number,
+  minLat: number,
+  maxLon: number,
+  maxLat: number,
+  limite: number = 250,
+  uf: string = "SP"
+): Promise<CarImovel[]> {
+  const layer = `sicar:sicar_imoveis_${uf.toLowerCase()}`;
+  const url =
+    `${CAR_WFS}?service=WFS&version=2.0.0&request=GetFeature` +
+    `&typeNames=${layer}&count=${limite}&outputFormat=application/json` +
+    `&bbox=${minLat},${minLon},${maxLat},${maxLon}`;
+
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`CAR WFS respondeu HTTP ${res.status}`);
+  const data = await res.json();
+  return (data.features ?? []).map(mapear);
+}
+
+/** Imovel que contem o ponto clicado no mapa. */
+export async function buscarImovelNoPonto(
+  lon: number,
+  lat: number,
+  uf: string = "SP"
+): Promise<CarImovel | null> {
+  const layer = `sicar:sicar_imoveis_${uf.toLowerCase()}`;
+  const cql = encodeURIComponent(
+    `INTERSECTS(geo_area_imovel, POINT(${lat} ${lon}))`
+  );
+  const url =
+    `${CAR_WFS}?service=WFS&version=2.0.0&request=GetFeature` +
+    `&typeNames=${layer}&count=1&outputFormat=application/json&CQL_FILTER=${cql}`;
+
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`CAR WFS respondeu HTTP ${res.status}`);
+  const data = await res.json();
+  const f = (data.features ?? [])[0];
+  return f ? mapear(f) : null;
 }
