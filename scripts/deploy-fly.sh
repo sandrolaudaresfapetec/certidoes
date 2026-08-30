@@ -16,13 +16,13 @@
 #   ./scripts/deploy-fly.sh
 #
 # Variáveis opcionais (valores padrão = ambiente atual):
-#   APP_NAME=certidoes-app  PG_NAME=certidoes-pg  REGION=iad
+#   APP_NAME=certidoes  PG_NAME=certidoes-pg  REGION=gru
 # =============================================================================
 set -euo pipefail
 
-APP_NAME="${APP_NAME:-certidoes-app}"
+APP_NAME="${APP_NAME:-certidoes}"
 PG_NAME="${PG_NAME:-certidoes-pg}"
-REGION="${REGION:-iad}"
+REGION="${REGION:-gru}"
 DB_NAME="certidoes_app"
 DB_USER="certidoes_app"
 PROXY_PORT=15432
