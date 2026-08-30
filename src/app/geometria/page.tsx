@@ -2,18 +2,43 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from "react";
-import { Scissors, Loader2, Map as MapIcon, Tractor } from "lucide-react";
+import { Scissors, Loader2, Map as MapIcon, MousePointerClick, Tractor } from "lucide-react";
 
+/** Poligono de demonstracao: cobre a triplice Brotas / Torrinha / Sao Pedro (SP). */
 const IMOVEL_EXEMPLO = {
   type: "Feature",
-  properties: { nome: "Imovel de exemplo SP (cruza a divisa)" },
+  properties: {
+    nome: "Imovel de exemplo (SP)",
+    municipios: ["Brotas", "Torrinha", "Sao Pedro"],
+  },
   geometry: {
     type: "Polygon",
     coordinates: [[[-48.15, -22.40], [-48.05, -22.40], [-48.05, -22.30], [-48.15, -22.30], [-48.15, -22.40]]],
   },
 };
 
+const ROTULO_EXEMPLO = "Imovel de exemplo — Brotas / Torrinha / Sao Pedro (SP) · 11.436 ha";
+
 const CORES = ["#10b981", "#f59e0b", "#3b82f6", "#ef4444", "#8b5cf6"];
+
+const CAR_WMS = "https://geoserver.car.gov.br/geoserver/sicar/wms";
+/** Zoom minimo para pedir as feicoes do WFS (abaixo disso a janela e grande demais). */
+const ZOOM_MIN_CAR = 12;
+
+function popupImovel(imovel: any) {
+  const linha = (rotulo: string, valor: string) =>
+    `<div style="display:flex;gap:6px"><span style="color:#6b7280">${rotulo}</span><b>${valor}</b></div>`;
+  return (
+    `<div style="font-size:12px;line-height:1.5;min-width:230px">` +
+    `<div style="font-family:monospace;font-weight:700;margin-bottom:4px">${imovel.codImovel}</div>` +
+    linha("Municipio:", `${imovel.municipio}/${imovel.uf}`) +
+    linha("Area:", `${Number(imovel.areaHa).toLocaleString("pt-BR", { maximumFractionDigits: 4 })} ha`) +
+    linha("Modulos fiscais:", Number(imovel.modulosFiscais).toLocaleString("pt-BR", { maximumFractionDigits: 4 })) +
+    linha("Situacao:", `${imovel.statusImovel}${imovel.tipoImovel ? ` (${imovel.tipoImovel})` : ""}`) +
+    linha("Condicao:", imovel.condicao || "—") +
+    `<div style="color:#9ca3af;margin-top:4px">Fonte: CAR/SICAR</div></div>`
+  );
+}
 
 export default function GeometriaPage() {
   const mapRef = useRef<any>(null);
@@ -27,6 +52,15 @@ export default function GeometriaPage() {
   const [carregandoCar, setCarregandoCar] = useState(false);
   const [carInfo, setCarInfo] = useState<string | null>(null);
   const [codigoCar, setCodigoCar] = useState("");
+  const [mostrarCar, setMostrarCar] = useState(false);
+  const [modoClique, setModoClique] = useState(false);
+  const [carregandoPonto, setCarregandoPonto] = useState(false);
+  const [totalCarVisivel, setTotalCarVisivel] = useState<number | null>(null);
+  const wmsRef = useRef<any>(null);
+  const carLayerRef = useRef<any>(null);
+  const selecaoRef = useRef<any>(null);
+  const mostrarCarRef = useRef(false);
+  const modoCliqueRef = useRef(false);
 
   useEffect(() => {
     if (!document.getElementById("leaflet-css")) {
@@ -40,26 +74,147 @@ export default function GeometriaPage() {
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     script.onload = async () => {
       const L = (window as any).L;
-      const map = L.map("mapa-divisas").setView([-22.35, -48.1], 11);
+      const map = L.map("mapa-divisas").setView([-22.2, -48.6], 6);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap",
       }).addTo(map);
       mapRef.current = map;
+      map.on("moveend", () => atualizarCamadaCar());
+      map.on("click", (e: any) => selecionarPorClique(e.latlng.lat, e.latlng.lng));
       await fetch("/api/geometria/seed", { method: "POST" });
-      const linhas = await (await fetch("/api/geometria/linhas")).json();
-      linhas.forEach((l: any) => {
-        const layer = L.geoJSON(
-          { type: "Feature", geometry: l.geometria },
-          { style: { color: "#dc2626", weight: 3, dashArray: "6 4" } }
-        )
-          .addTo(map)
-          .bindPopup(`<b>${l.codigo}</b><br/>${l.descricao ?? ""}<br/><i>${l.bancoOrigem}</i>`);
-        layersRef.current.push(layer);
-      });
+      // O mapa abre so com o limite estadual: a cobertura e todo o estado de SP.
+      const limite = await (await fetch("/api/geometria/limite-uf?uf=SP")).json();
+      if (limite.geojson) {
+        const layer = L.geoJSON(limite.geojson, {
+          style: { color: "#047857", weight: 2, fill: false },
+          interactive: false,
+        }).addTo(map);
+        map.fitBounds(layer.getBounds());
+      }
       setPronto(true);
     };
     document.body.appendChild(script);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * Contorno laranja dos imoveis da janela atual. O GeoServer do CAR ignora
+   * SLD_BODY (estilo unico com preenchimento opaco), por isso as feicoes vem do
+   * WFS e sao desenhadas no cliente; o WMS fica como base translucida.
+   */
+  async function atualizarCamadaCar() {
+    const L = (window as any).L;
+    const map = mapRef.current;
+    if (!map || !mostrarCarRef.current) return;
+    if (map.getZoom() < ZOOM_MIN_CAR) {
+      carLayerRef.current?.clearLayers();
+      setTotalCarVisivel(null);
+      return;
+    }
+    const b = map.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n: number) => n.toFixed(6)).join(",");
+    setCarregandoCar(true);
+    try {
+      const res = await fetch(`/api/car/imoveis?bbox=${bbox}&limite=300`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha ao consultar o CAR");
+      if (!mostrarCarRef.current) return;
+      const grupo = carLayerRef.current;
+      grupo.clearLayers();
+      (data.imoveis ?? []).forEach((imovel: any) => {
+        L.geoJSON({ type: "Feature", properties: {}, geometry: imovel.geometria }, {
+          style: { color: "#f97316", weight: 1.5, fillColor: "#f97316", fillOpacity: 0.05 },
+        })
+          .bindPopup(popupImovel(imovel))
+          .on("click", () => {
+            if (modoCliqueRef.current) usarImovel(imovel, false);
+          })
+          .addTo(grupo);
+      });
+      setTotalCarVisivel((data.imoveis ?? []).length);
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setCarregandoCar(false);
+    }
+  }
+
+  function alternarCamadaCar(ativo: boolean) {
+    const L = (window as any).L;
+    const map = mapRef.current;
+    setMostrarCar(ativo);
+    mostrarCarRef.current = ativo;
+    if (!map) return;
+    if (ativo) {
+      wmsRef.current ??= L.tileLayer.wms(CAR_WMS, {
+        layers: "sicar:sicar_imoveis_sp",
+        format: "image/png",
+        transparent: true,
+        opacity: 0.25,
+        attribution: "CAR/SICAR",
+      });
+      carLayerRef.current ??= L.layerGroup();
+      wmsRef.current.addTo(map);
+      carLayerRef.current.addTo(map);
+      atualizarCamadaCar();
+    } else {
+      if (wmsRef.current) map.removeLayer(wmsRef.current);
+      if (carLayerRef.current) {
+        carLayerRef.current.clearLayers();
+        map.removeLayer(carLayerRef.current);
+      }
+      setTotalCarVisivel(null);
+    }
+  }
+
+  /** Clique no mapa: o WFS devolve a feicao que contem o ponto. */
+  async function selecionarPorClique(lat: number, lon: number) {
+    if (!modoCliqueRef.current) return;
+    setCarregandoPonto(true);
+    setErro(null);
+    try {
+      const res = await fetch(`/api/car/imoveis?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha ao consultar o CAR");
+      usarImovel(data.imoveis[0], false);
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setCarregandoPonto(false);
+    }
+  }
+
+  /** Vira o poligono de analise: preenche o GeoJSON, destaca no mapa e abre o popup. */
+  function usarImovel(imovel: any, voar: boolean) {
+    const L = (window as any).L;
+    const map = mapRef.current;
+    setGeojson(JSON.stringify({
+      type: "Feature",
+      properties: {
+        nome: imovel.codImovel,
+        municipio: imovel.municipio,
+        uf: imovel.uf,
+        areaHa: imovel.areaHa,
+        modulosFiscais: imovel.modulosFiscais,
+      },
+      geometry: imovel.geometria,
+    }, null, 2));
+    setCarInfo(
+      `${imovel.codImovel} — ${imovel.municipio}/${imovel.uf} · ` +
+      `${Number(imovel.areaHa).toLocaleString("pt-BR")} ha · ${imovel.modulosFiscais} MF · ${imovel.statusImovel}`
+    );
+    if (selecaoRef.current) map.removeLayer(selecaoRef.current);
+    const layer = L.geoJSON({ type: "Feature", properties: {}, geometry: imovel.geometria }, {
+      style: { color: "#6366f1", weight: 3, fillColor: "#6366f1", fillOpacity: 0.2 },
+    })
+      .bindPopup(popupImovel(imovel))
+      .addTo(map);
+    selecaoRef.current = layer;
+    const bounds = layer.getBounds();
+    if (voar) map.flyToBounds(bounds.pad(0.3), { duration: 1 });
+    else map.fitBounds(bounds.pad(0.3));
+    layer.openPopup(bounds.getCenter());
+  }
 
   function desenharImovel(feature: any, cor: string) {
     const L = (window as any).L;
@@ -79,14 +234,7 @@ export default function GeometriaPage() {
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok || !data.imoveis?.length) throw new Error(data.error || "Nenhum imovel retornado pelo CAR");
-      const imovel = data.imoveis[0];
-      setGeojson(JSON.stringify({
-        type: "Feature",
-        properties: { nome: imovel.codImovel, municipio: imovel.municipio, uf: imovel.uf, areaHa: imovel.areaHa },
-        geometry: imovel.geometria,
-      }, null, 2));
-      setCarInfo(`${imovel.codImovel} — ${imovel.municipio}/${imovel.uf} · ${imovel.areaHa.toLocaleString("pt-BR")} ha`);
-      desenharImovel({ type: "Feature", properties: {}, geometry: imovel.geometria }, "#6366f1");
+      usarImovel(data.imoveis[0], Boolean(codigo && codigo.trim()));
     } catch (e) {
       setErro((e as Error).message || "Falha ao consultar o CAR");
     } finally {
@@ -127,9 +275,49 @@ export default function GeometriaPage() {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+          <div className="bg-orange-50 border border-orange-200 rounded-md p-3 space-y-2">
+            <label className="flex items-center gap-2 text-xs font-medium text-orange-900 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={mostrarCar}
+                disabled={!pronto}
+                onChange={(e) => alternarCamadaCar(e.target.checked)}
+                className="accent-orange-600"
+              />
+              Mostrar imoveis CAR (SP)
+              {carregandoCar && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            </label>
+            <label className="flex items-center gap-2 text-xs font-medium text-orange-900 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={modoClique}
+                disabled={!pronto}
+                onChange={(e) => {
+                  setModoClique(e.target.checked);
+                  modoCliqueRef.current = e.target.checked;
+                }}
+                className="accent-orange-600"
+              />
+              <MousePointerClick className="h-3.5 w-3.5" />
+              Selecionar imovel por clique
+              {carregandoPonto && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            </label>
+            {mostrarCar && (
+              <p className="text-[11px] text-orange-700">
+                {totalCarVisivel === null
+                  ? `Aproxime o mapa (zoom ${ZOOM_MIN_CAR}+) para carregar os contornos do CAR.`
+                  : `${totalCarVisivel} imoveis nesta janela — contorno laranja, direto do geoserver.car.gov.br.`}
+              </p>
+            )}
+            {modoClique && (
+              <p className="text-[11px] text-orange-700">
+                Clique sobre uma propriedade: o WFS devolve a feicao que contem o ponto e ela vira o poligono de analise.
+              </p>
+            )}
+          </div>
           <div className="flex items-center justify-between">
             <label className="block text-xs font-medium text-gray-600">
-              Poligono do imovel (GeoJSON — vindo do SIGEF ou CAR)
+              Imovel (SIGEF ou CAR)
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -151,17 +339,9 @@ export default function GeometriaPage() {
               </button>
             </div>
           </div>
-          {carInfo && (
-            <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded p-2">
-              CAR/SICAR (SP): {carInfo}
-            </p>
-          )}
-          <textarea
-            value={geojson}
-            onChange={(e) => setGeojson(e.target.value)}
-            rows={12}
-            className="w-full border border-gray-300 rounded-md p-2 font-mono text-xs"
-          />
+          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded p-2">
+            Poligono em analise: {carInfo ? `CAR/SICAR (SP) · ${carInfo}` : ROTULO_EXEMPLO}
+          </p>
           <input
             value={processId}
             onChange={(e) => setProcessId(e.target.value)}
