@@ -133,9 +133,28 @@ export function somenteDigitos(valor: string): string {
   return valor.replace(/\D/g, "");
 }
 
+export const LIMITE_DIGITOS_INCRA = 13;
+
+/** Algarismos do codigo INCRA/SNCR, limitados ao tamanho do cadastro. */
+export function digitosIncra(valor: string): string {
+  return somenteDigitos(valor).slice(0, LIMITE_DIGITOS_INCRA);
+}
+
+function codigoValido(
+  codigo: string,
+  opcoes: ReadonlyArray<{ codigo: string }>
+): boolean {
+  return opcoes.some((o) => o.codigo === codigo);
+}
+
+/** Quantidade de poligonos aceita apenas inteiro positivo, sem decimais. */
+function quantidadeValida(valor: string): boolean {
+  return /^\d+$/.test(valor.trim()) && parseInt(valor, 10) >= 1;
+}
+
 /** Aplica a mascara xxx.xxx.xxx.xxx-x sobre os digitos do codigo INCRA/SNCR. */
 export function mascaraIncra(valor: string): string {
-  const d = somenteDigitos(valor).slice(0, 13);
+  const d = digitosIncra(valor);
   const partes = [d.slice(0, 3), d.slice(3, 6), d.slice(6, 9), d.slice(9, 12)].filter(Boolean);
   const mascarado = partes.join(".");
   return d.length > 12 ? `${mascarado}-${d.slice(12)}` : mascarado;
@@ -153,9 +172,9 @@ export type ErrosCjt = Partial<Record<keyof FormularioCjt | "combinacao", string
 export function validarFormulario(form: FormularioCjt): ErrosCjt {
   const erros: ErrosCjt = {};
 
-  if (!form.qualidade) erros.qualidade = "Selecione uma opção.";
-  if (!form.resultado) erros.resultado = "Selecione uma opção.";
-  if (!form.situacao) erros.situacao = "Selecione uma opção.";
+  if (!codigoValido(form.qualidade, QUALIDADE_OPCOES)) erros.qualidade = "Selecione uma opção.";
+  if (!codigoValido(form.resultado, RESULTADO_OPCOES)) erros.resultado = "Selecione uma opção.";
+  if (!codigoValido(form.situacao, SITUACAO_OPCOES)) erros.situacao = "Selecione uma opção.";
   if (bloqueiaAvanco(form)) erros.combinacao = MENSAGEM_NAO_SEI;
   if (Object.keys(erros).length > 0) return erros;
 
@@ -176,10 +195,10 @@ export function validarFormulario(form: FormularioCjt): ErrosCjt {
   }
 
   if (campos.includes("qtdPoligonos")) {
-    const qtd = parseInt(form.qtdPoligonos, 10);
-    if (!Number.isInteger(qtd) || qtd < 1) {
+    if (!quantidadeValida(form.qtdPoligonos)) {
       erros.qtdPoligonos = "Informe um número inteiro igual ou superior a 1.";
     } else {
+      const qtd = parseInt(form.qtdPoligonos, 10);
       const nomes = form.nomesPoligonos.map((n) => n.trim());
       if (nomes.length !== qtd) {
         erros.nomesPoligonos = "Informe um nome para cada polígono.";
@@ -195,7 +214,7 @@ export function validarFormulario(form: FormularioCjt): ErrosCjt {
 
   if (campos.includes("codigoIncra")) {
     const digitos = somenteDigitos(form.codigoIncra);
-    if (digitos.length > 0 && digitos.length !== 13) {
+    if (digitos.length > 0 && digitos.length !== LIMITE_DIGITOS_INCRA) {
       erros.codigoIncra = "O código INCRA/SNCR deve ter 13 algarismos.";
     }
   }
@@ -227,7 +246,7 @@ export interface DadosCjtPersistidos {
 export function normalizarParaPersistencia(form: FormularioCjt): DadosCjtPersistidos {
   const limpo = limparCamposNaoAplicaveis(form);
   const campos = camposAplicaveis(limpo.resultado, limpo.situacao);
-  const qtd = parseInt(limpo.qtdPoligonos, 10);
+  const qtd = quantidadeValida(limpo.qtdPoligonos) ? parseInt(limpo.qtdPoligonos, 10) : NaN;
   const incra = somenteDigitos(limpo.codigoIncra);
 
   return {
@@ -242,7 +261,8 @@ export function normalizarParaPersistencia(form: FormularioCjt): DadosCjtPersist
     cjtNomesPoligonos: campos.includes("nomesPoligonos")
       ? JSON.stringify(limpo.nomesPoligonos.map((n) => n.trim()))
       : null,
-    cjtCodigoIncra: campos.includes("codigoIncra") && incra.length === 13 ? incra : null,
+    cjtCodigoIncra:
+      campos.includes("codigoIncra") && incra.length === LIMITE_DIGITOS_INCRA ? incra : null,
     cjtDeclaracaoAceita: limpo.declaracao,
   };
 }

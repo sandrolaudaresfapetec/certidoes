@@ -24,6 +24,7 @@ import {
   exigeEspolio,
   formularioVazio,
   limparCamposNaoAplicaveis,
+  digitosIncra,
   mascaraIncra,
   somenteDigitos,
   validarFormulario,
@@ -138,6 +139,14 @@ export function RequisicaoForm({
     setErros(validacao);
     if (Object.keys(validacao).length > 0) return;
 
+    if (etapaImovel === "consultando") {
+      setErro("Aguarde a consulta dos imóveis no SIGEF.");
+      return;
+    }
+    if (etapaImovel === "selecao" && !selecionada) {
+      setErro("Selecione o imóvel do SIGEF para o qual deseja a certidão.");
+      return;
+    }
     if (exigeDocsImovel && !(planta && docPropriedade)) {
       setErro("Anexe a planta do imóvel e o comprovante de propriedade.");
       return;
@@ -348,9 +357,7 @@ export function RequisicaoForm({
               />
               {parseInt(form.qtdPoligonos, 10) >= ALERTA_QTD_POLIGONOS && (
                 <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2 mt-2">
-                  Atenção: {form.qtdPoligonos} polígonos. Pedidos com{" "}
-                  {ALERTA_QTD_POLIGONOS} ou mais polígonos exigem análise
-                  específica e podem ter prazo maior.
+                  {`Atenção: ${form.qtdPoligonos} polígonos. Pedidos com ${ALERTA_QTD_POLIGONOS} ou mais polígonos exigem análise específica e podem ter prazo maior.`}
                 </p>
               )}
             </Campo>
@@ -400,7 +407,7 @@ export function RequisicaoForm({
                 value={mascaraIncra(form.codigoIncra)}
                 placeholder="xxx.xxx.xxx.xxx-x"
                 onChange={(e) =>
-                  setForm((a) => ({ ...a, codigoIncra: somenteDigitos(e.target.value) }))
+                  setForm((a) => ({ ...a, codigoIncra: digitosIncra(e.target.value) }))
                 }
                 className="w-64 border border-gray-300 rounded-md px-3 py-2 text-sm"
               />
