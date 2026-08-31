@@ -85,6 +85,28 @@ Endpoints do portal: `POST /api/portal/login`, `POST /api/portal/logout`, `POST 
 
 ---
 
+## Login do backoffice (funcionários do IGC)
+
+O backoffice (tudo fora de `/portal`) exige login institucional em `/login`: e-mail do
+`User` + senha (scrypt com salt por usuário) e sessão em cookie `igc_session`
+httpOnly assinado por HMAC-SHA256, com validade de 8 horas. O `proxy.ts` faz a
+checagem otimista do cookie e cada página/rota revalida a assinatura e o usuário
+ativo no banco; as ações continuam limitadas pelo papel (Atendimento abre
+requisição/processo/pagamento, cada papel vê apenas as suas etapas de assinatura).
+
+| Variável | Descrição |
+| --- | --- |
+| `STAFF_SESSION_SECRET` | Segredo HMAC da sessão do backoffice — **obrigatório** em produção |
+| `SEED_STAFF_PASSWORD` | Senha inicial dos usuários criados pelo seed (padrão `IGC@certidoes-2026`) |
+
+`POST /api/seed` só roda sem autenticação enquanto nenhum usuário tem senha
+(bootstrap); depois disso exige sessão de `ADMIN`. Ele define a senha inicial
+apenas para usuários sem senha — senhas já trocadas não são sobrescritas.
+Quando o Keycloak/OIDC do gov.br corporativo estiver disponível, basta trocar a
+emissão da sessão em `src/lib/auth.ts`.
+
+---
+
 ## Módulo de Geometria de Divisas (tela `/geometria`)
 
 Corte automático do polígono do imóvel (vindo do SIGEF) pelas **linhas de divisa validadas**:

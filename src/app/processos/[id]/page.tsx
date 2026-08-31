@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Clock, User, FileText, MapPin, FileCheck } from "lucide-react";
 import { WorkflowActions } from "@/components/workflow-actions";
+import { requireUsuario } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ interface PageProps {
 }
 
 export default async function ProcessoDetailPage({ params }: PageProps) {
+  await requireUsuario();
+
   const { id } = await params;
 
   const processo = await prisma.process.findUnique({

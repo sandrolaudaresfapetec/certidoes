@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { exigirUsuarioApi } from "@/lib/auth";
 
 /** POST /api/geometria/seed[?force=1] — linhas de divisa de demonstracao (interior de SP: Brotas, Holambra, Sao Pedro). */
 export async function POST(request: NextRequest) {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao.erro;
+
   const force = request.nextUrl.searchParams.get("force") === "1";
   const total = await prisma.linhaDivisa.count();
   if (total > 0 && !force) {

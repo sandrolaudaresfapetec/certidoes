@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { exigirUsuarioApi } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao.erro;
+
   const searchParams = request.nextUrl.searchParams;
   const userId = searchParams.get("userId");
   const unreadOnly = searchParams.get("unreadOnly") === "true";
@@ -44,6 +48,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao.erro;
+
   const body = await request.json();
   const { notificationIds, read } = body;
 

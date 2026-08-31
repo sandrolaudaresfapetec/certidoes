@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { consultarParcelasSigef } from "@/lib/sigef";
+import { getUsuarioLogado } from "@/lib/auth";
+import { getSolicitanteLogado } from "@/lib/portal-auth";
 
 /**
  * POST /api/sigef/consulta
@@ -17,6 +19,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido." },
       { status: 400 }
+    );
+  }
+
+  // A consulta atende o portal e o backoffice: o solicitante logado só pode
+  // consultar o próprio CPF; servidores do IGC consultam qualquer titular.
+  const [usuario, solicitante] = await Promise.all([
+    getUsuarioLogado(),
+    getSolicitanteLogado(),
+  ]);
+  if (!usuario && !solicitante) {
+    return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
+  }
+  if (!usuario && solicitante && solicitante.cpf !== digits) {
+    return NextResponse.json(
+      { error: "A consulta ao SIGEF é limitada ao CPF do solicitante logado." },
+      { status: 403 }
     );
   }
 

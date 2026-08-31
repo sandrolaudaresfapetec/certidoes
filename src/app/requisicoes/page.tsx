@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { formatarCPF } from "@/lib/cpf";
 import { statusRequisicao } from "@/lib/requisicao-status";
 import { RequisicaoFiltros } from "@/components/requisicao-filtros";
-import { getPerfilAtivo, podeAtender } from "@/lib/perfil-ativo";
+import { requireUsuario, podeAtender } from "@/lib/auth";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +15,8 @@ export default async function RequisicoesPage({
   searchParams: Promise<{ q?: string; status?: string; semProcesso?: string }>;
 }) {
   const { q = "", status = "", semProcesso = "" } = await searchParams;
-  const perfil = await getPerfilAtivo();
-  const atendimento = podeAtender(perfil);
+  const usuario = await requireUsuario();
+  const atendimento = podeAtender(usuario);
 
   const where: Prisma.SolicitacaoWhereInput = {};
   if (status) where.status = status;

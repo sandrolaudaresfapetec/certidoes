@@ -11,6 +11,7 @@ model User {
   name      String
   email     String   @unique
   role      String   // ADMIN, GERENTE, DIRETOR, TECNICO, CONFERENTE, SDTC
+  passwordHash String? // scrypt: login do backoffice
   department String? // CATDT, CG, SDTC
   active    Boolean  @default(true)
   createdAt DateTime @default(now())

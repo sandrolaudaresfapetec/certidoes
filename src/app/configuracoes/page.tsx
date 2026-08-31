@@ -1,6 +1,9 @@
 import { Settings } from "lucide-react";
+import { requireUsuario } from "@/lib/auth";
 
-export default function ConfiguracoesPage() {
+export default async function ConfiguracoesPage() {
+  await requireUsuario();
+
   return (
     <div className="p-8 max-w-2xl">
       <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 mb-6">

@@ -4,6 +4,7 @@ import { formatDateTime } from "@/lib/utils";
 import Link from "next/link";
 import { Bell, CheckCircle, Clock, FileText, UserCheck, AlertTriangle } from "lucide-react";
 import { MarkReadButton } from "@/components/mark-read-button";
+import { requireUsuario } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ const typeIcons: Record<string, React.ReactNode> = {
 };
 
 export default async function NotificacoesPage() {
+  await requireUsuario();
+
   const notifications = await prisma.notification.findMany({
     include: {
       process: {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { exigirUsuarioApi } from "@/lib/auth";
 
 /** Codigos IBGE das UFs aceitas (o sistema atende SP, as demais ficam disponiveis para consulta). */
 const UF_IBGE: Record<string, string> = {
@@ -14,6 +15,9 @@ const MALHAS_IBGE = "https://servicodados.ibge.gov.br/api/v3/malhas/estados";
 
 /** GET /api/geometria/limite-uf?uf=SP — limite estadual (malha IBGE) para enquadrar o mapa. */
 export async function GET(request: NextRequest) {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao.erro;
+
   const uf = (request.nextUrl.searchParams.get("uf") || "SP").toUpperCase();
   const codigo = UF_IBGE[uf];
   if (!codigo) {

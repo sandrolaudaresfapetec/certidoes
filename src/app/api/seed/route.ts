@@ -1,7 +1,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getUsuarioLogado, hashSenha } from "@/lib/auth";
+
+/** Senha inicial dos usuarios de demonstracao (trocar apos o primeiro acesso). */
+const SENHA_INICIAL = process.env.SEED_STAFF_PASSWORD || "IGC@certidoes-2026";
 
 export async function POST() {
+  // Bootstrap: liberado enquanto nenhum usuario tem senha definida. Depois
+  // disso, apenas um ADMIN autenticado pode rodar o seed novamente.
+  const jaInstalado = await prisma.user.count({ where: { passwordHash: { not: null } } });
+  if (jaInstalado > 0) {
+    const usuario = await getUsuarioLogado();
+    if (!usuario) {
+      return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
+    }
+    if (usuario.role !== "ADMIN") {
+      return NextResponse.json({ error: "Ação exclusiva de ADMIN." }, { status: 403 });
+    }
+  }
+
   // Create users
   const users = await Promise.all([
     prisma.user.upsert({
@@ -84,6 +101,14 @@ export async function POST() {
       },
     }),
   ]);
+
+  // Usuarios de demonstracao recebem a senha inicial; senhas ja definidas
+  // permanecem intactas.
+  const senhaHash = hashSenha(SENHA_INICIAL);
+  await prisma.user.updateMany({
+    where: { passwordHash: null },
+    data: { passwordHash: senhaHash },
+  });
 
   // Create sample processes
   const sampleProcesses = [

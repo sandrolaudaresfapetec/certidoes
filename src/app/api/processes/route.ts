@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { exigirUsuarioApi } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao.erro;
+
   const searchParams = request.nextUrl.searchParams;
   const situacao = searchParams.get("situacao");
   const tipoServico = searchParams.get("tipoServico");
@@ -45,6 +49,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao.erro;
+
   const body = await request.json();
 
   const maxOrdem = await prisma.process.findFirst({

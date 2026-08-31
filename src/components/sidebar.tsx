@@ -14,7 +14,7 @@ import {
   PenLine,
   UserPlus,
 } from "lucide-react";
-import { PerfilAtivoSelect } from "@/components/perfil-ativo-select";
+import { StaffLogoutButton } from "@/components/staff-logout";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -30,13 +30,11 @@ const navigation = [
 ];
 
 interface SidebarProps {
-  usuarios: { id: string; name: string; role: string }[];
-  perfilAtivoId: string | null;
+  usuario: { name: string; email: string; role: string };
 }
 
-export function Sidebar({ usuarios, perfilAtivoId }: SidebarProps) {
+export function Sidebar({ usuario }: SidebarProps) {
   const pathname = usePathname();
-  const ativo = usuarios.find((u) => u.id === perfilAtivoId) ?? null;
 
   return (
     <div className="fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -66,17 +64,15 @@ export function Sidebar({ usuarios, perfilAtivoId }: SidebarProps) {
           );
         })}
       </nav>
-      <div className="p-4 border-t border-gray-200 space-y-2">
-        {usuarios.length > 0 ? (
-          <PerfilAtivoSelect usuarios={usuarios} ativoId={perfilAtivoId} />
-        ) : (
-          <p className="text-xs text-gray-500">Nenhum usuário cadastrado.</p>
-        )}
-        {ativo && (
-          <p className="text-xs text-gray-500">
-            As ações disponíveis seguem o papel {ativo.role}.
-          </p>
-        )}
+      <div className="p-4 border-t border-gray-200 space-y-1">
+        <p className="text-sm font-medium text-gray-900">{usuario.name}</p>
+        <p className="text-xs text-gray-500">{usuario.email}</p>
+        <p className="text-xs text-gray-500">
+          As ações disponíveis seguem o papel {usuario.role}.
+        </p>
+        <div className="pt-2">
+          <StaffLogoutButton />
+        </div>
       </div>
     </div>
   );
