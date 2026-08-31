@@ -47,8 +47,10 @@ export function verificarSenha(senha: string, armazenado: string | null): boolea
   if (!armazenado) return false;
   const [algoritmo, salt, hash] = armazenado.split(":");
   if (algoritmo !== "scrypt" || !salt || !hash) return false;
+  // Hash corrompido nao pode ditar o custo do scrypt nem derrubar o login.
+  if (hash.length !== SCRYPT_KEYLEN * 2 || !/^[0-9a-f]+$/.test(hash)) return false;
   const esperado = Buffer.from(hash, "hex");
-  const calculado = scryptSync(senha, salt, esperado.length);
+  const calculado = scryptSync(senha, salt, SCRYPT_KEYLEN);
   return esperado.length === calculado.length && timingSafeEqual(esperado, calculado);
 }
 
@@ -100,6 +102,17 @@ export async function exigirUsuarioApi(): Promise<ChecagemApi> {
     };
   }
   return { usuario };
+}
+
+export async function exigirAdminApi(): Promise<ChecagemApi> {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao;
+  if (sessao.usuario.role !== "ADMIN") {
+    return {
+      erro: NextResponse.json({ error: "Ação exclusiva de ADMIN." }, { status: 403 }),
+    };
+  }
+  return sessao;
 }
 
 export async function exigirAtendimentoApi(): Promise<ChecagemApi> {

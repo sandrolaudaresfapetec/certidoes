@@ -9,28 +9,22 @@ interface WorkflowActionsProps {
   processId: string;
   currentStatus: WorkflowStage;
   allowedTransitions: WorkflowStage[];
-  users: Array<{ id: string; name: string; role: string }>;
+  responsavel: string;
 }
 
 export function WorkflowActions({
   processId,
   currentStatus,
   allowedTransitions,
-  users,
+  responsavel,
 }: WorkflowActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState("");
 
   const currentConfig = WORKFLOW_STAGES[currentStatus];
 
   async function handleTransition(toStatus: WorkflowStage) {
-    if (!selectedUser) {
-      setError("Selecione o usuario responsavel pela acao");
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
@@ -38,11 +32,7 @@ export function WorkflowActions({
       const res = await fetch("/api/workflow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          processId,
-          toStatus,
-          userId: selectedUser,
-        }),
+        body: JSON.stringify({ processId, toStatus }),
       });
 
       if (!res.ok) {
@@ -77,24 +67,10 @@ export function WorkflowActions({
       {allowedTransitions.length > 0 && (
         <>
           <div className="mb-4">
-            <label className="text-xs font-medium text-gray-500 block mb-1">
-              Responsavel pela Acao
-            </label>
-            <select
-              value={selectedUser}
-              onChange={(e) => {
-                setSelectedUser(e.target.value);
-                setError(null);
-              }}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Selecione...</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.role})
-                </option>
-              ))}
-            </select>
+            <p className="text-xs text-gray-500">
+              A ação será registrada em nome de{" "}
+              <span className="font-medium text-gray-900">{responsavel}</span>.
+            </p>
           </div>
 
           <div className="space-y-2">

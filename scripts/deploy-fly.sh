@@ -62,11 +62,25 @@ fi
 log "3/6 Secrets (banco + portal + SIGEF)"
 # Attach injeta DATABASE_URL automaticamente; ignora se já anexado
 $FLY postgres attach "$PG_NAME" -a "$APP_NAME" 2>/dev/null || warn "Postgres já anexado (DATABASE_URL existente)"
-$FLY secrets set -a "$APP_NAME" \
-  PORTAL_SESSION_SECRET="${PORTAL_SESSION_SECRET:-$(openssl rand -hex 24 2>/dev/null || echo change-me-$(date +%s))}" \
-  STAFF_SESSION_SECRET="${STAFF_SESSION_SECRET:-$(openssl rand -hex 24 2>/dev/null || echo change-me-$(date +%s))}" \
-  SIGEF_MOCK="${SIGEF_MOCK:-true}" \
-  GOVBR_MOCK="${GOVBR_MOCK:-true}"
+SECRETS_ATUAIS=$($FLY secrets list -a "$APP_NAME" --json 2>/dev/null || echo "[]")
+SECRETS_A_DEFINIR=()
+
+# Segredos de sessao sao gerados apenas no primeiro provisionamento: sobrescrever
+# a cada deploy invalidaria todas as sessoes ativas.
+for VAR in PORTAL_SESSION_SECRET STAFF_SESSION_SECRET; do
+  VALOR="${!VAR:-}"
+  if [ -n "$VALOR" ]; then
+    SECRETS_A_DEFINIR+=("$VAR=$VALOR")
+  elif echo "$SECRETS_ATUAIS" | grep -q "\"$VAR\""; then
+    ok "$VAR preservado (já configurado no app)"
+  else
+    SECRETS_A_DEFINIR+=("$VAR=$(openssl rand -hex 24 2>/dev/null || echo change-me-$(date +%s))")
+    ok "$VAR gerado (primeiro provisionamento)"
+  fi
+done
+
+SECRETS_A_DEFINIR+=("SIGEF_MOCK=${SIGEF_MOCK:-true}" "GOVBR_MOCK=${GOVBR_MOCK:-true}")
+$FLY secrets set -a "$APP_NAME" "${SECRETS_A_DEFINIR[@]}"
 ok "Secrets configurados"
 
 # -----------------------------------------------------------------------------

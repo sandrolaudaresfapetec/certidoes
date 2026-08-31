@@ -7,15 +7,9 @@ export async function GET(request: NextRequest) {
   if ("erro" in sessao) return sessao.erro;
 
   const searchParams = request.nextUrl.searchParams;
-  const userId = searchParams.get("userId");
   const unreadOnly = searchParams.get("unreadOnly") === "true";
-
-  if (!userId) {
-    return NextResponse.json(
-      { error: "userId e obrigatorio" },
-      { status: 400 }
-    );
-  }
+  // Cada usuario le apenas as proprias notificacoes.
+  const userId = sessao.usuario.id;
 
   const where: Record<string, unknown> = { userId };
   if (unreadOnly) {
@@ -62,7 +56,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   await prisma.notification.updateMany({
-    where: { id: { in: notificationIds } },
+    where: { id: { in: notificationIds }, userId: sessao.usuario.id },
     data: { read: read ?? true },
   });
 

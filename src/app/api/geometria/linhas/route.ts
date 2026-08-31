@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { exigirUsuarioApi } from "@/lib/auth";
+import { exigirAdminApi, exigirUsuarioApi } from "@/lib/auth";
 
 /** GET /api/geometria/linhas — lista as linhas de divisa validadas. */
 export async function GET() {
@@ -15,7 +15,7 @@ export async function GET() {
 
 /** POST /api/geometria/linhas — cadastra linha de divisa validada (base PostGIS). */
 export async function POST(request: NextRequest) {
-  const sessao = await exigirUsuarioApi();
+  const sessao = await exigirAdminApi();
   if ("erro" in sessao) return sessao.erro;
 
   const body = await request.json();

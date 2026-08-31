@@ -20,9 +20,10 @@ const typeIcons: Record<string, React.ReactNode> = {
 };
 
 export default async function NotificacoesPage() {
-  await requireUsuario();
+  const usuario = await requireUsuario();
 
   const notifications = await prisma.notification.findMany({
+    where: { userId: usuario.id },
     include: {
       process: {
         select: {
@@ -33,7 +34,6 @@ export default async function NotificacoesPage() {
           situacao: true,
         },
       },
-      user: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -88,9 +88,6 @@ export default async function NotificacoesPage() {
                 <div className="flex items-center gap-4 mt-2">
                   <span className="text-xs text-gray-400">
                     {formatDateTime(notif.createdAt)}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Para: {notif.user.name}
                   </span>
                   {notif.process && (
                     <Link

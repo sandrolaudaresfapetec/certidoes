@@ -14,7 +14,7 @@ interface PageProps {
 }
 
 export default async function ProcessoDetailPage({ params }: PageProps) {
-  await requireUsuario();
+  const usuario = await requireUsuario();
 
   const { id } = await params;
 
@@ -37,11 +37,6 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
 
   const stageConfig = WORKFLOW_STAGES[processo.situacao as WorkflowStage];
   const allowedNext = ALLOWED_TRANSITIONS[processo.situacao as WorkflowStage] || [];
-
-  const users = await prisma.user.findMany({
-    where: { active: true },
-    select: { id: true, name: true, role: true },
-  });
 
   return (
     <div className="p-8">
@@ -286,7 +281,7 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
             processId={processo.id}
             currentStatus={processo.situacao as WorkflowStage}
             allowedTransitions={allowedNext}
-            users={users}
+            responsavel={`${usuario.name} (${usuario.role})`}
           />
 
           {/* Financial */}
