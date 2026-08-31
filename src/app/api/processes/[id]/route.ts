@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { exigirUsuarioApi } from "@/lib/auth";
+import { exigirAtendimentoApi, exigirUsuarioApi } from "@/lib/auth";
+
+/**
+ * Campos editaveis pelo Atendimento. Situacao, datas de assinatura e autoria
+ * ficam fora: sao gravadas apenas por /api/workflow a partir da sessao.
+ */
+const CAMPOS_EDITAVEIS = [
+  "tipoServico", "expediente", "anoEntrada", "tipo", "interessado", "email",
+  "telefone", "cpfCnpj", "municipio", "ra", "dra", "pasta", "utm", "base",
+  "departamento", "observacaoEntrada", "observacoesTecnico", "taxaAbertura",
+  "taxaVistoria", "tecnicoRespId", "tecnicoConfId",
+  "dtAbertoSei", "dtCompile", "dtNascimentoIdoso", "dtEmail", "dtVisita1",
+];
+
+const CAMPOS_DATA = [
+  "dtAbertoSei", "dtCompile", "dtNascimentoIdoso", "dtEmail", "dtVisita1",
+];
 
 export async function GET(
   _request: NextRequest,
@@ -13,9 +29,10 @@ export async function GET(
   const processo = await prisma.process.findUnique({
     where: { id },
     include: {
-      tecnicoResp: true,
-      tecnicoConf: true,
-      criadoPor: true,
+      // Nunca devolver o registro completo do usuario (contem passwordHash).
+      tecnicoResp: { select: { id: true, name: true, role: true } },
+      tecnicoConf: { select: { id: true, name: true, role: true } },
+      criadoPor: { select: { id: true, name: true, role: true } },
       workflowActions: {
         include: { user: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
@@ -38,25 +55,20 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const sessao = await exigirUsuarioApi();
+  const sessao = await exigirAtendimentoApi();
   if ("erro" in sessao) return sessao.erro;
 
   const { id } = await params;
   const body = await request.json();
 
-  const dateFields = [
-    "dtAbertoSei", "dtCompile", "dtNascimentoIdoso", "dtEmail", "dtVisita1",
-    "dtConf", "dtAssTecnico", "dtAssGerente", "dtAssDiretor", "dtUpadoSei",
-    "dtInicioSobrestado", "dtFimSobrestado", "dtCancelado",
-  ];
-
   const data: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
-    if (dateFields.includes(key) && value) {
-      data[key] = new Date(value as string);
-    } else {
-      data[key] = value;
-    }
+    if (!CAMPOS_EDITAVEIS.includes(key)) continue;
+    data[key] = CAMPOS_DATA.includes(key) && value ? new Date(value as string) : value;
+  }
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "Nenhum campo editavel informado" }, { status: 400 });
   }
 
   const processo = await prisma.process.update({

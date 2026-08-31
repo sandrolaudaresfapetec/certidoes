@@ -39,7 +39,7 @@ export default async function ClientesPage({
         <ClienteForm />
       ) : (
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3">
-          Seu perfil não pertence ao Atendimento — a lista abaixo é somente
+          Seu usuário não pertence ao Atendimento — a lista abaixo é somente
           para consulta.
         </p>
       )}

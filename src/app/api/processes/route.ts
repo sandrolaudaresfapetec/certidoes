@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { exigirUsuarioApi } from "@/lib/auth";
+import { exigirAtendimentoApi, exigirUsuarioApi } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   const sessao = await exigirUsuarioApi();
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const sessao = await exigirUsuarioApi();
+  const sessao = await exigirAtendimentoApi();
   if ("erro" in sessao) return sessao.erro;
 
   const body = await request.json();
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       base: body.base,
       departamento: body.departamento,
       situacao: "entrada_sdtc",
-      criadoPorId: body.criadoPorId,
+      criadoPorId: sessao.usuario.id,
       // Dados da propriedade vindos da consulta ao SIGEF/INCRA
       sigefCodigoImovel: body.sigefCodigoImovel || null,
       sigefParcelaCodigo: body.sigefParcelaCodigo || null,

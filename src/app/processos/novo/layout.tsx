@@ -1,10 +1,12 @@
-import { requireUsuario } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { podeAtender, requireUsuario } from "@/lib/auth";
 
 export default async function NovoProcessoLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireUsuario();
+  const usuario = await requireUsuario();
+  if (!podeAtender(usuario)) redirect("/processos");
   return children;
 }
