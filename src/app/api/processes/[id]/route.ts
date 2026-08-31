@@ -10,13 +10,46 @@ const CAMPOS_EDITAVEIS = [
   "tipoServico", "expediente", "anoEntrada", "tipo", "interessado", "email",
   "telefone", "cpfCnpj", "municipio", "ra", "dra", "pasta", "utm", "base",
   "departamento", "observacaoEntrada", "observacoesTecnico", "taxaAbertura",
-  "taxaVistoria", "tecnicoRespId", "tecnicoConfId",
+  "taxaVistoria", "tecnicoRespId", "tecnicoConfId", "divisaDificuldade",
+  "nivelPrioridade", "statusEscritorio", "quemVaiAssinar", "numeroSaidaIGC",
   "dtAbertoSei", "dtCompile", "dtNascimentoIdoso", "dtEmail", "dtVisita1",
+  "dtVisita2",
 ];
 
 const CAMPOS_DATA = [
   "dtAbertoSei", "dtCompile", "dtNascimentoIdoso", "dtEmail", "dtVisita1",
+  "dtVisita2",
 ];
+
+/** Papeis aceitos em cada atribuicao pessoal do processo. */
+const PAPEIS_ATRIBUICAO: Record<"tecnicoRespId" | "tecnicoConfId", string[]> = {
+  tecnicoRespId: ["TECNICO", "ADMIN"],
+  tecnicoConfId: ["CONFERENTE", "ADMIN"],
+};
+
+/** Erro descritivo quando a atribuicao aponta para conta inelegivel ou inativa. */
+async function validarAtribuicoes(
+  data: Record<string, unknown>
+): Promise<string | null> {
+  for (const campo of ["tecnicoRespId", "tecnicoConfId"] as const) {
+    if (!(campo in data)) continue;
+    const valor = data[campo];
+    if (valor === null || valor === "") {
+      data[campo] = null;
+      continue;
+    }
+    if (typeof valor !== "string") return `${campo} invalido`;
+    const usuario = await prisma.user.findFirst({
+      where: { id: valor, active: true },
+      select: { role: true },
+    });
+    if (!usuario) return `${campo}: usuario inexistente ou inativo`;
+    if (!PAPEIS_ATRIBUICAO[campo].includes(usuario.role)) {
+      return `${campo}: papel ${usuario.role} nao pode assumir esta atribuicao`;
+    }
+  }
+  return null;
+}
 
 export async function GET(
   _request: NextRequest,
@@ -37,7 +70,9 @@ export async function GET(
         include: { user: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
       },
+      // Notificacoes seguem o escopo por usuario: cada um ve apenas as suas.
       notifications: {
+        where: { userId: sessao.usuario.id },
         orderBy: { createdAt: "desc" },
         take: 20,
       },
@@ -69,6 +104,11 @@ export async function PATCH(
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nenhum campo editavel informado" }, { status: 400 });
+  }
+
+  const erroAtribuicao = await validarAtribuicoes(data);
+  if (erroAtribuicao) {
+    return NextResponse.json({ error: erroAtribuicao }, { status: 400 });
   }
 
   const processo = await prisma.process.update({

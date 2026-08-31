@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ALLOWED_TRANSITIONS, type WorkflowStage } from "@/lib/workflow";
-import { etapasDeAssinatura, exigirUsuarioApi } from "@/lib/auth";
-
-/** Etapas cuja saida representa a acao pessoal do responsavel (assinatura/conferencia). */
-const ETAPAS_PESSOAIS: Record<string, "tecnicoRespId" | "tecnicoConfId" | null> = {
-  conferencia: "tecnicoConfId",
-  assinatura_tecnico: "tecnicoRespId",
-  assinatura_gerente: null,
-  assinatura_diretor: null,
-};
+import {
+  ALLOWED_TRANSITIONS,
+  bloqueioDeEntrada,
+  bloqueioDeSaida,
+  type WorkflowStage,
+} from "@/lib/workflow";
+import { exigirUsuarioApi } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   const sessao = await exigirUsuarioApi();
@@ -41,22 +38,16 @@ export async function POST(request: NextRequest) {
   const fromStatus = processo.situacao as WorkflowStage;
   const allowedNext = ALLOWED_TRANSITIONS[fromStatus] || [];
 
-  // Sair de uma etapa pessoal exige o papel da etapa e, quando ha responsavel
-  // designado, ser o proprio responsavel (ADMIN mantem a supervisao).
-  if (fromStatus in ETAPAS_PESSOAIS && sessao.usuario.role !== "ADMIN") {
-    if (!etapasDeAssinatura(sessao.usuario).includes(fromStatus)) {
-      return NextResponse.json(
-        { error: `A etapa ${fromStatus} e exclusiva do responsavel designado.` },
-        { status: 403 }
-      );
-    }
-    const campo = ETAPAS_PESSOAIS[fromStatus];
-    if (campo && processo[campo] && processo[campo] !== sessao.usuario.id) {
-      return NextResponse.json(
-        { error: "Processo atribuido a outro responsavel." },
-        { status: 403 }
-      );
-    }
+  // Cada etapa so pode ser movimentada pelos papeis responsaveis por ela e,
+  // quando ha servidor designado, pelo proprio designado.
+  const bloqueio = bloqueioDeSaida(fromStatus, sessao.usuario, processo);
+  if (bloqueio) {
+    return NextResponse.json({ error: bloqueio }, { status: 403 });
+  }
+
+  const bloqueioDestino = bloqueioDeEntrada(toStatus as WorkflowStage, sessao.usuario);
+  if (bloqueioDestino) {
+    return NextResponse.json({ error: bloqueioDestino }, { status: 403 });
   }
 
   if (!allowedNext.includes(toStatus as WorkflowStage)) {
