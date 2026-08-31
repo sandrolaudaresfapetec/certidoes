@@ -43,17 +43,23 @@ export async function POST(request: NextRequest) {
 
   // Auto-populate dates based on transitions
   const now = new Date();
+  // As datas de assinatura sao registradas quando o responsavel pela etapa
+  // assina e encaminha o processo (transicao de saida da etapa de assinatura).
   switch (toStatus) {
-    case "assinatura_tecnico":
-      if (!processo.dtAssTecnico) updateData.dtAssTecnico = now;
-      break;
     case "assinatura_gerente":
-      if (!processo.dtAssGerente) updateData.dtAssGerente = now;
+      if (fromStatus === "assinatura_tecnico" && !processo.dtAssTecnico) {
+        updateData.dtAssTecnico = now;
+      }
       break;
     case "assinatura_diretor":
-      if (!processo.dtAssDiretor) updateData.dtAssDiretor = now;
+      if (fromStatus === "assinatura_gerente" && !processo.dtAssGerente) {
+        updateData.dtAssGerente = now;
+      }
       break;
     case "upload_sei":
+      if (fromStatus === "assinatura_diretor" && !processo.dtAssDiretor) {
+        updateData.dtAssDiretor = now;
+      }
       if (!processo.dtUpadoSei) updateData.dtUpadoSei = now;
       break;
     case "sobrestado":
