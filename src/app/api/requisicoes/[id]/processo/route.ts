@@ -38,42 +38,64 @@ export async function POST(
   const expediente = (body.expediente ?? "").toString().trim() || null;
   const observacaoEntrada = (body.observacaoEntrada ?? "").toString().trim() || null;
 
-  const maxOrdem = await prisma.process.findFirst({
-    orderBy: { ordem: "desc" },
-    select: { ordem: true },
+  const processo = await prisma.$transaction(async (tx) => {
+    const jaAberta = await tx.solicitacao.findUnique({
+      where: { id: requisicao.id },
+      select: { processId: true },
+    });
+    if (jaAberta?.processId) {
+      throw new Error("PROCESSO_JA_ABERTO");
+    }
+
+    const maxOrdem = await tx.process.findFirst({
+      orderBy: { ordem: "desc" },
+      select: { ordem: true },
+    });
+
+    const criado = await tx.process.create({
+      data: {
+        ordem: (maxOrdem?.ordem || 0) + 1,
+        anoEntrada: new Date().getFullYear(),
+        tipoServico: "Certidao",
+        expediente,
+        dtAbertoSei: new Date(),
+        tipo: "Comum-CPF",
+        interessado: requisicao.solicitante.nome,
+        email: requisicao.solicitante.email,
+        telefone: requisicao.solicitante.telefone,
+        cpfCnpj: requisicao.solicitante.cpf,
+        municipio: requisicao.sigefMunicipio,
+        observacaoEntrada,
+        situacao: "entrada_sdtc",
+        criadoPorId: perfil?.id ?? null,
+        sigefCodigoImovel: requisicao.sigefCodigoImovel,
+        sigefParcelaCodigo: requisicao.sigefParcelaCodigo,
+        sigefAreaHectares: requisicao.sigefAreaHectares,
+        sigefMunicipio: requisicao.sigefMunicipio,
+        sigefUf: requisicao.sigefUf,
+        sigefStatus: requisicao.sigefStatus,
+        sigefOrigem: requisicao.sigefOrigem,
+        sigefConsultadoEm: requisicao.sigefCodigoImovel ? new Date() : null,
+      },
+    });
+
+    await tx.solicitacao.update({
+      where: { id: requisicao.id },
+      data: { processId: criado.id, status: "EM_ANALISE" },
+    });
+
+    return criado;
+  }).catch((e: Error) => {
+    if (e.message === "PROCESSO_JA_ABERTO") return null;
+    throw e;
   });
 
-  const processo = await prisma.process.create({
-    data: {
-      ordem: (maxOrdem?.ordem || 0) + 1,
-      anoEntrada: new Date().getFullYear(),
-      tipoServico: "Certidao",
-      expediente,
-      dtAbertoSei: new Date(),
-      tipo: "Comum-CPF",
-      interessado: requisicao.solicitante.nome,
-      email: requisicao.solicitante.email,
-      telefone: requisicao.solicitante.telefone,
-      cpfCnpj: requisicao.solicitante.cpf,
-      municipio: requisicao.sigefMunicipio,
-      observacaoEntrada,
-      situacao: "entrada_sdtc",
-      criadoPorId: perfil?.id ?? null,
-      sigefCodigoImovel: requisicao.sigefCodigoImovel,
-      sigefParcelaCodigo: requisicao.sigefParcelaCodigo,
-      sigefAreaHectares: requisicao.sigefAreaHectares,
-      sigefMunicipio: requisicao.sigefMunicipio,
-      sigefUf: requisicao.sigefUf,
-      sigefStatus: requisicao.sigefStatus,
-      sigefOrigem: requisicao.sigefOrigem,
-      sigefConsultadoEm: requisicao.sigefCodigoImovel ? new Date() : null,
-    },
-  });
-
-  await prisma.solicitacao.update({
-    where: { id: requisicao.id },
-    data: { processId: processo.id, status: "EM_ANALISE" },
-  });
+  if (!processo) {
+    return NextResponse.json(
+      { error: "Esta requisição já possui processo aberto." },
+      { status: 400 }
+    );
+  }
 
   const responsaveis = await prisma.user.findMany({
     where: { active: true, OR: [{ role: "ADMIN" }, { role: "GERENTE" }] },
