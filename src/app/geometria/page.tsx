@@ -120,7 +120,6 @@ export default function GeometriaPage() {
         atualizarCamadaSigef();
       });
       map.on("click", (e: any) => selecionarPorClique(e.latlng.lat, e.latlng.lng));
-      await fetch("/api/geometria/seed", { method: "POST" });
       // O mapa abre so com o limite estadual: a cobertura e todo o estado de SP.
       const limite = await (await fetch("/api/geometria/limite-uf?uf=SP")).json();
       if (limite.geojson) {

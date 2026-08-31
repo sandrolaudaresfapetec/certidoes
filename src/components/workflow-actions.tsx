@@ -10,6 +10,7 @@ interface WorkflowActionsProps {
   currentStatus: WorkflowStage;
   allowedTransitions: WorkflowStage[];
   responsavel: string;
+  bloqueio?: string | null;
 }
 
 export function WorkflowActions({
@@ -17,6 +18,7 @@ export function WorkflowActions({
   currentStatus,
   allowedTransitions,
   responsavel,
+  bloqueio,
 }: WorkflowActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -98,7 +100,7 @@ export function WorkflowActions({
 
       {allowedTransitions.length === 0 && (
         <p className="text-sm text-gray-500 italic">
-          Nenhuma transicao disponivel para esta etapa.
+          {bloqueio || "Nenhuma transicao disponivel para esta etapa."}
         </p>
       )}
 

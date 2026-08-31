@@ -62,7 +62,12 @@ fi
 log "3/6 Secrets (banco + portal + SIGEF)"
 # Attach injeta DATABASE_URL automaticamente; ignora se já anexado
 $FLY postgres attach "$PG_NAME" -a "$APP_NAME" 2>/dev/null || warn "Postgres já anexado (DATABASE_URL existente)"
-SECRETS_ATUAIS=$($FLY secrets list -a "$APP_NAME" --json 2>/dev/null || echo "[]")
+if SECRETS_ATUAIS=$($FLY secrets list -a "$APP_NAME" --json 2>/dev/null); then
+  SECRETS_CONHECIDOS=1
+else
+  SECRETS_ATUAIS=""
+  SECRETS_CONHECIDOS=0
+fi
 SECRETS_A_DEFINIR=()
 
 # Segredos de sessao sao gerados apenas no primeiro provisionamento: sobrescrever
@@ -71,6 +76,10 @@ for VAR in PORTAL_SESSION_SECRET STAFF_SESSION_SECRET; do
   VALOR="${!VAR:-}"
   if [ -n "$VALOR" ]; then
     SECRETS_A_DEFINIR+=("$VAR=$VALOR")
+  elif [ "$SECRETS_CONHECIDOS" = "0" ]; then
+    # Sem a listagem nao se sabe se o secret existe: gerar um novo aqui
+    # derrubaria todas as sessoes ativas, entao o deploy para.
+    die "Não foi possível listar os secrets de $APP_NAME; repita o deploy ou informe $VAR explicitamente para não invalidar as sessões ativas."
   elif echo "$SECRETS_ATUAIS" | grep -q "\"$VAR\""; then
     ok "$VAR preservado (já configurado no app)"
   else

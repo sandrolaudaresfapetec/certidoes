@@ -144,6 +144,90 @@ export const ALLOWED_TRANSITIONS: Record<WorkflowStage, WorkflowStage[]> = {
   cancelado: [],
 };
 
+/**
+ * Quem pode tirar um processo de cada etapa. `responsavel` amarra a acao ao
+ * servidor designado no processo quando o papel dele e um dos listados em
+ * `papeis` do responsavel; ADMIN mantem a supervisao de todas as etapas.
+ */
+export const AUTORIZACAO_SAIDA: Record<
+  WorkflowStage,
+  {
+    papeis: string[];
+    responsavel?: {
+      campo: "tecnicoRespId" | "tecnicoConfId";
+      papeis: string[];
+    };
+  }
+> = {
+  entrada_sdtc: { papeis: ["SDTC", "GERENTE", "ADMIN"] },
+  distribuicao_gdat: { papeis: ["GERENTE", "ADMIN"] },
+  analise_tecnica: {
+    papeis: ["TECNICO", "GERENTE", "ADMIN"],
+    responsavel: { campo: "tecnicoRespId", papeis: ["TECNICO"] },
+  },
+  conferencia: {
+    papeis: ["CONFERENTE", "ADMIN"],
+    responsavel: { campo: "tecnicoConfId", papeis: ["CONFERENTE"] },
+  },
+  assinatura_tecnico: {
+    papeis: ["TECNICO", "ADMIN"],
+    responsavel: { campo: "tecnicoRespId", papeis: ["TECNICO"] },
+  },
+  assinatura_gerente: { papeis: ["GERENTE", "ADMIN"] },
+  assinatura_diretor: { papeis: ["DIRETOR", "ADMIN"] },
+  upload_sei: { papeis: ["SDTC", "GERENTE", "ADMIN"] },
+  finalizado: { papeis: [] },
+  sobrestado: { papeis: ["SDTC", "GERENTE", "ADMIN"] },
+  cancelado: { papeis: [] },
+};
+
+/**
+ * Papeis exigidos para levar um processo a certas etapas, independentemente de
+ * onde ele esta: cancelar e sobrestar sao decisoes administrativas.
+ */
+export const AUTORIZACAO_ENTRADA: Partial<Record<WorkflowStage, string[]>> = {
+  sobrestado: ["SDTC", "GERENTE", "ADMIN"],
+  cancelado: ["SDTC", "GERENTE", "ADMIN"],
+};
+
+/** Motivo do bloqueio da entrada na etapa destino, ou `null`. */
+export function bloqueioDeEntrada(
+  destino: WorkflowStage,
+  usuario: { role: string }
+): string | null {
+  const papeis = AUTORIZACAO_ENTRADA[destino];
+  if (papeis && !papeis.includes(usuario.role)) {
+    return `Mover para ${destino} e restrito a: ${papeis.join(", ")}.`;
+  }
+  return null;
+}
+
+/** Motivo do bloqueio, ou `null` quando o usuario pode movimentar a etapa. */
+export function bloqueioDeSaida(
+  etapa: WorkflowStage,
+  usuario: { id: string; role: string },
+  processo: { tecnicoRespId: string | null; tecnicoConfId: string | null }
+): string | null {
+  const regra = AUTORIZACAO_SAIDA[etapa];
+  if (!regra) return `Etapa ${etapa} desconhecida.`;
+  if (regra.papeis.length === 0) {
+    return `A etapa ${etapa} e terminal: nao ha transicoes disponiveis.`;
+  }
+  if (!regra.papeis.includes(usuario.role)) {
+    return `A etapa ${etapa} e movimentada por: ${regra.papeis.join(", ")}.`;
+  }
+  const resp = regra.responsavel;
+  if (
+    resp &&
+    resp.papeis.includes(usuario.role) &&
+    processo[resp.campo] &&
+    processo[resp.campo] !== usuario.id
+  ) {
+    return "Processo atribuido a outro responsavel.";
+  }
+  return null;
+}
+
 export const SERVICE_TYPES = [
   "Certidao",
   "Drenagem",

@@ -97,7 +97,7 @@ requisição/processo/pagamento, cada papel vê apenas as suas etapas de assinat
 | Variável | Descrição |
 | --- | --- |
 | `STAFF_SESSION_SECRET` | Segredo HMAC da sessão do backoffice — **obrigatório** em produção |
-| `SEED_STAFF_PASSWORD` | Senha inicial dos usuários criados pelo seed (padrão `IGC@certidoes-2026`) |
+| `SEED_STAFF_PASSWORD` | Senha inicial dos usuários criados pelo seed (obrigatória em produção; em desenvolvimento o padrão é `IGC@certidoes-2026`) |
 
 `POST /api/seed` só roda sem autenticação enquanto nenhum usuário tem senha
 (bootstrap); depois disso exige sessão de `ADMIN`. Ele define a senha inicial

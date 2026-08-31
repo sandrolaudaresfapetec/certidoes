@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirAdminApi, exigirUsuarioApi } from "@/lib/auth";
+import { garantirLinhasDemo } from "@/lib/linhas-demo";
 
 /** GET /api/geometria/linhas — lista as linhas de divisa validadas. */
 export async function GET() {
   const sessao = await exigirUsuarioApi();
   if ("erro" in sessao) return sessao.erro;
+
+  // Instalacao nova comeca sem linhas: qualquer usuario ve as de demonstracao,
+  // sem poder criar ou substituir o conjunto (isso segue restrito a ADMIN).
+  await garantirLinhasDemo();
 
   const linhas = await prisma.linhaDivisa.findMany({ orderBy: { codigo: "asc" } });
   return NextResponse.json(

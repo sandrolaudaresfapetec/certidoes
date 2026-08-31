@@ -1,5 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { WORKFLOW_STAGES, ALLOWED_TRANSITIONS, type WorkflowStage } from "@/lib/workflow";
+import {
+  WORKFLOW_STAGES,
+  ALLOWED_TRANSITIONS,
+  bloqueioDeEntrada,
+  bloqueioDeSaida,
+  type WorkflowStage,
+} from "@/lib/workflow";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -36,7 +42,13 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
   }
 
   const stageConfig = WORKFLOW_STAGES[processo.situacao as WorkflowStage];
-  const allowedNext = ALLOWED_TRANSITIONS[processo.situacao as WorkflowStage] || [];
+  const etapaAtual = processo.situacao as WorkflowStage;
+  const bloqueio = bloqueioDeSaida(etapaAtual, usuario, processo);
+  const allowedNext = bloqueio
+    ? []
+    : (ALLOWED_TRANSITIONS[etapaAtual] || []).filter(
+        (destino) => !bloqueioDeEntrada(destino, usuario)
+      );
 
   return (
     <div className="p-8">
@@ -282,6 +294,7 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
             currentStatus={processo.situacao as WorkflowStage}
             allowedTransitions={allowedNext}
             responsavel={`${usuario.name} (${usuario.role})`}
+            bloqueio={bloqueio}
           />
 
           {/* Financial */}

@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUsuarioLogado, hashSenha } from "@/lib/auth";
 
-/** Senha inicial dos usuarios de demonstracao (trocar apos o primeiro acesso). */
-const SENHA_INICIAL = process.env.SEED_STAFF_PASSWORD || "IGC@certidoes-2026";
+/**
+ * Senha inicial dos usuarios de demonstracao (trocar apos o primeiro acesso).
+ * Em producao nao existe padrao: sem `SEED_STAFF_PASSWORD` o seed nao roda,
+ * para nenhum ambiente novo nascer com uma senha publicamente conhecida.
+ */
+function senhaInicial(): string | null {
+  const informada = process.env.SEED_STAFF_PASSWORD;
+  if (informada) return informada;
+  return process.env.NODE_ENV === "production" ? null : "IGC@certidoes-2026";
+}
 
 export async function POST() {
   // Bootstrap: liberado enquanto nenhum usuario tem senha definida. Depois
@@ -17,6 +25,14 @@ export async function POST() {
     if (usuario.role !== "ADMIN") {
       return NextResponse.json({ error: "Ação exclusiva de ADMIN." }, { status: 403 });
     }
+  }
+
+  const SENHA_INICIAL = senhaInicial();
+  if (!SENHA_INICIAL) {
+    return NextResponse.json(
+      { error: "Defina SEED_STAFF_PASSWORD antes de rodar o seed em produção." },
+      { status: 500 }
+    );
   }
 
   // Create users
