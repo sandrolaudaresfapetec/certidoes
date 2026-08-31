@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "./print-button";
+import { requireUsuario } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ interface Fragmento {
 }
 
 export default async function CertidaoPage({ params }: PageProps) {
+  await requireUsuario();
+
   const { id } = await params;
 
   const processo = await prisma.process.findUnique({

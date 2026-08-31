@@ -3,6 +3,7 @@ import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import { Search, Filter, PlusCircle } from "lucide-react";
+import { requireUsuario } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ interface PageProps {
 }
 
 export default async function ProcessosPage({ searchParams }: PageProps) {
+  await requireUsuario();
+
   const params = await searchParams;
   const situacao = params.situacao;
   const tipoServico = params.tipoServico;

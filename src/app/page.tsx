@@ -9,6 +9,7 @@ import {
   ArrowRight,
   TrendingUp,
 } from "lucide-react";
+import { requireUsuario } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,8 @@ async function getDashboardData() {
 }
 
 export default async function DashboardPage() {
+  await requireUsuario();
+
   const data = await getDashboardData();
 
   return (

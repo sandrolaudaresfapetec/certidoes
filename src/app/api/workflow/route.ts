@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ALLOWED_TRANSITIONS, type WorkflowStage } from "@/lib/workflow";
+import { exigirUsuarioApi } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao.erro;
+
   const body = await request.json();
   const { processId, toStatus, userId, action } = body;
 

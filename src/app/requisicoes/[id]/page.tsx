@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getPerfilAtivo, podeAtender } from "@/lib/perfil-ativo";
+import { requireUsuario, podeAtender } from "@/lib/auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
 import { AberturaProcesso, FinalizacaoPagamento } from "@/components/atendimento-acoes";
 
@@ -14,7 +14,7 @@ export default async function VisualizarRequisicaoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const perfil = await getPerfilAtivo();
+  const usuario = await requireUsuario();
 
   const requisicao = await prisma.solicitacao.findUnique({
     where: { id },
@@ -26,7 +26,7 @@ export default async function VisualizarRequisicaoPage({
   });
   if (!requisicao) notFound();
 
-  const atendimento = podeAtender(perfil);
+  const atendimento = podeAtender(usuario);
 
   return (
     <div className="p-8 max-w-4xl space-y-6">

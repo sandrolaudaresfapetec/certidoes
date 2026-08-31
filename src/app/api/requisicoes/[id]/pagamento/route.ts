@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getPerfilAtivo, podeAtender } from "@/lib/perfil-ativo";
+import { exigirAtendimentoApi } from "@/lib/auth";
 
 const STATUS_VALIDOS = ["PENDENTE", "PAGO", "ISENTO"];
 
@@ -14,13 +14,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const perfil = await getPerfilAtivo();
-  if (!podeAtender(perfil)) {
-    return NextResponse.json(
-      { error: "Perfil ativo não pertence ao Atendimento." },
-      { status: 403 }
-    );
-  }
+  const sessao = await exigirAtendimentoApi();
+  if ("erro" in sessao) return sessao.erro;
 
   const requisicao = await prisma.solicitacao.findUnique({ where: { id } });
   if (!requisicao) {

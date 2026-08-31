@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getPerfilAtivo, podeAtender } from "@/lib/perfil-ativo";
+import { requireUsuario, podeAtender } from "@/lib/auth";
 import { NovaRequisicaoAtendimento } from "@/components/nova-requisicao-atendimento";
 
 export const dynamic = "force-dynamic";
@@ -12,14 +12,14 @@ export default async function NovaRequisicaoPage({
   searchParams: Promise<{ cliente?: string }>;
 }) {
   const { cliente } = await searchParams;
-  const perfil = await getPerfilAtivo();
+  const usuario = await requireUsuario();
 
-  if (!podeAtender(perfil)) {
+  if (!podeAtender(usuario)) {
     return (
       <div className="p-8">
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-4">
-          Abertura de requisição é exclusiva do Atendimento. Troque o perfil
-          ativo na barra lateral para um usuário do SDTC.
+          Abertura de requisição é exclusiva do Atendimento. Entre com um
+          usuário do SDTC.
         </p>
       </div>
     );

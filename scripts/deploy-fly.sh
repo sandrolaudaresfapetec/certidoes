@@ -64,6 +64,7 @@ log "3/6 Secrets (banco + portal + SIGEF)"
 $FLY postgres attach "$PG_NAME" -a "$APP_NAME" 2>/dev/null || warn "Postgres já anexado (DATABASE_URL existente)"
 $FLY secrets set -a "$APP_NAME" \
   PORTAL_SESSION_SECRET="${PORTAL_SESSION_SECRET:-$(openssl rand -hex 24 2>/dev/null || echo change-me-$(date +%s))}" \
+  STAFF_SESSION_SECRET="${STAFF_SESSION_SECRET:-$(openssl rand -hex 24 2>/dev/null || echo change-me-$(date +%s))}" \
   SIGEF_MOCK="${SIGEF_MOCK:-true}" \
   GOVBR_MOCK="${GOVBR_MOCK:-true}"
 ok "Secrets configurados"

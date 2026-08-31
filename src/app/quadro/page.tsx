@@ -1,10 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { WORKFLOW_STAGES, KANBAN_STAGES } from "@/lib/workflow";
 import Link from "next/link";
+import { requireUsuario } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function QuadroPage() {
+  await requireUsuario();
+
   const processes = await prisma.process.findMany({
     where: {
       situacao: { in: KANBAN_STAGES as unknown as string[] },

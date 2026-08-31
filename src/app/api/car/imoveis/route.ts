@@ -5,6 +5,7 @@ import {
   buscarImovelNoPonto,
   buscarImovelPorCodigo,
 } from "@/lib/car";
+import { exigirUsuarioApi } from "@/lib/auth";
 
 const FONTE = "CAR/SICAR (geoserver.car.gov.br)";
 
@@ -15,6 +16,9 @@ const FONTE = "CAR/SICAR (geoserver.car.gov.br)";
  * GET /api/car/imoveis?lon=-47.31&lat=-21.93 — imovel que contem o ponto clicado
  */
 export async function GET(request: NextRequest) {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao.erro;
+
   const params = request.nextUrl.searchParams;
   const codigo = params.get("codigo");
   const bbox = params.get("bbox");

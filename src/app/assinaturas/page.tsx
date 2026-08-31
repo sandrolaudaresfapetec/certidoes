@@ -1,22 +1,21 @@
 import Link from "next/link";
 import { PenLine } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getPerfilAtivo, etapasDeAssinatura, podeAssinar } from "@/lib/perfil-ativo";
+import { requireUsuario, etapasDeAssinatura, podeAssinar } from "@/lib/auth";
 import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
 
 export const dynamic = "force-dynamic";
 
 export default async function AssinaturasPage() {
-  const perfil = await getPerfilAtivo();
-  const etapas = etapasDeAssinatura(perfil);
+  const usuario = await requireUsuario();
+  const etapas = etapasDeAssinatura(usuario);
 
-  if (!podeAssinar(perfil) || etapas.length === 0) {
+  if (!podeAssinar(usuario) || etapas.length === 0) {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Assinaturas Pendentes</h1>
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-4">
-          O perfil ativo ({perfil?.role ?? "sem perfil"}) não possui etapas de
-          assinatura. Troque o perfil ativo na barra lateral.
+          Seu perfil ({usuario.role}) não possui etapas de assinatura.
         </p>
       </div>
     );
@@ -26,8 +25,8 @@ export default async function AssinaturasPage() {
   const processos = await prisma.process.findMany({
     where: {
       situacao: { in: etapas },
-      ...(perfil?.role === "TECNICO" ? { tecnicoRespId: perfil.id } : {}),
-      ...(perfil?.role === "CONFERENTE" ? { tecnicoConfId: perfil.id } : {}),
+      ...(usuario.role === "TECNICO" ? { tecnicoRespId: usuario.id } : {}),
+      ...(usuario.role === "CONFERENTE" ? { tecnicoConfId: usuario.id } : {}),
     },
     orderBy: { updatedAt: "asc" },
     include: {
@@ -41,7 +40,7 @@ export default async function AssinaturasPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Assinaturas Pendentes</h1>
         <p className="text-sm text-gray-500">
-          Processos aguardando ação de {perfil?.name} ({perfil?.role}).
+          Processos aguardando ação de {usuario.name} ({usuario.role}).
         </p>
       </div>
 

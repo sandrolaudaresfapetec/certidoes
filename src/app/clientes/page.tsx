@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatarCPF } from "@/lib/cpf";
-import { getPerfilAtivo, podeAtender } from "@/lib/perfil-ativo";
+import { requireUsuario, podeAtender } from "@/lib/auth";
 import { ClienteForm } from "@/components/cliente-form";
 import type { Prisma } from "@prisma/client";
 
@@ -13,7 +13,7 @@ export default async function ClientesPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q = "" } = await searchParams;
-  const perfil = await getPerfilAtivo();
+  const usuario = await requireUsuario();
 
   const where: Prisma.SolicitanteWhereInput = q
     ? { OR: [{ nome: { contains: q } }, { cpf: { contains: q.replace(/\D/g, "") || q } }] }
@@ -35,11 +35,11 @@ export default async function ClientesPage({
         </p>
       </div>
 
-      {podeAtender(perfil) ? (
+      {podeAtender(usuario) ? (
         <ClienteForm />
       ) : (
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3">
-          O perfil ativo não pertence ao Atendimento — a lista abaixo é somente
+          Seu perfil não pertence ao Atendimento — a lista abaixo é somente
           para consulta.
         </p>
       )}
@@ -91,7 +91,7 @@ export default async function ClientesPage({
                   <span className="text-xs text-gray-500">
                     {c._count.solicitacoes} requisição(ões)
                   </span>
-                  {podeAtender(perfil) && (
+                  {podeAtender(usuario) && (
                     <Link
                       href={`/requisicoes/nova?cliente=${c.id}`}
                       className="text-sm text-emerald-700 hover:underline"

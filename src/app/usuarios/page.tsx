@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { Users } from "lucide-react";
+import { requireUsuario } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsuariosPage() {
+  await requireUsuario();
+
   const users = await prisma.user.findMany({
     orderBy: { name: "asc" },
     include: {

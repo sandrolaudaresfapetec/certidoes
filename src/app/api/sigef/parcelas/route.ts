@@ -5,6 +5,7 @@ import {
   parcelaPorCodigo,
   parcelasPorBbox,
 } from "@/lib/sigef-parcelas";
+import { exigirUsuarioApi } from "@/lib/auth";
 
 const FONTE = "SIGEF/Acervo Fundiario (INCRA) — shapefile importado";
 
@@ -15,6 +16,9 @@ const FONTE = "SIGEF/Acervo Fundiario (INCRA) — shapefile importado";
  * GET /api/sigef/parcelas?uf=SP — total importado da UF
  */
 export async function GET(request: NextRequest) {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao.erro;
+
   const params = request.nextUrl.searchParams;
   const bbox = params.get("bbox");
   const lon = params.get("lon");

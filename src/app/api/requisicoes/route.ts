@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getPerfilAtivo, podeAtender } from "@/lib/perfil-ativo";
+import { exigirAtendimentoApi } from "@/lib/auth";
 import {
   formularioDoPayload,
   normalizarParaPersistencia,
@@ -19,13 +19,8 @@ function gerarProtocolo(sequencial: number): string {
  * ATENDIMENTO e registro do atendente responsável.
  */
 export async function POST(request: NextRequest) {
-  const perfil = await getPerfilAtivo();
-  if (!podeAtender(perfil)) {
-    return NextResponse.json(
-      { error: "Perfil ativo não pertence ao Atendimento." },
-      { status: 403 }
-    );
-  }
+  const sessao = await exigirAtendimentoApi();
+  if ("erro" in sessao) return sessao.erro;
 
   const body = await request.json().catch(() => ({}));
   const solicitanteId = (body.solicitanteId ?? "").toString();
@@ -71,7 +66,7 @@ export async function POST(request: NextRequest) {
       observacao: (body.observacao ?? "").toString() || null,
       solicitanteId: solicitante.id,
       origem: "ATENDIMENTO",
-      abertaPorUserId: perfil?.id ?? null,
+      abertaPorUserId: sessao.usuario.id,
       ...cjt,
     },
   });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cortarImovel, LinhaDivisaGeo } from "@/lib/geometria";
+import { exigirUsuarioApi } from "@/lib/auth";
 
 /**
  * POST /api/geometria/corte
@@ -10,6 +11,9 @@ import { cortarImovel, LinhaDivisaGeo } from "@/lib/geometria";
  * classificacao + fragmentos com area/percentual por municipio.
  */
 export async function POST(request: NextRequest) {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao.erro;
+
   const body = await request.json().catch(() => ({}));
   const imovel = body.imovel;
   if (!imovel || imovel.type !== "Feature") {
