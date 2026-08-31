@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSolicitanteLogado } from "@/lib/portal-auth";
+import { getPerfilAtivo, podeAtender } from "@/lib/perfil-ativo";
 import {
   formularioDoPayload,
   normalizarParaPersistencia,
@@ -13,44 +13,28 @@ function gerarProtocolo(sequencial: number): string {
   return `CERT-${ano}-${String(sequencial).padStart(6, "0")}`;
 }
 
-/** GET /api/portal/solicitacoes — lista as solicitações do solicitante logado. */
-export async function GET() {
-  const solicitante = await getSolicitanteLogado();
-  if (!solicitante) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  }
-
-  const solicitacoes = await prisma.solicitacao.findMany({
-    where: { solicitanteId: solicitante.id },
-    orderBy: { createdAt: "desc" },
-    include: { documentos: { select: { id: true, tipo: true, nomeArquivo: true } } },
-  });
-
-  return NextResponse.json(solicitacoes);
-}
-
 /**
- * POST /api/portal/solicitacoes
- * Cria uma nova solicitação de certidão a partir do portal.
- * tipoViaSigef=true  → imóvel selecionado entre as parcelas do SIGEF (sem documentos)
- * tipoViaSigef=false → imóvel sem registro no INCRA (exigirá planta + doc. propriedade;
- *                      dados do imóvel serão preenchidos internamente pelo funcionário)
+ * POST /api/requisicoes — abertura de requisição pelo Atendimento, em nome de
+ * um cliente já cadastrado. Mesmo formulário CJT do portal, com origem
+ * ATENDIMENTO e registro do atendente responsável.
  */
 export async function POST(request: NextRequest) {
-  const solicitante = await getSolicitanteLogado();
-  if (!solicitante) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  }
-  if (!solicitante.cadastroCompleto) {
+  const perfil = await getPerfilAtivo();
+  if (!podeAtender(perfil)) {
     return NextResponse.json(
-      { error: "Complete seu cadastro (e-mail e telefone) antes de solicitar." },
-      { status: 400 }
+      { error: "Perfil ativo não pertence ao Atendimento." },
+      { status: 403 }
     );
   }
 
   const body = await request.json().catch(() => ({}));
-  const tipoViaSigef = body.tipoViaSigef !== false;
+  const solicitanteId = (body.solicitanteId ?? "").toString();
+  const solicitante = await prisma.solicitante.findUnique({ where: { id: solicitanteId } });
+  if (!solicitante) {
+    return NextResponse.json({ error: "Selecione o cliente." }, { status: 400 });
+  }
 
+  const tipoViaSigef = body.tipoViaSigef !== false;
   if (tipoViaSigef && !body.sigefCodigoImovel) {
     return NextResponse.json(
       { error: "Selecione o imóvel do SIGEF para o qual deseja a certidão." },
@@ -58,17 +42,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const emNomeDeCpf = (body.emNomeDeCpf ?? "").toString().replace(/\D/g, "") || null;
-  const emNomeDeNome = (body.emNomeDeNome ?? "").toString().trim() || null;
-  if (emNomeDeCpf && !emNomeDeNome) {
-    return NextResponse.json(
-      { error: "Informe o nome do proprietário representado." },
-      { status: 400 }
-    );
-  }
-
-  // O formulario CJT e revalidado no servidor: campos fora da combinacao
-  // ativa sao descartados antes de persistir (Especificacao Funcional v1.0).
   const formulario = formularioDoPayload(body.cjt);
   const erroCjt = primeiroErro(validarFormulario(formulario));
   if (erroCjt) {
@@ -93,10 +66,12 @@ export async function POST(request: NextRequest) {
       sigefUf: tipoViaSigef ? body.sigefUf || null : null,
       sigefStatus: tipoViaSigef ? body.sigefStatus || null : null,
       sigefOrigem: tipoViaSigef ? body.sigefOrigem || null : null,
-      emNomeDeCpf,
-      emNomeDeNome,
+      emNomeDeCpf: (body.emNomeDeCpf ?? "").toString().replace(/\D/g, "") || null,
+      emNomeDeNome: (body.emNomeDeNome ?? "").toString().trim() || null,
       observacao: (body.observacao ?? "").toString() || null,
       solicitanteId: solicitante.id,
+      origem: "ATENDIMENTO",
+      abertaPorUserId: perfil?.id ?? null,
       ...cjt,
     },
   });

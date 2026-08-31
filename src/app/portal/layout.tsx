@@ -33,6 +33,24 @@ export default async function PortalLayout({
           )}
         </div>
       </header>
+      {solicitante && (
+        <nav
+          aria-label="Áreas do portal"
+          className="bg-emerald-700 text-white/90 text-sm"
+        >
+          <div className="max-w-5xl mx-auto px-4 flex gap-5 py-2">
+            <Link href="/portal" className="hover:text-white">
+              Minhas Requisições
+            </Link>
+            <Link href="/portal/nova-solicitacao" className="hover:text-white">
+              Nova Requisição
+            </Link>
+            <Link href="/portal/cadastro" className="hover:text-white">
+              Cadastro
+            </Link>
+          </div>
+        </nav>
+      )}
       <main className="max-w-5xl mx-auto px-4 py-8">{children}</main>
       <footer className="text-center text-xs text-gray-400 pb-8">
         Serviço de emissão de certidões — identidade validada pela plataforma gov.br
