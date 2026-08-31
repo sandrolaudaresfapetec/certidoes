@@ -10,10 +10,17 @@ import {
   PlusCircle,
   Users,
   Settings,
+  Inbox,
+  PenLine,
+  UserPlus,
 } from "lucide-react";
+import { PerfilAtivoSelect } from "@/components/perfil-ativo-select";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Requisicoes", href: "/requisicoes", icon: Inbox },
+  { name: "Assinaturas Pendentes", href: "/assinaturas", icon: PenLine },
+  { name: "Cadastro de Cliente", href: "/clientes", icon: UserPlus },
   { name: "Processos", href: "/processos", icon: FileText },
   { name: "Quadro", href: "/quadro", icon: Columns3 },
   { name: "Novo Processo", href: "/processos/novo", icon: PlusCircle },
@@ -22,8 +29,14 @@ const navigation = [
   { name: "Configuracoes", href: "/configuracoes", icon: Settings },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  usuarios: { id: string; name: string; role: string }[];
+  perfilAtivoId: string | null;
+}
+
+export function Sidebar({ usuarios, perfilAtivoId }: SidebarProps) {
   const pathname = usePathname();
+  const ativo = usuarios.find((u) => u.id === perfilAtivoId) ?? null;
 
   return (
     <div className="fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -53,16 +66,17 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="p-4 border-t border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
-            A
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-900">Admin</p>
-            <p className="text-xs text-gray-500">admin@igc.sp.gov.br</p>
-          </div>
-        </div>
+      <div className="p-4 border-t border-gray-200 space-y-2">
+        {usuarios.length > 0 ? (
+          <PerfilAtivoSelect usuarios={usuarios} ativoId={perfilAtivoId} />
+        ) : (
+          <p className="text-xs text-gray-500">Nenhum usuário cadastrado.</p>
+        )}
+        {ativo && (
+          <p className="text-xs text-gray-500">
+            As ações disponíveis seguem o papel {ativo.role}.
+          </p>
+        )}
       </div>
     </div>
   );

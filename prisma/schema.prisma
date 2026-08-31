@@ -63,6 +63,29 @@ model Solicitacao {
 
   observacao        String?
 
+  // Formulario orientado CJT (Especificacao Funcional v1.0):
+  // respostas das perguntas 1 a 3 e campos dinamicos da pergunta 4.
+  cjtQualidade        String?  // 1a Representante | 1b Proprietario
+  cjtResultado        String?  // 2a Matricula | 2b Gleba | 2c Area
+  cjtSituacao         String?  // 3a Espolio | 3b Usucapiao | 3c Espolio com usucapiao | 3d Regular/comum
+  cjtPropriedadeDe    String?
+  cjtMatricula        String?  // somente algarismos
+  cjtQtdPoligonos     Int?
+  cjtNomesPoligonos   String?  // JSON array com um nome por poligono
+  cjtCodigoIncra      String?  // 13 algarismos, sem mascara
+  cjtDeclaracaoAceita Boolean  @default(false)
+
+  // Origem da requisicao e atendimento interno
+  origem            String   @default("PORTAL") // PORTAL | ATENDIMENTO
+  abertaPorUserId   String?  // atendente que abriu a requisicao pelo balcao
+
+  // Finalizacao e pagamento (interface de Atendimento)
+  pagamentoStatus   String?   // PENDENTE | PAGO | ISENTO
+  pagamentoValor    Float?
+  pagamentoEm       DateTime?
+  pagamentoObs      String?
+  finalizadaEm      DateTime?
+
   solicitanteId     String
   solicitante       Solicitante @relation(fields: [solicitanteId], references: [id])
 
