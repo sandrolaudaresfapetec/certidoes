@@ -16,7 +16,15 @@ import {
 } from "lucide-react";
 import { StaffLogoutButton } from "@/components/staff-logout";
 
-const navigation = [
+interface ItemNav {
+  name: string;
+  href: string;
+  icon: typeof Users;
+  /** Gerenciamento de usuarios aparece somente para o administrador. */
+  somenteAdmin?: boolean;
+}
+
+const navigation: ItemNav[] = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Requisicoes", href: "/requisicoes", icon: Inbox },
   { name: "Assinaturas Pendentes", href: "/assinaturas", icon: PenLine },
@@ -25,7 +33,7 @@ const navigation = [
   { name: "Quadro", href: "/quadro", icon: Columns3 },
   { name: "Novo Processo", href: "/processos/novo", icon: PlusCircle },
   { name: "Notificacoes", href: "/notificacoes", icon: Bell },
-  { name: "Usuarios", href: "/usuarios", icon: Users },
+  { name: "Usuarios", href: "/usuarios", icon: Users, somenteAdmin: true },
   { name: "Configuracoes", href: "/configuracoes", icon: Settings },
 ];
 
@@ -43,26 +51,28 @@ export function Sidebar({ usuario }: SidebarProps) {
         <p className="text-xs text-gray-500 mt-1">Sistema de Certidoes</p>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navigation.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-              }`}
-            >
-              <item.icon className="h-5 w-5 shrink-0" />
-              {item.name}
-            </Link>
-          );
-        })}
+        {navigation
+          .filter((item) => !item.somenteAdmin || usuario.role === "ADMIN")
+          .map((item) => {
+            const isActive =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                {item.name}
+              </Link>
+            );
+          })}
       </nav>
       <div className="p-4 border-t border-gray-200 space-y-1">
         <p className="text-sm font-medium text-gray-900">{usuario.name}</p>
