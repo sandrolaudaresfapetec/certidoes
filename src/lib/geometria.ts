@@ -119,6 +119,11 @@ function municipioDeclarado(imovel: any): string | null {
     const unico = props.municipios[0];
     if (typeof unico === "string" && unico.trim()) return unico.trim();
   }
+  // Parcelas do SIGEF nem sempre trazem o nome do municipio, so o codigo IBGE.
+  const ibge = props.municipioIbge;
+  if ((typeof ibge === "string" && ibge.trim()) || typeof ibge === "number") {
+    return `IBGE ${String(ibge).trim()}`;
+  }
   return null;
 }
 

@@ -345,6 +345,7 @@ export default function GeometriaPage() {
         nome: parcela.codigoParcela,
         nomeArea: parcela.nomeArea,
         municipio: parcela.municipio,
+        municipioIbge: parcela.municipioIbge,
         uf: parcela.uf,
         areaHa: parcela.areaHa,
         matricula: parcela.matricula,
