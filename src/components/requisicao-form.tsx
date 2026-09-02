@@ -48,6 +48,23 @@ interface SigefResult {
   aviso?: string;
 }
 
+/**
+ * Estado atual de uma requisição em edição. O solicitante pode alterar os
+ * dados que ele mesmo informou; nada de status, processo ou pagamento.
+ */
+export interface RequisicaoEdicao {
+  /** Endpoint PATCH da própria requisição. */
+  endpoint: string;
+  cjt: FormularioCjt;
+  tipoViaSigef: boolean;
+  sigefParcelaCodigo: string | null;
+  emNomeDeCpf: string | null;
+  emNomeDeNome: string | null;
+  observacao: string | null;
+  /** Documentos já anexados, que não precisam ser reenviados. */
+  documentosEnviados: string[];
+}
+
 interface RequisicaoFormProps {
   /** CPF do solicitante usado na consulta de imóveis do SIGEF. */
   cpf: string;
@@ -60,6 +77,8 @@ interface RequisicaoFormProps {
   /** Link exibido ao concluir. */
   painelHref: string;
   painelLabel: string;
+  /** Quando presente, o formulário altera a requisição em vez de criar. */
+  edicao?: RequisicaoEdicao;
 }
 
 type EtapaImovel = "consultando" | "selecao" | "semRegistro";
@@ -71,18 +90,19 @@ export function RequisicaoForm({
   payloadExtra,
   painelHref,
   painelLabel,
+  edicao,
 }: RequisicaoFormProps) {
-  const [form, setForm] = useState<FormularioCjt>(formularioVazio);
+  const [form, setForm] = useState<FormularioCjt>(edicao?.cjt ?? formularioVazio);
   const [erros, setErros] = useState<ErrosCjt>({});
 
   const [etapaImovel, setEtapaImovel] = useState<EtapaImovel>("consultando");
   const [sigef, setSigef] = useState<SigefResult | null>(null);
   const [selecionada, setSelecionada] = useState<SigefParcela | null>(null);
 
-  const [procurador, setProcurador] = useState(false);
-  const [emNomeDeCpf, setEmNomeDeCpf] = useState("");
-  const [emNomeDeNome, setEmNomeDeNome] = useState("");
-  const [observacao, setObservacao] = useState("");
+  const [procurador, setProcurador] = useState(Boolean(edicao?.emNomeDeCpf));
+  const [emNomeDeCpf, setEmNomeDeCpf] = useState(edicao?.emNomeDeCpf ?? "");
+  const [emNomeDeNome, setEmNomeDeNome] = useState(edicao?.emNomeDeNome ?? "");
+  const [observacao, setObservacao] = useState(edicao?.observacao ?? "");
 
   const [planta, setPlanta] = useState<File | null>(null);
   const [docPropriedade, setDocPropriedade] = useState<File | null>(null);
@@ -103,12 +123,24 @@ export function RequisicaoForm({
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         setSigef(data);
+        if (edicao && !edicao.tipoViaSigef) {
+          setEtapaImovel("semRegistro");
+          return;
+        }
+        // Na edição a parcela já escolhida volta selecionada.
+        const anterior = edicao?.sigefParcelaCodigo
+          ? data.parcelas.find(
+              (p: SigefParcela) => p.parcelaCodigo === edicao.sigefParcelaCodigo
+            )
+          : undefined;
+        if (anterior) setSelecionada(anterior);
         setEtapaImovel(data.parcelas.length > 0 ? "selecao" : "semRegistro");
       } catch (e) {
         setErro((e as Error).message || "Erro ao consultar o SIGEF.");
         setEtapaImovel("semRegistro");
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cpf]);
 
   // Trocar uma resposta anterior recalcula a pergunta 4 e descarta os valores
@@ -133,6 +165,11 @@ export function RequisicaoForm({
   const bloqueado = bloqueiaAvanco(form);
   const mostrarPergunta4 = combinacaoDefinida(form);
   const exigeDocsImovel = etapaImovel === "semRegistro";
+  const enviados = edicao?.documentosEnviados ?? [];
+  const temPlanta = Boolean(planta) || enviados.includes("PLANTA");
+  const temDocPropriedade =
+    Boolean(docPropriedade) || enviados.includes("DOC_PROPRIEDADE");
+  const temProcuracao = Boolean(procuracao) || enviados.includes("PROCURACAO");
 
   async function enviar() {
     const validacao = validarFormulario(form);
@@ -147,11 +184,11 @@ export function RequisicaoForm({
       setErro("Selecione o imóvel do SIGEF para o qual deseja a certidão.");
       return;
     }
-    if (exigeDocsImovel && !(planta && docPropriedade)) {
+    if (exigeDocsImovel && !(temPlanta && temDocPropriedade)) {
       setErro("Anexe a planta do imóvel e o comprovante de propriedade.");
       return;
     }
-    if (procurador && !(procuracao && emNomeDeCpf && emNomeDeNome)) {
+    if (procurador && !(temProcuracao && emNomeDeCpf && emNomeDeNome)) {
       setErro("Informe os dados do proprietário representado e anexe a procuração.");
       return;
     }
@@ -160,8 +197,8 @@ export function RequisicaoForm({
     setErro(null);
     try {
       const limpo = limparCamposNaoAplicaveis(form);
-      const res = await fetch(criarEndpoint, {
-        method: "POST",
+      const res = await fetch(edicao?.endpoint ?? criarEndpoint, {
+        method: edicao ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...payloadExtra,
@@ -191,7 +228,11 @@ export function RequisicaoForm({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao criar requisição.");
+      if (!res.ok) {
+        throw new Error(
+          data.error || (edicao ? "Erro ao alterar requisição." : "Erro ao criar requisição.")
+        );
+      }
 
       const uploads: [string, File | null][] = [
         ["PLANTA", planta],
@@ -222,7 +263,9 @@ export function RequisicaoForm({
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
         <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-3" />
-        <h2 className="text-lg font-semibold text-gray-900">Requisição registrada!</h2>
+        <h2 className="text-lg font-semibold text-gray-900">
+          {edicao ? "Alterações salvas!" : "Requisição registrada!"}
+        </h2>
         <p className="text-sm text-gray-600 mt-1">
           Protocolo <strong>{protocolo}</strong>.
         </p>
@@ -523,16 +566,27 @@ export function RequisicaoForm({
             <div className="space-y-3">
               {exigeDocsImovel && (
                 <>
-                  <DocField label="Planta do imóvel *" file={planta} onChange={setPlanta} />
+                  <DocField
+                    label="Planta do imóvel *"
+                    file={planta}
+                    enviado={enviados.includes("PLANTA")}
+                    onChange={setPlanta}
+                  />
                   <DocField
                     label="Comprovante de propriedade *"
                     file={docPropriedade}
+                    enviado={enviados.includes("DOC_PROPRIEDADE")}
                     onChange={setDocPropriedade}
                   />
                 </>
               )}
               {procurador && (
-                <DocField label="Procuração *" file={procuracao} onChange={setProcuracao} />
+                <DocField
+                  label="Procuração *"
+                  file={procuracao}
+                  enviado={enviados.includes("PROCURACAO")}
+                  onChange={setProcuracao}
+                />
               )}
               <p className="text-xs text-gray-400">
                 Formatos aceitos: PDF, JPG ou PNG — até 10 MB cada.
@@ -581,7 +635,7 @@ export function RequisicaoForm({
             className="w-full bg-emerald-700 text-white py-2.5 rounded-md text-sm font-medium hover:bg-emerald-800 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {enviando && <Loader2 className="h-4 w-4 animate-spin" />}
-            Enviar requisição
+            {edicao ? "Salvar alterações" : "Enviar requisição"}
           </button>
         </section>
       )}
@@ -667,10 +721,13 @@ function Campo({
 function DocField({
   label,
   file,
+  enviado,
   onChange,
 }: {
   label: string;
   file: File | null;
+  /** Documento deste tipo já anexado antes; reenviar é opcional. */
+  enviado?: boolean;
   onChange: (f: File | null) => void;
 }) {
   return (
@@ -679,6 +736,11 @@ function DocField({
       <span className="text-sm text-gray-700 flex-1">
         {label}
         {file && <span className="block text-xs text-emerald-700">{file.name}</span>}
+        {!file && enviado && (
+          <span className="block text-xs text-gray-500">
+            Já enviado — escolha um arquivo para substituir.
+          </span>
+        )}
       </span>
       <input
         type="file"

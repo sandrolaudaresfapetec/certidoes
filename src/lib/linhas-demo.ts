@@ -56,8 +56,9 @@ export async function garantirLinhasDemo(): Promise<number> {
         }),
       ),
     );
-  } catch {
-    // Outra chamada concorrente ja inicializou a base.
+  } catch (erro) {
+    // P2002: outra chamada concorrente inseriu os mesmos codigos primeiro.
+    if ((erro as { code?: string })?.code !== "P2002") throw erro;
     return 0;
   }
   return LINHAS_DEMO.length;

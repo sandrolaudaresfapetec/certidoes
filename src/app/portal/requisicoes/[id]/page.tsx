@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
@@ -26,6 +26,12 @@ export default async function AcompanharRequisicaoPage({
   });
   if (!requisicao) notFound();
 
+  // Alteração pelo cliente só antes da abertura do processo (ou após devolução).
+  const editavel =
+    !requisicao.processId &&
+    !requisicao.finalizadaEm &&
+    ["PENDENTE", "DEVOLVIDA"].includes(requisicao.status);
+
   return (
     <div>
       <Link
@@ -35,7 +41,18 @@ export default async function AcompanharRequisicaoPage({
         <ArrowLeft className="h-4 w-4" />
         Minhas Requisições
       </Link>
-      <h1 className="text-xl font-semibold text-gray-900 mb-4">Acompanhar Requisição</h1>
+      <div className="flex items-center justify-between mb-4 gap-4">
+        <h1 className="text-xl font-semibold text-gray-900">Acompanhar Requisição</h1>
+        {editavel && (
+          <Link
+            href={`/portal/requisicoes/${requisicao.id}/editar`}
+            className="inline-flex items-center gap-1 bg-emerald-700 text-white px-4 py-2 rounded-md text-sm hover:bg-emerald-800"
+          >
+            <Pencil className="h-4 w-4" />
+            Alterar requisição
+          </Link>
+        )}
+      </div>
       <RequisicaoDetalhe requisicao={requisicao} escopo="CLIENTE" />
     </div>
   );

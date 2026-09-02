@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@prisma/client";
+import { PAPEIS, type Papel } from "@/lib/papeis";
 
 /**
  * Autenticacao do backoffice do IGC.
@@ -21,6 +22,10 @@ export const SESSION_COOKIE = "igc_session";
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
 const SCRYPT_KEYLEN = 64;
+
+export function papelValido(role: string): role is Papel {
+  return PAPEIS.includes(role as Papel);
+}
 
 /** Papeis que operam a area de Atendimento (cadastro, abertura, pagamento). */
 export const PAPEIS_ATENDIMENTO = ["ADMIN", "SDTC"];
@@ -88,6 +93,13 @@ export async function getUsuarioLogado(): Promise<User | null> {
 export async function requireUsuario(): Promise<User> {
   const usuario = await getUsuarioLogado();
   if (!usuario) redirect("/login");
+  return usuario;
+}
+
+/** Exige ADMIN; usuarios de outros papeis nao acessam gerenciamento de usuarios. */
+export async function requireAdmin(): Promise<User> {
+  const usuario = await requireUsuario();
+  if (usuario.role !== "ADMIN") redirect("/");
   return usuario;
 }
 
