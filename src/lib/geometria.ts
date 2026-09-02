@@ -96,7 +96,7 @@ export function classificarCaso(imovel: any, linhas: LinhaDivisaGeo[]): Resultad
         return buf ? turf.booleanIntersects(imovel, buf as any) : false;
       } catch { return false; }
     });
-    return noCorredor ? "FACIL" : "MEDIO";
+    return noCorredor ? "MEDIO" : "FACIL";
   }
 
   const municipios = new Set(intersectantes.flatMap((l) => l.municipios));
@@ -105,6 +105,21 @@ export function classificarCaso(imovel: any, linhas: LinhaDivisaGeo[]): Resultad
     return "PIOR_CASO";
   }
   return "DIFICIL";
+}
+
+/** Municipio declarado no proprio imovel (CAR/SICAR e SIGEF trazem o municipio
+ *  do cadastro). Serve de referencia quando nenhuma linha de divisa corta o
+ *  poligono e, portanto, nao ha municipios vindos da divisa. */
+function municipioDeclarado(imovel: any): string | null {
+  const props = imovel?.properties ?? {};
+  if (typeof props.municipio === "string" && props.municipio.trim()) {
+    return props.municipio.trim();
+  }
+  if (Array.isArray(props.municipios) && props.municipios.length === 1) {
+    const unico = props.municipios[0];
+    if (typeof unico === "string" && unico.trim()) return unico.trim();
+  }
+  return null;
 }
 
 export function cortarImovel(imovel: any, linhas: LinhaDivisaGeo[]): ResultadoCorteDivisa {
@@ -137,18 +152,22 @@ export function cortarImovel(imovel: any, linhas: LinhaDivisaGeo[]): ResultadoCo
   pecas = mergeMicrofragmentos(pecas, areaTotal);
 
   const municipiosRef = [...new Set(intersectantes.flatMap((l) => l.municipios))];
+  const declarado = municipioDeclarado(imovel);
   let fragmentos: FragmentoCorte[] = pecas.map((p, i) => {
     const area = turf.area(p);
     return {
       fragmento: i + 1,
       areaHa: Math.round((area / 10000) * 100) / 100,
       percentual: Math.round((area / areaTotal) * 10000) / 100,
-      municipio: municipiosRef.length > 0 ? municipiosRef[Math.min(i, municipiosRef.length - 1)] : null,
+      municipio: municipiosRef.length > 0 ? municipiosRef[Math.min(i, municipiosRef.length - 1)] : declarado,
       geometria: p.geometry,
     };
   });
 
-  fragmentos = identificarMunicipios(fragmentos, intersectantes, municipiosRef);
+  fragmentos = identificarMunicipios(fragmentos, intersectantes, municipiosRef).map((f) => ({
+    ...f,
+    municipio: f.municipio ?? declarado,
+  }));
   return { classificacao, fragmentos, linhasUsadas };
 }
 
