@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cortarImovel, LinhaDivisaGeo } from "@/lib/geometria";
 import { exigirUsuarioApi } from "@/lib/auth";
+import { garantirLinhasDemo } from "@/lib/linhas-demo";
 
 /**
  * POST /api/geometria/corte
@@ -19,6 +20,10 @@ export async function POST(request: NextRequest) {
   if (!imovel || imovel.type !== "Feature") {
     return NextResponse.json({ error: "Envie o imovel como GeoJSON Feature<Polygon>." }, { status: 400 });
   }
+
+  // Base vazia nao pode produzir corte sem divisas: garante as linhas de
+  // demonstracao antes de classificar (idempotente, so insere se nao houver).
+  await garantirLinhasDemo();
 
   const linhasDb = await prisma.linhaDivisa.findMany();
   const linhas: LinhaDivisaGeo[] = linhasDb.map((l) => ({
