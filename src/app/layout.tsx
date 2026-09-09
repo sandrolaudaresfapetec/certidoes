@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/sidebar";
+import { FeedbackWidget } from "@/components/feedback-widget";
 import { getUsuarioLogado } from "@/lib/auth";
 
 const geistSans = Geist({
@@ -32,20 +33,25 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex">
-        {usuario && (
-          <Sidebar
-            usuario={{
-              name: usuario.name,
-              email: usuario.email,
-              role: usuario.role,
-            }}
-          />
-        )}
-        <main
-          className={`flex-1 bg-gray-50 min-h-screen ${usuario ? "ml-64" : ""}`}
+        <FeedbackWidget
+          projectId={process.env.NEXT_PUBLIC_FASTERFIXES_PROJECT_ID}
+          apiOrigin={process.env.NEXT_PUBLIC_FASTERFIXES_API_ORIGIN}
         >
-          {children}
-        </main>
+          {usuario && (
+            <Sidebar
+              usuario={{
+                name: usuario.name,
+                email: usuario.email,
+                role: usuario.role,
+              }}
+            />
+          )}
+          <main
+            className={`flex-1 bg-gray-50 min-h-screen ${usuario ? "ml-64" : ""}`}
+          >
+            {children}
+          </main>
+        </FeedbackWidget>
       </body>
     </html>
   );

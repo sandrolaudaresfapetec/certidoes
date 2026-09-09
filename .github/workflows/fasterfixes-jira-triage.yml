@@ -1,0 +1,91 @@
+name: Triagem FasterFixes -> Jira
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  criar-card-jira:
+    if: contains(join(github.event.issue.labels.*.name, ','), 'faster-fixes') || contains(join(github.event.issue.labels.*.name, ','), 'client-feedback')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Criar card no Jira e escrever a chave na issue
+        uses: actions/github-script@v7
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY || 'SC' }}
+          JIRA_ISSUE_TYPE: ${{ vars.JIRA_ISSUE_TYPE || 'Bug' }}
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const keyPattern = new RegExp(`${process.env.JIRA_PROJECT_KEY}-\\d+`);
+            if (keyPattern.test(issue.title) || keyPattern.test(issue.body || '')) {
+              core.info('Issue ja referencia um card do Jira; nada a fazer.');
+              return;
+            }
+
+            const auth = Buffer.from(
+              `${process.env.JIRA_USER_EMAIL}:${process.env.JIRA_API_TOKEN}`
+            ).toString('base64');
+
+            const descricao = [
+              issue.body || '',
+              '',
+              `GitHub issue: ${issue.html_url}`,
+            ].join('\n');
+
+            const resposta = await fetch(`${process.env.JIRA_BASE_URL}/rest/api/3/issue`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Basic ${auth}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                fields: {
+                  project: { key: process.env.JIRA_PROJECT_KEY },
+                  issuetype: { name: process.env.JIRA_ISSUE_TYPE },
+                  summary: issue.title.slice(0, 250),
+                  description: {
+                    type: 'doc',
+                    version: 1,
+                    content: [
+                      {
+                        type: 'paragraph',
+                        content: [{ type: 'text', text: descricao.slice(0, 30000) }],
+                      },
+                    ],
+                  },
+                },
+              }),
+            });
+
+            if (!resposta.ok) {
+              core.setFailed(`Jira respondeu ${resposta.status}: ${await resposta.text()}`);
+              return;
+            }
+
+            const { key } = await resposta.json();
+
+            // A chave precisa aparecer no titulo e num comentario: o GitHub for Jira so
+            // vincula issues/branches/PRs quando encontra a chave nesses lugares.
+            await github.rest.issues.update({
+              ...context.repo,
+              issue_number: issue.number,
+              title: `${key} ${issue.title}`,
+            });
+
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: issue.number,
+              body: [
+                `Card do Jira: ${key} — ${process.env.JIRA_BASE_URL}/browse/${key}`,
+                '',
+                `Use a chave \`${key}\` no nome da branch, nas mensagens de commit e no titulo do PR`,
+                'para que o GitHub for Jira vincule tudo ao card.',
+              ].join('\n'),
+            });
