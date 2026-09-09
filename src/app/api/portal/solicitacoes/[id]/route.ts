@@ -7,13 +7,8 @@ import {
   primeiroErro,
   validarFormulario,
 } from "@/lib/cjt-formulario";
-
-/**
- * Situações em que o solicitante ainda pode alterar a própria requisição.
- * Depois da abertura do processo os dados alimentam a análise técnica e só o
- * backoffice altera; a devolução existe justamente para o cliente corrigir.
- */
-const STATUS_EDITAVEIS = ["PENDENTE", "DEVOLVIDA"];
+import { IMOVEL_SIGEF_VAZIO, resolverImovelSigef } from "@/lib/sigef-imovel";
+import { STATUS_EDITAVEIS } from "@/lib/solicitacao-status";
 
 /**
  * PATCH /api/portal/solicitacoes/[id]
@@ -71,30 +66,57 @@ export async function PATCH(
     return NextResponse.json({ error: erroCjt }, { status: 400 });
   }
   const cjt = normalizarParaPersistencia(formulario);
+  const imovel = tipoViaSigef
+    ? await resolverImovelSigef(body, solicitante.cpf)
+    : IMOVEL_SIGEF_VAZIO;
+  if (!imovel) {
+    return NextResponse.json(
+      { error: "Imóvel do SIGEF não encontrado para o seu CPF/CNPJ. Refaça a consulta e selecione o imóvel na lista." },
+      { status: 400 }
+    );
+  }
 
-  const solicitacao = await prisma.solicitacao.update({
-    where: { id: atual.id },
-    data: {
-      tipoViaSigef,
-      sigefCodigoImovel: tipoViaSigef ? body.sigefCodigoImovel : null,
-      sigefParcelaCodigo: tipoViaSigef ? body.sigefParcelaCodigo : null,
-      sigefNomeArea: tipoViaSigef ? body.sigefNomeArea || null : null,
-      sigefAreaHectares:
-        tipoViaSigef && body.sigefAreaHectares != null
-          ? parseFloat(body.sigefAreaHectares)
-          : null,
-      sigefMunicipio: tipoViaSigef ? body.sigefMunicipio || null : null,
-      sigefUf: tipoViaSigef ? body.sigefUf || null : null,
-      sigefStatus: tipoViaSigef ? body.sigefStatus || null : null,
-      sigefOrigem: tipoViaSigef ? body.sigefOrigem || null : null,
-      emNomeDeCpf,
-      emNomeDeNome,
-      observacao: (body.observacao ?? "").toString() || null,
-      // Requisição devolvida volta à fila de atendimento depois da correção.
-      status: "PENDENTE",
-      ...cjt,
-    },
+  // A condição de editabilidade vai no próprio UPDATE: se a Abertura de
+  // Processo vencer a corrida entre a leitura acima e a gravação, nenhuma linha
+  // é alterada e o cliente recebe 409 em vez de sobrescrever dados já em análise.
+  const solicitacao = await prisma.$transaction(async (tx) => {
+    const alterados = await tx.solicitacao.updateMany({
+      where: {
+        id: atual.id,
+        solicitanteId: solicitante.id,
+        processId: null,
+        finalizadaEm: null,
+        status: { in: STATUS_EDITAVEIS },
+      },
+      data: {
+        tipoViaSigef,
+        ...imovel,
+        emNomeDeCpf,
+        emNomeDeNome,
+        observacao: (body.observacao ?? "").toString() || null,
+        // Requisição devolvida volta à fila de atendimento depois da correção.
+        status: "PENDENTE",
+        ...cjt,
+      },
+    });
+    if (alterados.count === 0) return null;
+
+    // Sem representação a procuração anexada deixa de valer para a análise.
+    if (!emNomeDeCpf) {
+      await tx.documento.deleteMany({
+        where: { solicitacaoId: atual.id, tipo: "PROCURACAO" },
+      });
+    }
+
+    return tx.solicitacao.findUnique({ where: { id: atual.id } });
   });
+
+  if (!solicitacao) {
+    return NextResponse.json(
+      { error: "Esta requisição já está em andamento e não pode mais ser alterada." },
+      { status: 409 }
+    );
+  }
 
   return NextResponse.json(solicitacao);
 }

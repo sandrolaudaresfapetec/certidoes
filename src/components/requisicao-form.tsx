@@ -53,6 +53,7 @@ interface SigefResult {
  * dados que ele mesmo informou; nada de status, processo ou pagamento.
  */
 export interface RequisicaoEdicao {
+  id: string;
   /** Endpoint PATCH da própria requisição. */
   endpoint: string;
   cjt: FormularioCjt;
@@ -171,6 +172,26 @@ export function RequisicaoForm({
     Boolean(docPropriedade) || enviados.includes("DOC_PROPRIEDADE");
   const temProcuracao = Boolean(procuracao) || enviados.includes("PROCURACAO");
 
+  async function enviarDocumentos(solicitacaoId: string) {
+    const uploads: [string, File | null][] = [
+      ["PLANTA", planta],
+      ["DOC_PROPRIEDADE", docPropriedade],
+      ["PROCURACAO", procuracao],
+    ];
+    for (const [tipo, file] of uploads) {
+      if (!file) continue;
+      const fd = new FormData();
+      fd.append("solicitacaoId", solicitacaoId);
+      fd.append("tipo", tipo);
+      fd.append("arquivo", file);
+      const up = await fetch(documentosEndpoint, { method: "POST", body: fd });
+      if (!up.ok) {
+        const d = await up.json();
+        throw new Error(d.error || `Falha ao enviar ${tipo}.`);
+      }
+    }
+  }
+
   async function enviar() {
     const validacao = validarFormulario(form);
     setErros(validacao);
@@ -197,6 +218,12 @@ export function RequisicaoForm({
     setErro(null);
     try {
       const limpo = limparCamposNaoAplicaveis(form);
+
+      // Na alteração os documentos substituídos sobem antes do PATCH: enquanto
+      // algum upload falhar a requisição continua DEVOLVIDA, e o backoffice só
+      // a recebe de volta com o conjunto completo de arquivos.
+      if (edicao) await enviarDocumentos(edicao.id);
+
       const res = await fetch(edicao?.endpoint ?? criarEndpoint, {
         method: edicao ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -234,23 +261,8 @@ export function RequisicaoForm({
         );
       }
 
-      const uploads: [string, File | null][] = [
-        ["PLANTA", planta],
-        ["DOC_PROPRIEDADE", docPropriedade],
-        ["PROCURACAO", procuracao],
-      ];
-      for (const [tipo, file] of uploads) {
-        if (!file) continue;
-        const fd = new FormData();
-        fd.append("solicitacaoId", data.id);
-        fd.append("tipo", tipo);
-        fd.append("arquivo", file);
-        const up = await fetch(documentosEndpoint, { method: "POST", body: fd });
-        if (!up.ok) {
-          const d = await up.json();
-          throw new Error(d.error || `Falha ao enviar ${tipo}.`);
-        }
-      }
+      if (!edicao) await enviarDocumentos(data.id);
+
       setProtocolo(data.protocolo);
     } catch (e) {
       setErro((e as Error).message);

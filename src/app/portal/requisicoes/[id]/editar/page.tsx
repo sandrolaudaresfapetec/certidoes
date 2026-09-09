@@ -5,11 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoForm } from "@/components/requisicao-form";
 import { formularioDoPayload } from "@/lib/cjt-formulario";
+import { STATUS_EDITAVEIS } from "@/lib/solicitacao-status";
 
 export const dynamic = "force-dynamic";
-
-/** Situações em que a requisição ainda aceita alteração pelo cliente. */
-const STATUS_EDITAVEIS = ["PENDENTE", "DEVOLVIDA"];
 
 export default async function EditarRequisicaoPage({
   params,
@@ -78,6 +76,7 @@ export default async function EditarRequisicaoPage({
         painelHref={`/portal/requisicoes/${requisicao.id}`}
         painelLabel="Ver requisição"
         edicao={{
+          id: requisicao.id,
           endpoint: `/api/portal/solicitacoes/${requisicao.id}`,
           cjt: formularioDoPayload({
             qualidade: requisicao.cjtQualidade,

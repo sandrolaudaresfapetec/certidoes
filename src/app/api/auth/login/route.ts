@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   }
 
   const user = await prisma.user.findFirst({ where: { email, active: true } });
-  if (!user || !verificarSenha(senha, user.passwordHash)) {
+  if (!user || !(await verificarSenha(senha, user.passwordHash))) {
     return NextResponse.json({ error: "E-mail ou senha inválidos." }, { status: 401 });
   }
 
