@@ -1,5 +1,5 @@
 diff --git a/apps/web/.env.example b/apps/web/.env.example
-index eb5230a..7046e3e 100644
+index eb5230a..ca1427f 100644
 --- a/apps/web/.env.example
 +++ b/apps/web/.env.example
 @@ -2,6 +2,8 @@ DOMAIN_NAME="example.com"
@@ -11,17 +11,19 @@ index eb5230a..7046e3e 100644
  
  # ---------------------
  # 
-@@ -30,6 +32,9 @@ AGENCY_YEARLY_PRICE_ID=price_
+@@ -30,6 +32,11 @@ AGENCY_YEARLY_PRICE_ID=price_
  # MAILER
  # 
  # ---------------------
-+# "resend", "plunk" or "console" (emails logged to stdout, for self-hosted installs without a provider).
-+# Defaults to whichever key is set: RESEND_API_KEY, then PLUNK_SECRET_KEY, else console.
++# "resend" (default), "plunk" (inferred when only PLUNK_SECRET_KEY is set) or "console".
++# "console" must be set explicitly: it writes emails, including verification/reset links,
++# to stdout. Only for self-hosted bootstrap where log access is already trusted.
++# Switch to a real provider before opening the instance to other users.
 +MAILER_PROVIDER=
  PLUNK_SECRET_KEY=sk_
  RESEND_API_KEY=re_
  RESEND_SEGMENT_ID= 
-@@ -47,6 +52,13 @@ R2_ACCOUNT_ID=""
+@@ -47,6 +54,13 @@ R2_ACCOUNT_ID=""
  R2_ACCESS_KEY_ID=""
  R2_SECRET_ACCESS_KEY=""
  
@@ -105,10 +107,10 @@ index 0000000..d74086b
 +  };
 +}
 diff --git a/apps/web/src/lib/mailer/mailer-factory.ts b/apps/web/src/lib/mailer/mailer-factory.ts
-index 412652b..4e3f17d 100644
+index 412652b..b2bda54 100644
 --- a/apps/web/src/lib/mailer/mailer-factory.ts
 +++ b/apps/web/src/lib/mailer/mailer-factory.ts
-@@ -1,20 +1,55 @@
+@@ -1,20 +1,54 @@
  import "server-only";
  
 +import { ConsoleMailer } from "./console";
@@ -126,9 +128,8 @@ index 412652b..4e3f17d 100644
 +  if (configured === "plunk" || configured === "resend" || configured === "console") {
 +    return configured;
 +  }
-+  if (process.env.RESEND_API_KEY) return "resend";
-+  if (process.env.PLUNK_SECRET_KEY) return "plunk";
-+  return "console";
++  // "console" is never inferred: it prints auth links to the logs, so it has to be an explicit choice.
++  return process.env.PLUNK_SECRET_KEY && !process.env.RESEND_API_KEY ? "plunk" : "resend";
 +}
 +
 +function instantiate(): Mailer {

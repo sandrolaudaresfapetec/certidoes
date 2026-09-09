@@ -57,7 +57,7 @@ Tudo fica em `deploy/fasterfixes/`, na mesma conta Fly do `certidoes-app`:
 | App Fly | Papel | Custo |
 | --- | --- | --- |
 | `certidoes-fasterfixes` | dashboard + API do widget (`https://certidoes-fasterfixes.fly.dev`) | 1 máquina shared-cpu-1x/1 GB, para quando ociosa |
-| `certidoes-minio` | bucket S3 (`fasterfixes`, leitura pública) com volume de 3 GB | 1 máquina 512 MB + volume |
+| `certidoes-minio` | bucket S3 (`fasterfixes`, leitura pública, criado por `minio/start.sh` no boot) com volume de 3 GB | 1 máquina 512 MB + volume |
 | `certidoes-inngest` | Inngest self-hosted (`inngest start`, SQLite em volume) | 1 máquina 512 MB + volume |
 | `certidoes-pg` | banco `fasterfixes` (role própria) no cluster já existente | zero adicional |
 
@@ -66,9 +66,11 @@ A imagem é construída pelo `Dockerfile` a partir do upstream fixado
 usa `@prisma/adapter-pg` quando `DATABASE_ADAPTER=pg` (o upstream assume Neon em
 produção), aceita qualquer S3 via `STORAGE_HOST`, não cria cliente Stripe fora da
 nuvem, lê as credenciais do GitHub App só quando usadas e acrescenta o mailer
-`console` (`MAILER_PROVIDER=console`): sem Resend/Plunk, os e-mails de
-verificação/reset saem no log do app (`fly logs -a certidoes-fasterfixes`), de
-onde se copia o link. `build-env.sh` fornece placeholders que o `next build` exige
+`console` (`MAILER_PROVIDER=console`, nunca inferido): sem Resend/Plunk, os e-mails
+de verificação/reset saem no log do app (`fly logs -a certidoes-fasterfixes`), de
+onde se copia o link. Quem lê o log do Fly consegue usar esses links (expiram em
+1 h), por isso é um modo de bootstrap: antes de abrir o dashboard a outras pessoas,
+troque para Resend/Plunk (linha "opcional" abaixo). `build-env.sh` fornece placeholders que o `next build` exige
 na importação dos módulos; em runtime valem apenas os secrets do Fly.
 
 Primeiro acesso: cadastre-se em `/signup`, pegue o link "Verify your email" no
