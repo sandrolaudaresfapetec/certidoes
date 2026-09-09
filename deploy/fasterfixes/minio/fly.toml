@@ -1,0 +1,37 @@
+# Armazenamento S3-compatible (screenshots do FasterFixes). Um único bucket "fasterfixes",
+# público para leitura, servido em https://certidoes-minio.fly.dev/fasterfixes/<chave>.
+app = "certidoes-minio"
+primary_region = "iad"
+
+[build]
+  image = "quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z"
+
+[env]
+  MINIO_VOLUMES = "/data"
+  MINIO_CONSOLE_ADDRESS = ":9001"
+
+[experimental]
+  cmd = ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+
+[[mounts]]
+  source = "minio_data"
+  destination = "/data"
+  initial_size = "3gb"
+
+[http_service]
+  internal_port = 9000
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/minio/health/live"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

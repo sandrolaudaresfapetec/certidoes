@@ -1,0 +1,50 @@
+# FasterFixes self-hosted — dashboard + API do widget de feedback.
+# Deploy: ./deploy/fasterfixes/deploy.sh (conta Fly sandrolaudares@gmail.com)
+app = "certidoes-fasterfixes"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+  [build.args]
+    NEXT_PUBLIC_FF_API_ORIGIN = "https://certidoes-fasterfixes.fly.dev"
+    NEXT_PUBLIC_STORAGE_BASE_URL = "https://certidoes-minio.fly.dev/fasterfixes"
+    NEXT_PUBLIC_IS_CLOUD = "false"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  HOSTNAME = "0.0.0.0"
+  DOMAIN_NAME = "certidoes-fasterfixes.fly.dev"
+  BASE_URL = "https://certidoes-fasterfixes.fly.dev"
+  BETTER_AUTH_URL = "https://certidoes-fasterfixes.fly.dev"
+  NEXT_PUBLIC_FF_API_ORIGIN = "https://certidoes-fasterfixes.fly.dev"
+  NEXT_PUBLIC_STORAGE_BASE_URL = "https://certidoes-minio.fly.dev/fasterfixes"
+  DATABASE_ADAPTER = "pg"
+  STORAGE_HOST = "certidoes-minio.internal:9000"
+  STORAGE_SECURE = "false"
+  STORAGE_FORCE_PATH_STYLE = "true"
+  STORAGE_REGION = "us-east-1"
+  STORAGE_BUCKET_NAME = "fasterfixes"
+  INNGEST_BASE_URL = "http://certidoes-inngest.internal:8288"
+  MAILER_PROVIDER = "console"
+
+[deploy]
+  release_command = "/release.sh"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "60s"
+    method = "GET"
+    path = "/login"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
