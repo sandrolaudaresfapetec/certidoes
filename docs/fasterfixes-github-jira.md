@@ -50,6 +50,51 @@ o projeto SC aceita `Tarefa`, `Subtarefa`, `História`, `Bug`, `Epic`).
 
 Guia oficial: https://www.faster-fixes.com/docs/self-hosting
 
+### 1a. Instância no Fly.io (staging usada pelo projeto)
+
+Tudo fica em `deploy/fasterfixes/`, na mesma conta Fly do `certidoes-app`:
+
+| App Fly | Papel | Custo |
+| --- | --- | --- |
+| `certidoes-fasterfixes` | dashboard + API do widget (`https://certidoes-fasterfixes.fly.dev`) | 1 máquina shared-cpu-1x/1 GB, para quando ociosa |
+| `certidoes-minio` | bucket S3 (`fasterfixes`, leitura pública, criado por `minio/start.sh` no boot) com volume de 3 GB | 1 máquina 512 MB + volume |
+| `certidoes-inngest` | Inngest self-hosted (`inngest start`, SQLite em volume) | 1 máquina 512 MB + volume |
+| `certidoes-pg` | banco `fasterfixes` (role própria) no cluster já existente | zero adicional |
+
+A imagem é construída pelo `Dockerfile` a partir do upstream fixado
+(`FASTERFIXES_COMMIT`) com o patch `patches/self-hosted-pg-s3.patch`, que:
+usa `@prisma/adapter-pg` quando `DATABASE_ADAPTER=pg` (o upstream assume Neon em
+produção), aceita qualquer S3 via `STORAGE_HOST`, não cria cliente Stripe fora da
+nuvem, lê as credenciais do GitHub App só quando usadas e acrescenta o mailer
+`console` (`MAILER_PROVIDER=console`, nunca inferido): sem Resend/Plunk, os e-mails
+de verificação/reset saem no log do app (`fly logs -a certidoes-fasterfixes`), de
+onde se copia o link. Quem lê o log do Fly consegue usar esses links (expiram em
+1 h), por isso é um modo de bootstrap: antes de abrir o dashboard a outras pessoas,
+troque para Resend/Plunk (linha "opcional" abaixo). `build-env.sh` fornece placeholders que o `next build` exige
+na importação dos módulos; em runtime valem apenas os secrets do Fly.
+
+Primeiro acesso: cadastre-se em `/signup`, pegue o link "Verify your email" no
+log e conclua o onboarding (organização → projeto). O `projectId` do widget fica
+em Settings → Widget do projeto.
+
+```bash
+cd deploy/fasterfixes
+fly deploy -c minio/fly.toml     # secrets: MINIO_ROOT_USER, MINIO_ROOT_PASSWORD
+fly deploy -c inngest/fly.toml   # secrets: INNGEST_EVENT_KEY, INNGEST_SIGNING_KEY
+fly secrets set -a certidoes-fasterfixes DATABASE_URL=... BETTER_AUTH_SECRET=... \
+  STORAGE_ACCESS_KEY_ID=... STORAGE_SECRET_ACCESS_KEY=... \
+  INNGEST_EVENT_KEY=... INNGEST_SIGNING_KEY=... \
+  JIRA_TOKEN_ENCRYPTION_KEY=... LINEAR_TOKEN_ENCRYPTION_KEY=... SLACK_TOKEN_ENCRYPTION_KEY=... \
+  GITHUB_APP_ID=... GITHUB_PRIVATE_KEY=... GITHUB_WEBHOOK_SECRET=...
+fly deploy                       # release_command roda `prisma migrate deploy`
+# opcional: fly secrets set -a certidoes-fasterfixes MAILER_PROVIDER=resend RESEND_API_KEY=...
+```
+
+Chaves de criptografia: `openssl rand -hex 32`. As chaves do Inngest são as
+mesmas nos dois apps (`--event-key`/`--signing-key` do servidor e do SDK).
+
+### 1b. Em qualquer outro servidor
+
 ```bash
 git clone https://github.com/manucoffin/faster-fixes.git
 cd faster-fixes

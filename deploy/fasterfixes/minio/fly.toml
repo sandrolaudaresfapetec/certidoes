@@ -1,0 +1,36 @@
+# Armazenamento S3-compatible (screenshots do FasterFixes). Um único bucket "fasterfixes",
+# público para leitura, servido em https://certidoes-minio.fly.dev/fasterfixes/<chave>.
+# start.sh cria o bucket e a política de leitura no primeiro boot (idempotente).
+app = "certidoes-minio"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  MINIO_VOLUMES = "/data"
+  MINIO_CONSOLE_ADDRESS = ":9001"
+  MINIO_BUCKET = "fasterfixes"
+
+[[mounts]]
+  source = "minio_data"
+  destination = "/data"
+  initial_size = "3gb"
+
+[http_service]
+  internal_port = 9000
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/minio/health/live"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

@@ -1,0 +1,307 @@
+diff --git a/apps/web/.env.example b/apps/web/.env.example
+index eb5230a..ca1427f 100644
+--- a/apps/web/.env.example
++++ b/apps/web/.env.example
+@@ -2,6 +2,8 @@ DOMAIN_NAME="example.com"
+ BASE_URL=http://localhost:3000
+ 
+ DATABASE_URL="postgresql://username:password@host:5432/database_name?schema=public"
++# Set to "pg" when the production database is plain PostgreSQL instead of Neon.
++DATABASE_ADAPTER=
+ 
+ # ---------------------
+ # 
+@@ -30,6 +32,11 @@ AGENCY_YEARLY_PRICE_ID=price_
+ # MAILER
+ # 
+ # ---------------------
++# "resend" (default), "plunk" (inferred when only PLUNK_SECRET_KEY is set) or "console".
++# "console" must be set explicitly: it writes emails, including verification/reset links,
++# to stdout. Only for self-hosted bootstrap where log access is already trusted.
++# Switch to a real provider before opening the instance to other users.
++MAILER_PROVIDER=
+ PLUNK_SECRET_KEY=sk_
+ RESEND_API_KEY=re_
+ RESEND_SEGMENT_ID= 
+@@ -47,6 +54,13 @@ R2_ACCOUNT_ID=""
+ R2_ACCESS_KEY_ID=""
+ R2_SECRET_ACCESS_KEY=""
+ 
++# Any S3-compatible store (MinIO, Garage, AWS S3). Setting STORAGE_HOST replaces R2.
++STORAGE_HOST=""
++STORAGE_ACCESS_KEY_ID=""
++STORAGE_SECRET_ACCESS_KEY=""
++STORAGE_SECURE=true
++STORAGE_FORCE_PATH_STYLE=true
++
+ AWS_ACCESS_KEY_ID=""
+ AWS_BUCKET_NAME=""
+ AWS_SECRET_ACCESS_KEY=""
+diff --git a/apps/web/src/lib/mailer/console.ts b/apps/web/src/lib/mailer/console.ts
+new file mode 100644
+index 0000000..d74086b
+--- /dev/null
++++ b/apps/web/src/lib/mailer/console.ts
+@@ -0,0 +1,63 @@
++import "server-only";
++
++import {
++  Contact,
++  CreateContactOptions,
++  EmailError,
++  EmailResponse,
++  Mailer,
++  MailOptions,
++  UpdateContactOptions,
++} from "./types";
++
++// Self-hosted installs without a transactional email provider: emails are
++// written to the server log so verification / reset links stay reachable.
++// Contacts (marketing segments) have no meaning here and are no-ops.
++export class ConsoleMailer implements Mailer {
++  emails = {
++    send: async (options: MailOptions): Promise<EmailResponse> => {
++      const links = Array.from(
++        (options.body ?? "").matchAll(/https?:\/\/[^\s"'<>]+/g),
++        (match) => match[0],
++      );
++      console.info(
++        `[mailer:console] to=${options.to} subject="${options.subject}"` +
++          (links.length ? `\n  ${links.join("\n  ")}` : ""),
++      );
++      return { success: true, message: "Logged to console" };
++    },
++  };
++
++  contacts = {
++    list: async (): Promise<Contact[]> => [],
++    create: async (options: CreateContactOptions): Promise<Contact> => {
++      const now = new Date().toISOString();
++      return {
++        id: options.email,
++        email: options.email,
++        subscribed: options.subscribed,
++        data: options.data ?? {},
++        createdAt: now,
++        updatedAt: now,
++      };
++    },
++    get: async (): Promise<Contact> => {
++      throw new EmailError("Contacts are not available with the console mailer");
++    },
++    update: async (options: UpdateContactOptions): Promise<Contact> => {
++      const now = new Date().toISOString();
++      return {
++        id: options.id ?? options.email ?? "",
++        email: options.email ?? "",
++        subscribed: options.subscribed ?? false,
++        data: options.data ?? {},
++        createdAt: now,
++        updatedAt: now,
++      };
++    },
++    delete: async (): Promise<Contact> => {
++      throw new EmailError("Contacts are not available with the console mailer");
++    },
++    addToSegment: async (): Promise<void> => {},
++  };
++}
+diff --git a/apps/web/src/lib/mailer/mailer-factory.ts b/apps/web/src/lib/mailer/mailer-factory.ts
+index 412652b..b2bda54 100644
+--- a/apps/web/src/lib/mailer/mailer-factory.ts
++++ b/apps/web/src/lib/mailer/mailer-factory.ts
+@@ -1,20 +1,54 @@
+ import "server-only";
+ 
++import { ConsoleMailer } from "./console";
+ import { PlunkMailer } from "./plunk";
+ import { ResendMailer } from "./resend";
+ import { Mailer } from "./types";
+ 
+-type MailerProvider = "plunk" | "resend";
++type MailerProvider = "plunk" | "resend" | "console";
+ 
+-export function createMailer(): Mailer {
+-  const provider = "resend" as MailerProvider;
++function resolveProvider(): MailerProvider {
++  const configured = process.env.MAILER_PROVIDER;
++  if (configured === "plunk" || configured === "resend" || configured === "console") {
++    return configured;
++  }
++  // "console" is never inferred: it prints auth links to the logs, so it has to be an explicit choice.
++  return process.env.PLUNK_SECRET_KEY && !process.env.RESEND_API_KEY ? "plunk" : "resend";
++}
++
++function instantiate(): Mailer {
++  const provider = resolveProvider();
+ 
+   switch (provider) {
+     case "plunk":
+       return new PlunkMailer(process.env.PLUNK_SECRET_KEY!);
+     case "resend":
+       return new ResendMailer(process.env.RESEND_API_KEY!);
++    case "console":
++      return new ConsoleMailer();
+     default:
+       throw new Error(`Unsupported mailer provider: ${provider}`);
+   }
+ }
++
++// Provider SDKs throw when constructed without an API key. Deferring construction
++// until the first send keeps the app bootable (and `next build` runnable) on
++// self-hosted installs that have not configured email yet.
++export function createMailer(): Mailer {
++  let instance: Mailer | undefined;
++  const get = () => (instance ??= instantiate());
++
++  return {
++    emails: {
++      send: (options) => get().emails.send(options),
++    },
++    contacts: {
++      list: () => get().contacts.list(),
++      create: (options) => get().contacts.create(options),
++      get: (id) => get().contacts.get(id),
++      update: (options) => get().contacts.update(options),
++      delete: (id) => get().contacts.delete(id),
++      addToSegment: (options) => get().contacts.addToSegment(options),
++    },
++  };
++}
+diff --git a/apps/web/src/server/auth/plugins/stripe.ts b/apps/web/src/server/auth/plugins/stripe.ts
+index 9ce2ce8..4cccdc8 100644
+--- a/apps/web/src/server/auth/plugins/stripe.ts
++++ b/apps/web/src/server/auth/plugins/stripe.ts
+@@ -1,16 +1,19 @@
+ import { SUBSCRIPTION_PLANS } from "@/server/auth/config/subscription-plans";
+ import { stripeApi } from "@/server/stripe";
++import { isCloud } from "@/utils/environment/env";
+ import { stripe } from "@better-auth/stripe";
+ import { prisma } from "@workspace/db";
+ 
+-if (process.env.NODE_ENV === "production" && !process.env.STRIPE_WEBHOOK_SIGNING_SECRET) {
++// Billing only runs on the hosted cloud; self-hosted installs keep the plugin
++// for type inference but never talk to Stripe on sign-up.
++if (isCloud() && process.env.NODE_ENV === "production" && !process.env.STRIPE_WEBHOOK_SIGNING_SECRET) {
+   throw new Error("STRIPE_WEBHOOK_SIGNING_SECRET is required in production");
+ }
+ 
+ export const stripePlugin = stripe({
+   stripeClient: stripeApi,
+   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SIGNING_SECRET ?? "",
+-  createCustomerOnSignUp: true,
++  createCustomerOnSignUp: isCloud(),
+   organization: {
+     enabled: true,
+     getCustomerCreateParams: async (organization) => {
+diff --git a/apps/web/src/server/github/github-app.ts b/apps/web/src/server/github/github-app.ts
+index d23072f..3d4bc4c 100644
+--- a/apps/web/src/server/github/github-app.ts
++++ b/apps/web/src/server/github/github-app.ts
+@@ -1,19 +1,27 @@
+ import { createAppAuth } from "@octokit/auth-app";
+ import { Octokit } from "@octokit/core";
+ 
+-const appId = process.env.GITHUB_APP_ID!;
+-const privateKey = process.env.GITHUB_PRIVATE_KEY!.replace(/\\n/g, "\n");
++// Read lazily so routes that merely import this module (Inngest handler, tRPC)
++// still load on installs where the GitHub App is not configured yet.
++function getAppCredentials() {
++  const appId = process.env.GITHUB_APP_ID;
++  const privateKey = process.env.GITHUB_PRIVATE_KEY;
++  if (!appId || !privateKey) {
++    throw new Error("GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be set to use the GitHub integration");
++  }
++  return { appId, privateKey: privateKey.replace(/\\n/g, "\n") };
++}
+ 
+ export function getAppOctokit() {
+   return new Octokit({
+     authStrategy: createAppAuth,
+-    auth: { appId, privateKey },
++    auth: getAppCredentials(),
+   });
+ }
+ 
+ export function getInstallationOctokit(installationId: number) {
+   return new Octokit({
+     authStrategy: createAppAuth,
+-    auth: { appId, privateKey, installationId },
++    auth: { ...getAppCredentials(), installationId },
+   });
+ }
+diff --git a/apps/web/src/server/storage/index.ts b/apps/web/src/server/storage/index.ts
+index 9e85718..c5dd143 100644
+--- a/apps/web/src/server/storage/index.ts
++++ b/apps/web/src/server/storage/index.ts
+@@ -1,7 +1,19 @@
+-import { cloudflare } from "@better-upload/server/clients";
++import { cloudflare, custom } from "@better-upload/server/clients";
+ 
+-export const s3Client = cloudflare({
+-  accountId: process.env.R2_ACCOUNT_ID!,
+-  accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+-  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+-});
++// Self-hosted installs may point at any S3-compatible store (MinIO, Garage, a
++// local dev bucket). STORAGE_HOST switches to the generic client so those
++// deployments do not need a Cloudflare account; R2 stays the default.
++export const s3Client = process.env.STORAGE_HOST
++  ? custom({
++      host: process.env.STORAGE_HOST,
++      accessKeyId: process.env.STORAGE_ACCESS_KEY_ID!,
++      secretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY!,
++      region: process.env.STORAGE_REGION || "us-east-1",
++      secure: process.env.STORAGE_SECURE !== "false",
++      forcePathStyle: process.env.STORAGE_FORCE_PATH_STYLE !== "false",
++    })
++  : cloudflare({
++      accountId: process.env.R2_ACCOUNT_ID!,
++      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
++      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
++    });
+diff --git a/apps/web/turbo.json b/apps/web/turbo.json
+index 773debf..6f9994a 100644
+--- a/apps/web/turbo.json
++++ b/apps/web/turbo.json
+@@ -21,6 +21,7 @@
+         "AGENCY_MONTHLY_PRICE_ID",
+         "AGENCY_YEARLY_PRICE_ID",
+ 
++        "MAILER_PROVIDER",
+         "PLUNK_SECRET_KEY",
+         "RESEND_API_KEY",
+         "RESEND_SEGMENT_ID",
+@@ -31,6 +32,11 @@
+         "R2_ACCOUNT_ID",
+         "R2_ACCESS_KEY_ID",
+         "R2_SECRET_ACCESS_KEY",
++        "STORAGE_HOST",
++        "STORAGE_ACCESS_KEY_ID",
++        "STORAGE_SECRET_ACCESS_KEY",
++        "STORAGE_SECURE",
++        "STORAGE_FORCE_PATH_STYLE",
+ 
+         "LINEAR_CLIENT_ID",
+         "LINEAR_CLIENT_SECRET",
+diff --git a/packages/database/index.ts b/packages/database/index.ts
+index 94d4e14..74eb090 100644
+--- a/packages/database/index.ts
++++ b/packages/database/index.ts
+@@ -6,10 +6,12 @@ import { PrismaClient } from "./generated/prisma/client";
+ const connectionString = `${process.env.DATABASE_URL}`;
+ 
+ // Neon's serverless driver uses HTTP, avoiding TCP cold-start overhead in production.
+-// Fall back to the standard pg adapter for local development.
+-const adapter = process.env.NODE_ENV === "production"
+-  ? new PrismaNeon({ connectionString })
+-  : new PrismaPg({ connectionString });
++// Self-hosted installs on plain PostgreSQL (Fly, Docker) cannot speak Neon's
++// protocol, so they opt into the standard pg adapter with DATABASE_ADAPTER=pg.
++const adapter =
++  process.env.NODE_ENV === "production" && process.env.DATABASE_ADAPTER !== "pg"
++    ? new PrismaNeon({ connectionString })
++    : new PrismaPg({ connectionString });
+ 
+ const prisma = new PrismaClient({ adapter });
+ 
