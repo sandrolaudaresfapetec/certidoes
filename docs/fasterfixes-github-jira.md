@@ -35,6 +35,12 @@ NEXT_PUBLIC_FASTERFIXES_PROJECT_ID=proj_...        # Project settings no dashboa
 NEXT_PUBLIC_FASTERFIXES_API_ORIGIN=https://<host do FasterFixes>
 ```
 
+Staging do sistema de certidões com o widget ativo: app Fly `certidoes-staging`
+(https://certidoes-staging.fly.dev, `fly.staging.toml`), banco `certidoes_staging` no
+cluster `certidoes-pg`, SIGEF/gov.br simulados (`SIGEF_MOCK=true`, `GOVBR_MOCK=true`).
+As duas variáveis acima entram como secrets desse app; a produção (`certidoes-app`)
+segue sem widget. Deploy: `fly deploy -c fly.staging.toml --ha=false`.
+
 Secrets do repositório GitHub usados pelo workflow (Settings → Secrets and variables → Actions):
 
 ```text
@@ -146,11 +152,22 @@ Doc: https://www.faster-fixes.com/docs/integrations/github
 1. Criar um GitHub App na organização `sandrolaudaresfapetec`
    (Settings → Developer settings → GitHub Apps → New GitHub App):
    - Webhook URL: `https://<host do FasterFixes>/api/webhooks/github`
+   - Setup URL (marcar "Redirect on update"): `https://<host do FasterFixes>/api/github/setup`
    - Permissions: `Issues: Read & write`, `Metadata: Read`
    - Events: `Issues`
    - Copiar `App ID`, gerar `Private key` e `Webhook secret` → `GITHUB_APP_ID`,
-     `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`.
+     `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` (secrets do app Fly
+     `certidoes-fasterfixes`). O nome (slug) do App vai em
+     `NEXT_PUBLIC_GITHUB_APP_NAME` — é lido no build, então exige rebuild da imagem;
+     sem ele o botão "Connect GitHub" do dashboard não abre, mas a instalação
+     manual em `https://github.com/apps/<slug>/installations/new` funciona igual.
+   - Atalho: o [manifest flow](https://docs.github.com/apps/sharing-github-apps/registering-a-github-app-from-a-manifest)
+     cria o App com tudo preenchido; o `code` devolvido é trocado em
+     `POST https://api.github.com/app-manifests/{code}/conversions` por App ID,
+     private key e webhook secret (vale 1 h, sem autenticação).
 2. Instalar o App **uma vez, no nível da organização** (cobre todos os repositórios).
+   O GitHub redireciona para o Setup URL, que exige sessão no dashboard FasterFixes
+   e grava a instalação na organização ativa.
 3. No dashboard do FasterFixes: Project → Integrations → GitHub → vincular o
    repositório `sandrolaudaresfapetec/certidoes`, ativar **auto-create issues** e
    definir labels padrão: `faster-fixes`, `client-feedback`, `bug`.
