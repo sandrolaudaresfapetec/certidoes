@@ -201,6 +201,12 @@ aberta/rotulada com `faster-fixes` ou `client-feedback` e:
 
 Se a issue já mencionar `SC-\d+` no título/corpo, o workflow não cria card duplicado.
 
+Antes de criar o card o workflow valida as credenciais em `/rest/api/3/myself`; se
+falhar, o log mostra `Credenciais do Jira invalidas` — refaça o secret
+`JIRA_API_TOKEN` (sem espaços/quebra de linha). Para redisparar a triagem de uma
+issue que ficou sem card, remova e recoloque o label `client-feedback`
+(gatilho `issues.labeled`).
+
 Fluxo do desenvolvedor a partir daí:
 
 ```bash
@@ -225,3 +231,10 @@ quando a issue for fechada.
    https://grupoge21.atlassian.net/jira/software/projects/SC/boards/318.
 6. Abrir branch/commit/PR com `SC-xx` e conferir o painel "Desenvolvimento" do card.
 7. Resolver o feedback no FasterFixes → issue fecha → mover o card para Concluído.
+
+Resultado do piloto (set/2026, staging): feedback enviado pelo widget em
+`/geometria` → issue [#30](https://github.com/sandrolaudaresfapetec/certidoes/issues/30)
+criada automaticamente com screenshot, URL, seletor CSS, navegador/SO/viewport e
+logs de rede → card [SC-28](https://grupoge21.atlassian.net/browse/SC-28) criado
+pela triagem e chave inserida no título/comentário da issue → branch, commit e PR
+com `SC-28` vinculados ao card pelo GitHub for Jira.
