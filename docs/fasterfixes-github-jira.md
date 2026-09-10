@@ -236,5 +236,7 @@ Resultado do piloto (set/2026, staging): feedback enviado pelo widget em
 `/geometria` → issue [#30](https://github.com/sandrolaudaresfapetec/certidoes/issues/30)
 criada automaticamente com screenshot, URL, seletor CSS, navegador/SO/viewport e
 logs de rede → card [SC-28](https://grupoge21.atlassian.net/browse/SC-28) criado
-pela triagem e chave inserida no título/comentário da issue → branch, commit e PR
-com `SC-28` vinculados ao card pelo GitHub for Jira.
+pela triagem e chave inserida no título/comentário da issue → branch, commit e
+[PR #32](https://github.com/sandrolaudaresfapetec/certidoes/pull/32) abertos com
+`SC-28` para o vínculo pelo GitHub for Jira (exige a org `sandrolaudaresfapetec`
+conectada em Apps → GitHub for Jira → Get started).
