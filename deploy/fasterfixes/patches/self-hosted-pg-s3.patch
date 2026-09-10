@@ -230,6 +230,65 @@ index d23072f..3d4bc4c 100644
 +    auth: { ...getAppCredentials(), installationId },
    });
  }
+diff --git a/apps/web/src/server/inngest/create-github-issue.ts b/apps/web/src/server/inngest/create-github-issue.ts
+index 46f4dcf..17fc5b7 100644
+--- a/apps/web/src/server/inngest/create-github-issue.ts
++++ b/apps/web/src/server/inngest/create-github-issue.ts
+@@ -5,9 +5,14 @@ import {
+ import { getInstallationOctokit } from "@/server/github/github-app";
+ import type { DiagnosticTrail } from "@fasterfixes/core";
+ import { getSignedAssetUrl } from "@/server/storage/get-signed-asset-url";
++import { resolveS3Url } from "@/server/storage/resolve-s3-url";
+ import { prisma } from "@workspace/db";
+ import { inngest } from "./index";
+ 
++// The widget attaches the screenshot in a second request after the feedback is
++// created, so `feedback/created` usually fires before it has landed.
++const SCREENSHOT_GRACE_PERIOD = "20s";
++
+ export const createGitHubIssue = inngest.createFunction(
+   {
+     id: "create-github-issue",
+@@ -21,9 +26,22 @@ export const createGitHubIssue = inngest.createFunction(
+       },
+     ],
+   },
+-  async ({ event }) => {
++  async ({ event, step }) => {
+     const { feedbackId } = event.data;
+ 
++    if (event.name === "feedback/created") {
++      const hasScreenshot = await step.run("check-screenshot", async () => {
++        const row = await prisma.feedback.findUnique({
++          where: { id: feedbackId },
++          select: { screenshotId: true },
++        });
++        return row?.screenshotId != null;
++      });
++      if (!hasScreenshot) {
++        await step.sleep("wait-for-screenshot", SCREENSHOT_GRACE_PERIOD);
++      }
++    }
++
+     const feedback = await prisma.feedback.findUnique({
+       where: { id: feedbackId },
+       include: {
+@@ -63,9 +81,14 @@ export const createGitHubIssue = inngest.createFunction(
+     const installation = gitHubLink.gitHubInstallation;
+     const octokit = getInstallationOctokit(installation.installationId);
+ 
++    // A presigned URL expires, which leaves the issue with a broken image; when
++    // the bucket is served publicly (NEXT_PUBLIC_STORAGE_BASE_URL) use the
++    // permanent URL instead.
+     let screenshotUrl: string | null = null;
+     if (feedback.screenshot) {
+-      screenshotUrl = await getSignedAssetUrl(feedback.screenshot, 3600);
++      screenshotUrl = process.env.NEXT_PUBLIC_STORAGE_BASE_URL
++        ? resolveS3Url(feedback.screenshot.key)
++        : await getSignedAssetUrl(feedback.screenshot, 3600);
+     }
+ 
+     const baseUrl = process.env.BETTER_AUTH_URL ?? process.env.BASE_URL!;
 diff --git a/apps/web/src/server/storage/index.ts b/apps/web/src/server/storage/index.ts
 index 9e85718..c5dd143 100644
 --- a/apps/web/src/server/storage/index.ts

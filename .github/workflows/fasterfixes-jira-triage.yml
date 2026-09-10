@@ -29,9 +29,22 @@ jobs:
               return;
             }
 
+            // Secrets colados com espaco/quebra de linha viram 401/400 genericos no Jira.
+            const baseUrl = process.env.JIRA_BASE_URL.trim().replace(/\/+$/, '');
             const auth = Buffer.from(
-              `${process.env.JIRA_USER_EMAIL}:${process.env.JIRA_API_TOKEN}`
+              `${process.env.JIRA_USER_EMAIL.trim()}:${process.env.JIRA_API_TOKEN.trim()}`
             ).toString('base64');
+
+            const eu = await fetch(`${baseUrl}/rest/api/3/myself`, {
+              headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' },
+            });
+            if (!eu.ok) {
+              core.setFailed(
+                `Credenciais do Jira invalidas (HTTP ${eu.status} em /myself): confira JIRA_USER_EMAIL e JIRA_API_TOKEN.`
+              );
+              return;
+            }
+            core.info(`Autenticado no Jira como ${(await eu.json()).emailAddress}`);
 
             const descricao = [
               issue.body || '',
@@ -39,7 +52,7 @@ jobs:
               `GitHub issue: ${issue.html_url}`,
             ].join('\n');
 
-            const resposta = await fetch(`${process.env.JIRA_BASE_URL}/rest/api/3/issue`, {
+            const resposta = await fetch(`${baseUrl}/rest/api/3/issue`, {
               method: 'POST',
               headers: {
                 Authorization: `Basic ${auth}`,
