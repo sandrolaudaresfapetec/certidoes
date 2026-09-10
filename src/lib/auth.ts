@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes, scrypt, timingSafeEqual } from "crypto";
+import { promisify } from "util";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@prisma/client";
 import { PAPEIS, type Papel } from "@/lib/papeis";
@@ -23,6 +24,14 @@ export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
 const SCRYPT_KEYLEN = 64;
 
+// scrypt assincrono: o custo do hash roda no pool de threads do libuv e nao
+// bloqueia o event loop do servidor durante logins e troca de senha.
+const derivar = promisify(scrypt) as (
+  senha: string,
+  salt: string,
+  keylen: number
+) => Promise<Buffer>;
+
 export function papelValido(role: string): role is Papel {
   return PAPEIS.includes(role as Papel);
 }
@@ -42,20 +51,23 @@ function sessionSecret(): string {
   return "dev-staff-secret-change-me";
 }
 
-export function hashSenha(senha: string): string {
+export async function hashSenha(senha: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(senha, salt, SCRYPT_KEYLEN).toString("hex");
+  const hash = (await derivar(senha, salt, SCRYPT_KEYLEN)).toString("hex");
   return `scrypt:${salt}:${hash}`;
 }
 
-export function verificarSenha(senha: string, armazenado: string | null): boolean {
+export async function verificarSenha(
+  senha: string,
+  armazenado: string | null
+): Promise<boolean> {
   if (!armazenado) return false;
   const [algoritmo, salt, hash] = armazenado.split(":");
   if (algoritmo !== "scrypt" || !salt || !hash) return false;
   // Hash corrompido nao pode ditar o custo do scrypt nem derrubar o login.
   if (hash.length !== SCRYPT_KEYLEN * 2 || !/^[0-9a-f]+$/.test(hash)) return false;
   const esperado = Buffer.from(hash, "hex");
-  const calculado = scryptSync(senha, salt, SCRYPT_KEYLEN);
+  const calculado = await derivar(senha, salt, SCRYPT_KEYLEN);
   return esperado.length === calculado.length && timingSafeEqual(esperado, calculado);
 }
 

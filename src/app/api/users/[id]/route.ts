@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, usaPostgres } from "@/lib/prisma";
 import { exigirAdminApi, hashSenha, papelValido } from "@/lib/auth";
 import { SENHA_MINIMA } from "@/lib/papeis";
 
@@ -73,7 +73,7 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    dados.passwordHash = hashSenha(senha);
+    dados.passwordHash = await hashSenha(senha);
   }
 
   // O administrador logado não pode revogar o próprio acesso e deixar o
@@ -86,6 +86,35 @@ export async function PATCH(
     );
   }
 
-  const user = await prisma.user.update({ where: { id: alvo.id }, data: dados, select: CAMPOS });
+  // O sistema precisa manter ao menos um ADMIN ativo. A contagem roda dentro da
+  // transação, depois da gravação, com as linhas de ADMIN travadas: dois
+  // administradores rebaixando um ao outro ao mesmo tempo são serializados e o
+  // segundo recebe 409 em vez de deixar o sistema sem administrador.
+  const user = await prisma
+    .$transaction(async (tx) => {
+      if (usaPostgres()) {
+        await tx.$queryRaw`SELECT id FROM "User" WHERE role = 'ADMIN' FOR UPDATE`;
+      }
+      const atualizado = await tx.user.update({
+        where: { id: alvo.id },
+        data: dados,
+        select: CAMPOS,
+      });
+      const admins = await tx.user.count({ where: { role: "ADMIN", active: true } });
+      if (admins === 0) throw new Error("SEM_ADMIN");
+      return atualizado;
+    })
+    .catch((e: Error) => {
+      if (e.message === "SEM_ADMIN") return null;
+      throw e;
+    });
+
+  if (!user) {
+    return NextResponse.json(
+      { error: "O sistema precisa de ao menos um administrador ativo." },
+      { status: 409 }
+    );
+  }
+
   return NextResponse.json(user);
 }
