@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
+import { geometriaDoAcervo } from "@/components/requisicao/geometria";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,15 @@ export default async function AcompanharRequisicaoPage({
   });
   if (!requisicao) notFound();
 
+  // Contorno do imóvel no acervo SIGEF importado (vazio até a importação; #PEND-33).
+  const parcela = requisicao.sigefParcelaCodigo
+    ? await prisma.sigefParcela.findUnique({
+        where: { codigoParcela: requisicao.sigefParcelaCodigo },
+        select: { geometria: true },
+      })
+    : null;
+  const geometriaImovel = geometriaDoAcervo(parcela?.geometria);
+
   // O cliente só altera a requisição depois que a equipe a devolve.
   const editavel =
     !requisicao.processId && !requisicao.finalizadaEm && requisicao.status === "DEVOLVIDA";
@@ -42,7 +52,10 @@ export default async function AcompanharRequisicaoPage({
         Minhas Requisições
       </Link>
       <h1 className="text-xl font-semibold text-gray-900 mb-4">Acompanhar Requisição</h1>
-      <RequisicaoDetalhe requisicao={requisicao} escopo="CLIENTE" editavel={editavel} />
+      <RequisicaoDetalhe requisicao={requisicao} escopo="CLIENTE"
+        editavel={editavel}
+        geometriaImovel={geometriaImovel}
+      />
     </div>
   );
 }

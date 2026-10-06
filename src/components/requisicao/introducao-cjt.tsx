@@ -1,6 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
+
+const ConclusaoContext = createContext<() => void>(() => {});
+
+/** O formulário avisa a introdução que o envio terminou, para ela sair da frente da confirmação. */
+export function useConclusaoSolicitacao(): () => void {
+  return useContext(ConclusaoContext);
+}
 
 /** Texto institucional da CJT e avisos (documento de correções do cliente, item 1). */
 function TextoCjt() {
@@ -54,6 +61,7 @@ function TextoCjt() {
  */
 export function IntroducaoCjt({ children }: { children: React.ReactNode }) {
   const [iniciou, setIniciou] = useState(false);
+  const [concluida, setConcluida] = useState(false);
   const formularioRef = useRef<HTMLDivElement>(null);
 
   if (!iniciou) {
@@ -79,24 +87,30 @@ export function IntroducaoCjt({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="space-y-4">
-      <details className="group rounded-lg border border-gray-200 bg-white">
-        <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-gray-800">
-          Sobre a CJT e avisos
-          <span className="text-xs font-normal text-emerald-700">
-            <span className="group-open:hidden">Ver</span>
-            <span className="hidden group-open:inline">Ocultar</span>
-          </span>
-        </summary>
-        <div className="px-4 pb-4">
-          <TextoCjt />
-        </div>
-      </details>
-      <p className="text-sm text-gray-600">
-        Responda às perguntas abaixo: os campos exibidos mudam conforme o resultado pretendido
-        e a situação atual do imóvel.
-      </p>
+      {!concluida && (
+        <details className="group rounded-lg border border-gray-200 bg-white">
+          <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-gray-800">
+            Sobre a CJT e avisos
+            <span className="text-xs font-normal text-emerald-700">
+              <span className="group-open:hidden">Ver</span>
+              <span className="hidden group-open:inline">Ocultar</span>
+            </span>
+          </summary>
+          <div className="px-4 pb-4">
+            <TextoCjt />
+          </div>
+        </details>
+      )}
+      {!concluida && (
+        <p className="text-sm text-gray-600">
+          Responda às perguntas abaixo: os campos exibidos mudam conforme o resultado pretendido
+          e a situação atual do imóvel.
+        </p>
+      )}
       <div ref={formularioRef} tabIndex={-1} className="outline-none">
-        {children}
+        <ConclusaoContext.Provider value={() => setConcluida(true)}>
+          {children}
+        </ConclusaoContext.Provider>
       </div>
     </div>
   );

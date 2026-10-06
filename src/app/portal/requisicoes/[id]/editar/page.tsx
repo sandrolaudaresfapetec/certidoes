@@ -75,7 +75,7 @@ export default async function EditarRequisicaoPage({
         cpf={solicitante.cpf}
         criarEndpoint="/api/portal/solicitacoes"
         documentosEndpoint="/api/portal/documentos"
-        progressivo
+        variante="SOLICITANTE"
         painelHref={`/portal/requisicoes/${requisicao.id}`}
         painelLabel="Ver requisição"
         edicao={{

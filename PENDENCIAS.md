@@ -65,6 +65,8 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-42 | Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar | backend | adição | média | aberta |
 | #PEND-43 | Salvar rascunho e continuar requisição no formulário e em Minhas Requisições | frontend | adição | média | bloqueada (#PEND-42) |
 | #PEND-44 | Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1 | backend | segurança | média | aberta |
+| #PEND-45 | Associar cada polígono nomeado ao polígono do mapa (UI) | frontend | adição | média | bloqueada (#PEND-34) |
+| #PEND-46 | Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio | backend | bugfix | baixa | aberta |
 
 ## Detalhes
 
@@ -335,7 +337,7 @@ Documento (§2 e §5): o representante informa o CPF ou CNPJ de quem representa 
 **Onde:** `prisma/schema.prisma` (`Solicitacao` guarda uma única parcela, e `cjtNomesPoligonos` só os nomes); `POST/PATCH /api/portal/solicitacoes`
 
 Documento (§5): o cliente "precisa indicar quem é quem", isto é, qual polígono do SIGEF corresponde a cada gleba/polígono nomeado, unificando contagem e nomes com a tela do imóvel. O modelo não relaciona nome e parcela, e a API aceita uma só parcela. Precisa persistir a associação (nome ↔ código da parcela) e aceitar várias parcelas.
-**Impacto no frontend:** UI de associação no bloco do imóvel.
+**Impacto no frontend:** UI de associação no bloco do imóvel (#PEND-45). A Fase 6 já mostra o mapa do imóvel e, ao lado, a lista dos nomes informados; falta só a associação.
 
 ### #PEND-35 · Matrícula "Usucapião" na validação e na persistência
 
@@ -423,3 +425,18 @@ Botão "Salvar rascunho" em `RequisicaoForm` (portal) e, em Minhas Requisições
 Hoje a rota só tira os não-dígitos de `emNomeDeCpf` e exige o nome quando há documento. Não confere o tamanho (11 ou 14 algarismos) nem o dígito verificador, aceita CNPJ numa coluna chamada "Cpf", e não cruza com a Pergunta 1: dá para enviar `qualidade` "Proprietário" com representado, ou "Representante" sem nenhum. O portal passou a exigir CPF/CNPJ completo e nome quando a resposta é "Representante" (Fase 4), mas isso é só usabilidade.
 Precisa: validar CPF (checksum) ou CNPJ (checksum); exigir os dados de representação e a procuração quando `qualidade` for "1a" e descartá-los nas demais; avaliar renomear a coluna (ex.: `representadoDocumento`).
 **Impacto no frontend:** a exibição já formata CPF ou CNPJ conforme o tamanho (`mascaraCpfCnpj`); nada a mudar quando o servidor passar a validar além de mostrar o erro devolvido.
+
+### #PEND-45 · Associar cada polígono nomeado ao polígono do mapa (UI)
+
+**Responsável:** frontend · **Tipo:** adição · **Registrada em:** 2026-10-06
+
+Item 16 do documento: "mostrar de alguma maneira um indicativo de quem é cada Gleba… o cliente precisa indicar quem é quem". A Fase 6 mostra o contorno do imóvel (`MapaImovel`) e a lista de nomes (Pergunta 4), com o aviso de que a equipe do IGC relaciona nome e polígono. Falta a interface em que o solicitante marca no mapa qual polígono é cada nome (numerar as partes do contorno e escolher o nome de cada uma). Só vale fazer depois que o backend gravar o vínculo.
+**Depende de:** #PEND-34 (persistência do vínculo e de várias parcelas); #PEND-33 (geometria por parcela em todos os modos).
+
+### #PEND-46 · Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio
+
+**Responsável:** backend · **Tipo:** bugfix · **Registrada em:** 2026-10-06
+**Onde:** `src/lib/sigef.ts` (`gerarParcelasMockComCar`, só com `SIGEF_MOCK`/sem credenciais)
+
+Em desenvolvimento a mesma consulta devolve ora parcelas com dados completos (11,72 ha, Ribeirão Branco/SP), ora parcelas enriquecidas com o CAR em que `areaHectares` é 0 e `municipio` é vazio (lista mostra "0 ha · /SP"). A resposta varia entre chamadas. Afeta só o ambiente simulado, mas atrapalha testes e demonstrações.
+**Impacto no frontend:** nenhum; o texto do mapa para leitores de tela ignora área e município ausentes.

@@ -11,6 +11,7 @@ import {
 } from "@/lib/cjt-formulario";
 import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
 import { AcompanhamentoRequisicao } from "@/components/requisicao/acompanhamento";
+import { MapaImovel } from "@/components/requisicao/mapa-imovel";
 
 export type RequisicaoDetalhada = Prisma.SolicitacaoGetPayload<{
   include: {
@@ -46,16 +47,18 @@ function nomesPoligonos(json: string | null): string[] {
  * escopo="CLIENTE" oculta dados internos (contato do solicitante e processo);
  * escopo="INTERNO" é usado pelo atendimento e pelos responsáveis técnicos.
  * `editavel` (só escopo CLIENTE) indica que a requisição foi devolvida e o solicitante
- * pode alterá-la.
+ * pode alterá-la. `geometriaImovel` é o contorno da parcela no acervo SIGEF (null se não houver).
  */
 export function RequisicaoDetalhe({
   requisicao,
   escopo,
   editavel = false,
+  geometriaImovel = null,
 }: {
   requisicao: RequisicaoDetalhada;
   escopo: "CLIENTE" | "INTERNO";
   editavel?: boolean;
+  geometriaImovel?: unknown | null;
 }) {
   const st = statusRequisicao(requisicao.status);
   const poligonos = nomesPoligonos(requisicao.cjtNomesPoligonos);
@@ -136,7 +139,23 @@ export function RequisicaoDetalhe({
         />
       </Bloco>
 
-      <Bloco titulo="Imóvel">
+      <Bloco
+        titulo="Imóvel"
+        rodape={
+          requisicao.tipoViaSigef ? (
+            <div className="mt-4">
+              <MapaImovel
+                geometria={geometriaImovel}
+                descricao={`Contorno do imóvel ${requisicao.sigefNomeArea ?? "rural"}${
+                  requisicao.sigefAreaHectares != null
+                    ? `, ${requisicao.sigefAreaHectares.toLocaleString("pt-BR")} ha`
+                    : ""
+                }`}
+              />
+            </div>
+          ) : undefined
+        }
+      >
         {requisicao.tipoViaSigef ? (
           <>
             <Item rotulo="Nome da área" valor={requisicao.sigefNomeArea ?? "—"} />
@@ -276,11 +295,21 @@ export function RequisicaoDetalhe({
   );
 }
 
-function Bloco({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Bloco({
+  titulo,
+  rodape,
+  children,
+}: {
+  titulo: string;
+  /** Conteúdo de largura total depois da lista de dados (ex.: mapa). */
+  rodape?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="bg-white rounded-lg border border-gray-200 p-6">
       <h3 className="font-semibold text-gray-900 mb-3">{titulo}</h3>
       <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2">{children}</dl>
+      {rodape}
     </section>
   );
 }

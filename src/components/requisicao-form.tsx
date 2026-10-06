@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -33,6 +33,8 @@ import {
   type FormularioCjt,
 } from "@/lib/cjt-formulario";
 import { ProgressoSolicitacao } from "@/components/requisicao/progresso-solicitacao";
+import { MapaImovel } from "@/components/requisicao/mapa-imovel";
+import { useConclusaoSolicitacao } from "@/components/requisicao/introducao-cjt";
 import {
   NomesPoligonos,
   erroNomenclatura,
@@ -46,6 +48,8 @@ interface SigefParcela {
   municipio: string;
   uf: string;
   status: string;
+  /** Contorno do imóvel (GeoJSON), quando a consulta o devolve. */
+  geometria?: unknown;
 }
 
 interface SigefResult {
@@ -86,10 +90,11 @@ interface RequisicaoFormProps {
   /** Quando presente, o formulário altera a requisição em vez de criar. */
   edicao?: RequisicaoEdicao;
   /**
-   * Portal do solicitante: as caixas abrem uma a uma, conforme as anteriores ficam
-   * completas, com barra de progresso. O atendimento usa o formulário inteiro.
+   * SOLICITANTE (portal): caixas que abrem uma a uma, com barra de progresso, e a tela
+   * "Solicitação enviada com sucesso". ATENDIMENTO usa o formulário inteiro e a
+   * confirmação curta com o protocolo.
    */
-  progressivo?: boolean;
+  variante?: "SOLICITANTE" | "ATENDIMENTO";
 }
 
 const NOMES_CAIXAS = [
@@ -116,8 +121,11 @@ export function RequisicaoForm({
   painelHref,
   painelLabel,
   edicao,
-  progressivo = false,
+  variante = "ATENDIMENTO",
 }: RequisicaoFormProps) {
+  const progressivo = variante === "SOLICITANTE";
+  const marcarConcluida = useConclusaoSolicitacao();
+  const tituloEnvioRef = useRef<HTMLHeadingElement>(null);
   const [form, setForm] = useState<FormularioCjt>(edicao?.cjt ?? formularioVazio);
   const [erros, setErros] = useState<ErrosCjt>({});
 
@@ -136,6 +144,13 @@ export function RequisicaoForm({
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [protocolo, setProtocolo] = useState<string | null>(null);
+
+  // Ao concluir, leva a tela e o foco para a confirmação.
+  useEffect(() => {
+    if (!protocolo) return;
+    window.scrollTo({ top: 0 });
+    tituloEnvioRef.current?.focus();
+  }, [protocolo]);
 
   useEffect(() => {
     (async () => {
@@ -188,6 +203,9 @@ export function RequisicaoForm({
 
   const campos = camposAplicaveis(form.resultado, form.situacao);
   const mostrarPergunta4 = combinacaoDefinida(form);
+  const nomesInformados = campos.includes("nomesPoligonos")
+    ? form.nomesPoligonos.map((n) => n.trim()).filter(Boolean)
+    : [];
   // "Representante" na Pergunta 1 abre a caixa com os dados de quem é representado.
   const procurador = form.qualidade === "1a";
   const exigeDocsImovel = etapaImovel === "semRegistro";
@@ -307,6 +325,7 @@ export function RequisicaoForm({
         }
       }
       setProtocolo(data.protocolo);
+      marcarConcluida();
     } catch (e) {
       setErro((e as Error).message);
     } finally {
@@ -315,6 +334,56 @@ export function RequisicaoForm({
   }
 
   if (protocolo) {
+    if (variante === "SOLICITANTE") {
+      return (
+        <section
+          aria-labelledby="envio-titulo"
+          className="bg-white rounded-lg border border-gray-200 p-8 text-center"
+        >
+          <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-3" aria-hidden="true" />
+          <h2
+            id="envio-titulo"
+            ref={tituloEnvioRef}
+            tabIndex={-1}
+            className="text-lg font-semibold text-gray-900 outline-none"
+          >
+            {edicao ? "Solicitação reenviada com sucesso" : "Solicitação enviada com sucesso"}
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Protocolo <strong>{protocolo}</strong>
+          </p>
+          <div className="mt-4 mx-auto max-w-xl space-y-3 text-left text-sm leading-relaxed text-gray-700">
+            <p>
+              Sua solicitação foi encaminhada ao Setor de Atendimento e será avaliada em até 10
+              dias, período de funcionamento do Instituto, de segunda a sexta-feira, das 9h às
+              17h, exceto feriados.
+            </p>
+            {/* PEND-25: o chat da solicitação ainda não existe; texto do cliente mantido. */}
+            <p>
+              Todas as comunicações e solicitações de complementação serão realizadas
+              exclusivamente por este sistema, no chat da solicitação.
+            </p>
+            <p>
+              Em “Minhas Requisições”, é possível acompanhar o andamento de cada solicitação.
+            </p>
+            <p className="pt-1 text-center font-semibold text-gray-900">
+              Aguarde o retorno da equipe.
+            </p>
+          </div>
+          <p className="mt-4 text-sm text-gray-600">
+            Atenciosamente
+            <br />
+            <strong className="text-gray-900">Instituto Geográfico e Cartográfico – IGC</strong>
+          </p>
+          <Link
+            href={painelHref}
+            className="inline-block mt-5 bg-emerald-700 text-white px-5 py-2 rounded-md text-sm hover:bg-emerald-800"
+          >
+            {painelLabel}
+          </Link>
+        </section>
+      );
+    }
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
         <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-3" />
@@ -661,6 +730,41 @@ export function RequisicaoForm({
                   );
                 })}
               </ul>
+              {selecionada && (
+                <figure className="mt-4 space-y-2">
+                  <figcaption className="text-sm font-bold text-gray-900">
+                    Localização do imóvel selecionado
+                  </figcaption>
+                  <MapaImovel
+                    geometria={selecionada.geometria}
+                    descricao={descreverImovel(selecionada)}
+                  />
+                  <p className="text-xs text-gray-600">
+                    Contorno do imóvel conforme o SIGEF/INCRA. O mapa é só para conferência:
+                    confirme que é a área para a qual você quer a certidão.
+                  </p>
+                  {nomesInformados.length > 0 && (
+                    <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                      <p className="font-medium text-gray-900">
+                        Polígonos informados na Pergunta 4 ({nomesInformados.length})
+                      </p>
+                      <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                        {nomesInformados.map((nome) => (
+                          <li
+                            key={nome}
+                            className="rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-xs"
+                          >
+                            {nome}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-xs text-gray-600">
+                        Depois do envio, a equipe do IGC relaciona cada nome ao polígono do mapa.
+                      </p>
+                    </div>
+                  )}
+                </figure>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -734,8 +838,8 @@ export function RequisicaoForm({
               onChange={(e) => setForm((a) => ({ ...a, declaracao: e.target.checked }))}
               className="mt-0.5 rounded border-gray-300"
             />
-            Declaro que as informações prestadas e a documentação apresentada estão
-            de acordo com as instruções constantes no site.
+            Declaro que as informações prestadas e a documentação apresentada são
+            verdadeiras e estão em conformidade com os padrões estabelecidos pelo Instituto.
           </label>
           {erros.declaracao && (
             <p role="alert" className="text-sm text-red-600">
@@ -820,6 +924,14 @@ function Pergunta({
       )}
     </fieldset>
   );
+}
+
+/** Texto do mapa para tecnologias assistivas, só com os dados que a parcela traz. */
+function descreverImovel(p: SigefParcela): string {
+  const partes = [`Contorno do imóvel ${p.nomeArea || "rural"}`];
+  if (p.areaHectares > 0) partes.push(`${p.areaHectares.toLocaleString("pt-BR")} ha`);
+  if (p.municipio) partes.push(`${p.municipio}/${p.uf}`);
+  return partes.join(", ");
 }
 
 /** Liga o campo à dica e ao erro (aria-describedby); o ids vêm de `Campo`. */
