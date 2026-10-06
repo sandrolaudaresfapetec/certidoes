@@ -62,6 +62,8 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-39 | Decisão: dúvidas do documento de correções de 2026-09-16 | negócio | decisão | média | aberta |
 | #PEND-40 | Texto auxiliar em `gray-400` abaixo do contraste AA (rodapé do portal) | frontend | melhoria | baixa | aberta |
 | #PEND-41 | Máscaras de entrada nos formulários (telefone, CPF, CNPJ etc.) | frontend | adição | média | aberta |
+| #PEND-42 | Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar | backend | adição | média | aberta |
+| #PEND-43 | Salvar rascunho e continuar requisição no formulário e em Minhas Requisições | frontend | adição | média | bloqueada (#PEND-42) |
 
 ## Detalhes
 
@@ -269,7 +271,7 @@ O documento pede que o cliente "não possa editar enquanto não tiver sido devol
 
 O documento (Minhas Requisições) define **Status Geral** — não enviadas · em análise · devolvidas · arquivadas · concluídas — e **Status da requisição** — conformidade mínima → Setor de Atendimentos (checagem de documentos, liberação do SEI) → Setor Técnico (triagem, elaboração da divisa, conferência, expedição) → documento em assinatura → aguardando pagamento → liberado para download. O dado atual cobre `PENDENTE/EM_ANALISE/APROVADA/DEVOLVIDA/CONCLUIDA` e as 9 etapas do workflow. Faltam rascunho ("não enviada"), arquivada, as sub-etapas de Atendimento e Técnico e a posição do pagamento (`pagamentoStatus` é solto). Definir o mapeamento com o negócio e expor ao portal.
 **Impacto no frontend:** o stepper e os filtros só chegam ao grau de detalhe que o dado permitir; hoje dá para derivar o grau grosso.
-**Bloqueia:** #PEND-29.
+**Bloqueia:** #PEND-29, #PEND-42.
 
 ### #PEND-28 · Download da certidão emitida pelo solicitante
 
@@ -284,6 +286,11 @@ O último status do documento é "Liberado para download". Não há geração de
 **Responsável:** backend · **Tipo:** adição · **Registrada em:** 2026-10-06
 
 Documento (Acompanhar): botão para solicitar arquivamento. Se a DDD ainda não iniciou a análise (exemplo do cliente: até 2 horas do envio) o solicitante encerra sem custo; se já houve análise (a de duplicidade, feita por trigger) o pedido segue para a DDD, que é a única a encerrar, pois pode haver custo. Não há status `ARQUIVADA`, rota nem registro de "análise iniciada".
+**O que o backend precisa entregar para o cartão "Arquivadas" funcionar** (Minhas Requisições, cartão já desenhado e desabilitado "em breve"):
+1. Novo valor `ARQUIVADA` em `Solicitacao.status` (campo `String`; atualizar o comentário do schema e as listas de validação).
+2. `POST /api/portal/solicitacoes/[id]/arquivar`: autenticada pelo portal, só do dono; arquivamento direto se a análise ainda não começou, senão registra o pedido para a DDD (precisa de um campo "análise iniciada em" ou equivalente).
+3. Ação do backoffice (ex.: `POST /api/solicitacoes/[id]/arquivar`, papel de atendimento/DDD) que conclui o arquivamento quando houver custo.
+**Impacto no frontend:** ao existir o status, basta incluir `"ARQUIVADA"` em `GRUPOS_STATUS_GERAL` (`src/lib/requisicao-status.ts`, marcado com `// PEND-29`) e o cartão passa a contar e a filtrar; o botão "Solicitar arquivamento" vai em Acompanhar.
 **Depende de:** #PEND-27.
 
 ### #PEND-30 · Análise agendada de duplicidade e sobreposição (4 situações)
@@ -381,3 +388,24 @@ Achado na varredura de contraste da Fase A: o rodapé "Serviço de emissão de c
 **Responsável:** frontend · **Tipo:** adição · **Registrada em:** 2026-10-06
 
 Os campos de telefone, CPF, CNPJ e similares aceitam texto livre, sem máscara de digitação. Aplicar máscara em todo formulário que tiver esses tipos de campo. Pedido do time; não mapeado nem priorizado ainda — o levantamento dos formulários afetados fica para quando a pendência for atacada.
+
+### #PEND-42 · Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar
+
+**Responsável:** backend · **Tipo:** adição · **Registrada em:** 2026-10-06
+**Onde:** `POST /api/portal/solicitacoes` (só cria a requisição completa, validada de uma vez), `Solicitacao.status`
+
+O Status Geral do documento tem "Requisições não enviadas": o solicitante começa o formulário, sai e volta depois. Hoje não existe rascunho: a rota exige o formulário todo e já cria como `PENDENTE`. Para o cartão "Não enviadas" de Minhas Requisições funcionar o backend precisa de:
+1. Novo valor `RASCUNHO` em `Solicitacao.status`.
+2. Salvar rascunho com validação parcial (campos opcionais): por exemplo `POST /api/portal/solicitacoes` com `rascunho: true` ou `PUT /api/portal/solicitacoes/[id]/rascunho`.
+3. `POST /api/portal/solicitacoes/[id]/enviar`: valida o formulário completo e muda `RASCUNHO` → `PENDENTE` (também é onde a análise de duplicidade da #PEND-30 poderia ser disparada).
+4. Excluir rascunho (`DELETE`), já que ele não tem protocolo oficial; decidir se rascunho recebe protocolo.
+5. Rascunhos não podem aparecer no backoffice (`/requisicoes`, dashboard, contagens): filtrar por status nas consultas de lá.
+**Impacto no frontend:** hoje o cartão aparece desabilitado "em breve". Quando existir, incluir `"RASCUNHO"` em `GRUPOS_STATUS_GERAL` (marcado com `// PEND-42`) e fazer #PEND-43.
+**Depende de:** #PEND-27 (modelo de status). **Bloqueia:** #PEND-43; relaciona-se com #PEND-31 (requisição congelada com 13+ polígonos).
+
+### #PEND-43 · Salvar rascunho e continuar requisição no formulário e em Minhas Requisições
+
+**Responsável:** frontend · **Tipo:** adição · **Registrada em:** 2026-10-06
+
+Botão "Salvar rascunho" em `RequisicaoForm` (portal) e, em Minhas Requisições, abrir o rascunho no formulário preenchido ("Continuar") com opção de excluir. O formulário de edição já aceita dados iniciais (`edicao`), o que facilita. Só dá para fazer depois das rotas da #PEND-42.
+**Depende de:** #PEND-42.

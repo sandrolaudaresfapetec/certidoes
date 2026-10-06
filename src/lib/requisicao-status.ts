@@ -62,3 +62,23 @@ export function acompanhamentoRequisicao(dados: {
   }
   return { tipo: "ETAPA", atual: 1 };
 }
+
+/**
+ * Status Geral da tela Minhas Requisições (documento do cliente): cada grupo reúne os
+ * status que o solicitante enxerga como uma coisa só. `status` vazio = grupo que o
+ * backend ainda não alimenta (#PEND-42 rascunho, #PEND-29 arquivada); o cartão aparece
+ * como "em breve" e passa a funcionar quando o código do status entrar na lista.
+ */
+export const GRUPOS_STATUS_GERAL = [
+  { chave: "nao-enviadas", rotulo: "Não enviadas", status: [] as string[] }, // PEND-42: ["RASCUNHO"]
+  { chave: "em-analise", rotulo: "Em análise", status: ["PENDENTE", "EM_ANALISE"] },
+  { chave: "devolvidas", rotulo: "Devolvidas", status: ["DEVOLVIDA"] },
+  { chave: "arquivadas", rotulo: "Arquivadas", status: [] as string[] }, // PEND-29: ["ARQUIVADA"]
+  { chave: "concluidas", rotulo: "Concluídas", status: ["APROVADA", "CONCLUIDA"] },
+] as const;
+
+export type ChaveGrupoStatus = (typeof GRUPOS_STATUS_GERAL)[number]["chave"];
+
+export function grupoStatusGeral(chave: string | undefined) {
+  return GRUPOS_STATUS_GERAL.find((g) => g.chave === chave);
+}

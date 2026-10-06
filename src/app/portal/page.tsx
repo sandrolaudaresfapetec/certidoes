@@ -3,9 +3,14 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { formatarCPF } from "@/lib/cpf";
-import { statusRequisicao } from "@/lib/requisicao-status";
+import {
+  GRUPOS_STATUS_GERAL,
+  grupoStatusGeral,
+  statusRequisicao,
+} from "@/lib/requisicao-status";
 import { RequisicaoFiltros } from "@/components/requisicao-filtros";
-import { FileText, PlusCircle, Clock, CheckCircle2, RotateCcw } from "lucide-react";
+import { CartoesStatusGeral } from "@/components/requisicao/cartoes-status-geral";
+import { FileText, PlusCircle } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -13,15 +18,17 @@ export const dynamic = "force-dynamic";
 export default async function PortalHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; grupo?: string }>;
 }) {
   const solicitante = await requireSolicitante();
   if (!solicitante.cadastroCompleto) redirect("/portal/completar-cadastro");
 
-  const { q = "", status = "" } = await searchParams;
+  const { q = "", status = "", grupo: grupoParam = "" } = await searchParams;
+  const grupo = grupoStatusGeral(grupoParam);
 
   const filtro: Prisma.SolicitacaoWhereInput = { solicitanteId: solicitante.id };
   if (status) filtro.status = status;
+  if (grupo) filtro.AND = [{ status: { in: [...grupo.status] } }];
   if (q) {
     filtro.OR = [
       { protocolo: { contains: q } },
@@ -43,9 +50,17 @@ export default async function PortalHomePage({
     }),
   ]);
 
-  const pendentes = todas.filter((s) => ["PENDENTE", "EM_ANALISE"].includes(s.status)).length;
-  const aprovadas = todas.filter((s) => ["APROVADA", "CONCLUIDA"].includes(s.status)).length;
-  const devolvidas = todas.filter((s) => s.status === "DEVOLVIDA").length;
+  const contagens = Object.fromEntries(
+    GRUPOS_STATUS_GERAL.map((g) => [
+      g.chave,
+      todas.filter((s) => (g.status as readonly string[]).includes(s.status)).length,
+    ])
+  );
+
+  const paramsSemGrupo = new URLSearchParams();
+  if (q) paramsSemGrupo.set("q", q);
+  if (status) paramsSemGrupo.set("status", status);
+  const hrefSemGrupo = paramsSemGrupo.size ? `/portal?${paramsSemGrupo}` : "/portal";
 
   return (
     <div className="space-y-6">
@@ -67,39 +82,24 @@ export default async function PortalHomePage({
         </Link>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-3">
-          <Clock className="h-8 w-8 text-amber-500" />
-          <div>
-            <p className="text-2xl font-bold text-gray-900">{pendentes}</p>
-            <p className="text-xs text-gray-500">Requisições pendentes</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-3">
-          <CheckCircle2 className="h-8 w-8 text-emerald-600" />
-          <div>
-            <p className="text-2xl font-bold text-gray-900">{aprovadas}</p>
-            <p className="text-xs text-gray-500">Requisições aprovadas</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-3">
-          <RotateCcw className="h-8 w-8 text-red-500" />
-          <div>
-            <p className="text-2xl font-bold text-gray-900">{devolvidas}</p>
-            <p className="text-xs text-gray-500">Requisições devolvidas</p>
-          </div>
-        </div>
-      </div>
+      <CartoesStatusGeral contagens={contagens} ativo={grupo?.chave ?? ""} q={q} status={status} />
 
-      <RequisicaoFiltros action="/portal" q={q} status={status} />
+      <RequisicaoFiltros action="/portal" q={q} status={status} grupo={grupo?.chave} />
 
       <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="font-semibold text-gray-900">Minhas Requisições</h2>
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-gray-900">
+            Minhas Requisições{grupo && ` · ${grupo.rotulo}`}
+          </h2>
+          {grupo && (
+            <Link href={hrefSemGrupo} className="text-xs text-emerald-700 hover:underline">
+              Limpar filtro
+            </Link>
+          )}
         </div>
         {solicitacoes.length === 0 ? (
           <p className="px-6 py-8 text-sm text-gray-500 text-center">
-            {q || status
+            {q || status || grupo
               ? "Nenhuma requisição encontrada com os filtros aplicados."
               : "Você ainda não possui requisições. Clique em Nova Requisição para começar."}
           </p>
