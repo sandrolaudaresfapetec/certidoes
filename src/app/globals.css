@@ -24,3 +24,35 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Padrões de interação: valem para toda a plataforma. Estão em `base` para um
+   componente poder optar por outro valor com um utilitário (ex.: cursor-default). */
+@layer base {
+  /* Cor fixa: sem isso o campo herda a do body (#ededed no modo escuro do sistema). */
+  input,
+  textarea,
+  select {
+    color: #111827;
+    font-weight: 400;
+  }
+
+  ::placeholder {
+    color: #6b7280;
+    opacity: 1;
+  }
+
+  /* O Tailwind 4 deixou de pôr cursor de mão nos botões. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  input:is([type="button"], [type="submit"], [type="reset"], [type="checkbox"], [type="radio"]):not(:disabled),
+  label:has(> input:is([type="checkbox"], [type="radio"]):not(:disabled)) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  input:is([type="button"], [type="submit"], [type="reset"], [type="checkbox"], [type="radio"]):disabled,
+  label:has(> input:is([type="checkbox"], [type="radio"]):disabled) {
+    cursor: not-allowed;
+  }
+}
