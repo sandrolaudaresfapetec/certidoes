@@ -38,7 +38,7 @@ export const MENSAGEM_NAO_SEI =
   "o atendimento do IGC para identificar a informação antes de prosseguir.";
 
 export const LIMITE_NOME_POLIGONO = 15;
-export const ALERTA_QTD_POLIGONOS = 15;
+export const ALERTA_QTD_POLIGONOS = 6;
 
 export type CampoCjt =
   | "propriedadeDe"
@@ -242,7 +242,7 @@ export function validarFormulario(form: FormularioCjt): ErrosCjt {
   if (campos.includes("codigoIncra")) {
     const digitos = somenteDigitos(form.codigoIncra);
     if (digitos.length > 0 && digitos.length !== LIMITE_DIGITOS_INCRA) {
-      erros.codigoIncra = "O código INCRA/SNCR deve ter 13 algarismos.";
+      erros.codigoIncra = "O código INCRA deve ter 13 algarismos.";
     }
   }
 

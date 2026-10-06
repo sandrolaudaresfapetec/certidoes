@@ -37,7 +37,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-14 | Decisão: formato da "pontuação de centena" na matrícula | negócio | decisão | baixa | aberta |
 | #PEND-15 | Decisão: Pergunta 1 × checkbox "procurador" — qual controla? | negócio | decisão | média | resolvida (2026-10-06) |
 | #PEND-16 | Amarrar o fluxo do procurador à Pergunta 1 | frontend | bugfix | média | resolvida (2026-10-06) |
-| #PEND-17 | Acessibilidade do formulário CJT (`aria-*`, rótulo órfão) | frontend | bugfix | média | aberta |
+| #PEND-17 | Acessibilidade do formulário CJT (`aria-*`, rótulo órfão) | frontend | bugfix | média | resolvida (2026-10-06) |
 | #PEND-18 | Migrations SQLite não reconstroem o banco do zero | backend | bugfix | média | aberta |
 | #PEND-19 | Colunas legadas sem uso em `Process` (`processes`, `users`) | backend | refatoração | baixa | aberta |
 | #PEND-20 | `.env.example` desatualizado (caminho do banco, variáveis ausentes) | infra | documentação | média | aberta |
@@ -198,6 +198,7 @@ Aplicar a regra. A API também deveria validar a coerência entre `cjtQualidade`
 **Onde:** `src/components/requisicao-form.tsx` (componente `Campo`; bloco `nomesPoligonos`)
 
 Critério de aceite 18 da spec. Já atendido: navegação por teclado, `fieldset`/`legend` nas perguntas, erros em texto com `role="alert"`. Falta: `aria-describedby` ligando dica e erro ao campo, `aria-invalid` nos campos recusados, e o `<label htmlFor="cjt-nomes">` aponta para um `id` que não existe (os inputs de polígono só têm `aria-label`) — agrupar com `fieldset`/`legend` ou usar `aria-labelledby`.
+**Resolução:** Fase 5 da branch `feat/portal-correcoes-cjt` (2026-10-06). `Campo` liga dica e erro por `aria-describedby`, os campos recusados levam `aria-invalid`, e os nomes dos polígonos viraram `fieldset`/`legend` com um rótulo por campo (`NomesPoligonos`).
 
 ### #PEND-18 · Migrations SQLite não reconstroem o banco do zero
 
@@ -349,7 +350,8 @@ Decisão do cliente (#PEND-11): "Quero informar o número da matrícula?" — N�
 **Responsável:** backend (lib compartilhada) · **Tipo:** adição · **Registrada em:** 2026-10-06
 **Onde:** `src/lib/cjt-formulario.ts` (bloco `nomesPoligonos`; "Propriedade de")
 
-Documento (§3–4): o nome do polígono segue um padrão fechado — Gleba, Parte ou Parcela (ou só o complemento) mais um complemento de até 3 caracteres entre letras sem "ç", números e "-" — e "Propriedade de" não pode ter "S/M" nem "S/E" ("e sua mulher", "e seu esposo"). O servidor valida só 1–15 caracteres e unicidade. A tela vai impor o padrão, mas a API precisa validar também (um cliente adulterado contorna a tela). Substitui #PEND-10 e dispensa #PEND-13.
+Documento (§3–4): o nome do polígono segue um padrão fechado — Gleba, Parte ou Parcela (ou só o complemento) mais um complemento de até 3 caracteres entre letras sem "ç", números e "-" — e "Propriedade de" não pode ter "S/M" nem "S/E" ("e sua mulher", "e seu esposo"). O servidor valida só 1–15 caracteres e unicidade. A tela vai impor o padrão, mas a API precisa validar também (um cliente adulterado contorna a tela).
+**Estado na tela (Fase 5):** o padrão é imposto em `src/components/requisicao/nomes-poligonos.tsx` (tipo único por pedido, complemento de 1 a 3 caracteres `[A-Za-z0-9-]`, sem repetição). Em "Propriedade de" só há a explicação sobre "S/M" e "S/E"; a recusa por texto ficou de fora de propósito (erra com nomes legítimos) e, se o cliente quiser, deve ser feita no servidor. Substitui #PEND-10 e dispensa #PEND-13.
 
 ### #PEND-37 · Decisão: o que é "incluir e-mail para finalizar o cadastro (ou SMS)"
 

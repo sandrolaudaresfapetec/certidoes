@@ -14,7 +14,6 @@ import {
   RESULTADO_OPCOES,
   SITUACAO_OPCOES,
   MENSAGEM_NAO_SEI,
-  LIMITE_NOME_POLIGONO,
   ALERTA_QTD_POLIGONOS,
   PREFIXO_ESPOLIO,
   ajustarNomesPoligonos,
@@ -34,6 +33,10 @@ import {
   type FormularioCjt,
 } from "@/lib/cjt-formulario";
 import { ProgressoSolicitacao } from "@/components/requisicao/progresso-solicitacao";
+import {
+  NomesPoligonos,
+  erroNomenclatura,
+} from "@/components/requisicao/nomes-poligonos";
 
 interface SigefParcela {
   codigoImovel: string;
@@ -200,7 +203,16 @@ export function RequisicaoForm({
     form.qualidade !== "1c" &&
     (!procurador || (cpfCnpjCompleto(emNomeDeCpf) && emNomeDeNome.trim().length > 1));
   const caixa2 = caixa1 && mostrarPergunta4;
-  const dadosCompletos = Object.keys(validarFormulario(form)).every((c) => c === "declaracao");
+  // Validação do servidor mais a nomenclatura fechada dos polígonos, que só a tela impõe (#PEND-36).
+  function validarComNomenclatura(): ErrosCjt {
+    const v = validarFormulario(form);
+    if (!v.nomesPoligonos && campos.includes("nomesPoligonos")) {
+      const erroNomes = erroNomenclatura(form.nomesPoligonos);
+      if (erroNomes) v.nomesPoligonos = erroNomes;
+    }
+    return v;
+  }
+  const dadosCompletos = Object.keys(validarComNomenclatura()).every((c) => c === "declaracao");
   const caixa3 = caixa2 && dadosCompletos;
   const caixa4 =
     caixa3 &&
@@ -215,7 +227,7 @@ export function RequisicaoForm({
   const entra = progressivo ? "caixa-entra" : "";
 
   async function enviar() {
-    const validacao = validarFormulario(form);
+    const validacao = validarComNomenclatura();
     setErros(validacao);
     if (Object.keys(validacao).length > 0) return;
 
@@ -476,9 +488,20 @@ export function RequisicaoForm({
               label="Propriedade de *"
               erro={erros.propriedadeDe}
               dica={
-                exigeEspolio(form.situacao)
-                  ? "Informe o nome do falecido."
-                  : "Havendo vários proprietários, informe o primeiro seguido de “e outros”."
+                <ul className="list-disc space-y-0.5 pl-5">
+                  {exigeEspolio(form.situacao) ? (
+                    <>
+                      <li>Informe o nome do falecido.</li>
+                      <li>
+                        Com um falecido e outros herdeiros vivos, informe o nome do falecido e
+                        depois “; Outros” (resultado: “Espólio de xxxx ; Outros”).
+                      </li>
+                    </>
+                  ) : (
+                    <li>Havendo vários proprietários, informe o primeiro seguido de “e outros”.</li>
+                  )}
+                  <li>Não use “S/M” nem “S/E” (“e sua mulher”, “e seu esposo”).</li>
+                </ul>
               }
             >
               <div className="flex items-center gap-2">
@@ -494,6 +517,8 @@ export function RequisicaoForm({
                   onChange={(e) =>
                     setForm((a) => ({ ...a, propriedadeDe: e.target.value }))
                   }
+                  aria-describedby={descrito("cjt-propriedade", true, erros.propriedadeDe)}
+                  aria-invalid={erros.propriedadeDe ? true : undefined}
                   className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
                 />
               </div>
@@ -505,7 +530,12 @@ export function RequisicaoForm({
               id="cjt-matricula"
               label="Matrícula *"
               erro={erros.matricula}
-              dica="Somente algarismos; não é necessário escrever a palavra “Matrícula”."
+              dica={
+                <p>
+                  Somente algarismos. Não colocar CRI, Trans, Transcrição, “-”, “/” ou outros
+                  caracteres.
+                </p>
+              }
             >
               <input
                 id="cjt-matricula"
@@ -515,6 +545,8 @@ export function RequisicaoForm({
                 onChange={(e) =>
                   setForm((a) => ({ ...a, matricula: somenteDigitos(e.target.value) }))
                 }
+                aria-describedby={descrito("cjt-matricula", true, erros.matricula)}
+                aria-invalid={erros.matricula ? true : undefined}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
               />
             </Campo>
@@ -532,10 +564,15 @@ export function RequisicaoForm({
                 min={1}
                 value={form.qtdPoligonos}
                 onChange={(e) => alterarQuantidade(e.target.value)}
+                aria-describedby={descrito("cjt-qtd", false, erros.qtdPoligonos)}
+                aria-invalid={erros.qtdPoligonos ? true : undefined}
                 className="w-32 border border-gray-300 rounded-md px-3 py-2 text-sm"
               />
               {parseInt(form.qtdPoligonos, 10) >= ALERTA_QTD_POLIGONOS && (
-                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2 mt-2">
+                <p
+                  role="status"
+                  className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+                >
                   {`Atenção: ${form.qtdPoligonos} polígonos. Pedidos com ${ALERTA_QTD_POLIGONOS} ou mais polígonos exigem análise específica e podem ter prazo maior.`}
                 </p>
               )}
@@ -543,41 +580,21 @@ export function RequisicaoForm({
           )}
 
           {campos.includes("nomesPoligonos") && form.nomesPoligonos.length > 0 && (
-            <Campo
+            <NomesPoligonos
               id="cjt-nomes"
-              label="Nome de cada gleba/polígono *"
+              nomes={form.nomesPoligonos}
+              onChange={(nomes) => setForm((a) => ({ ...a, nomesPoligonos: nomes }))}
               erro={erros.nomesPoligonos}
-              dica={`Até ${LIMITE_NOME_POLIGONO} caracteres, sem repetir nomes e sem usar nomes de municípios ou matrículas.`}
-            >
-              <div className="grid sm:grid-cols-2 gap-2">
-                {form.nomesPoligonos.map((nome, i) => (
-                  <input
-                    key={i}
-                    aria-label={`Nome do polígono ${i + 1}`}
-                    type="text"
-                    maxLength={LIMITE_NOME_POLIGONO}
-                    value={nome}
-                    placeholder={`Polígono ${i + 1}`}
-                    onChange={(e) =>
-                      setForm((a) => {
-                        const nomes = [...a.nomesPoligonos];
-                        nomes[i] = e.target.value;
-                        return { ...a, nomesPoligonos: nomes };
-                      })
-                    }
-                    className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  />
-                ))}
-              </div>
-            </Campo>
+            />
           )}
 
           {campos.includes("codigoIncra") && (
             <Campo
               id="cjt-incra"
-              label="INCRA/SNCR"
+              label="INCRA"
+              opcional
               erro={erros.codigoIncra}
-              dica="Opcional. Quando preenchido, deve conter 13 algarismos (xxx.xxx.xxx.xxx-x)."
+              dica={<p>Quando preenchido, deve ter 13 algarismos (xxx.xxx.xxx.xxx-x).</p>}
             >
               <input
                 id="cjt-incra"
@@ -588,6 +605,8 @@ export function RequisicaoForm({
                 onChange={(e) =>
                   setForm((a) => ({ ...a, codigoIncra: digitosIncra(e.target.value) }))
                 }
+                aria-describedby={descrito("cjt-incra", true, erros.codigoIncra)}
+                aria-invalid={erros.codigoIncra ? true : undefined}
                 className="w-64 border border-gray-300 rounded-md px-3 py-2 text-sm"
               />
             </Campo>
@@ -803,28 +822,42 @@ function Pergunta({
   );
 }
 
+/** Liga o campo à dica e ao erro (aria-describedby); o ids vêm de `Campo`. */
+function descrito(id: string, dica: boolean, erro?: string): string | undefined {
+  const ids = [dica && `${id}-dica`, erro && `${id}-erro`].filter(Boolean);
+  return ids.length > 0 ? ids.join(" ") : undefined;
+}
+
+/** Rótulo em negrito, explicação acima do campo e erro em texto abaixo. */
 function Campo({
   id,
   label,
+  opcional,
   dica,
   erro,
   children,
 }: {
   id: string;
   label: string;
-  dica?: string;
+  opcional?: boolean;
+  dica?: React.ReactNode;
   erro?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-gray-900 mb-1">
+      <label htmlFor={id} className="block text-sm font-bold text-gray-900">
         {label}
+        {opcional && <span className="font-normal text-gray-600"> (opcional)</span>}
       </label>
-      {children}
-      {dica && <p className="text-xs text-gray-500 mt-1">{dica}</p>}
+      {dica && (
+        <div id={`${id}-dica`} className="mt-1 space-y-1 text-sm text-gray-700">
+          {dica}
+        </div>
+      )}
+      <div className="mt-2">{children}</div>
       {erro && (
-        <p role="alert" className="text-sm text-red-600 mt-1">
+        <p id={`${id}-erro`} role="alert" className="mt-1 text-sm text-red-600">
           {erro}
         </p>
       )}
