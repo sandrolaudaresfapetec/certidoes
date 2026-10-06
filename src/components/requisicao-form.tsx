@@ -18,19 +18,22 @@ import {
   ALERTA_QTD_POLIGONOS,
   PREFIXO_ESPOLIO,
   ajustarNomesPoligonos,
-  bloqueiaAvanco,
   camposAplicaveis,
   combinacaoDefinida,
   exigeEspolio,
   formularioVazio,
   limparCamposNaoAplicaveis,
+  cpfCnpjCompleto,
+  digitosCpfCnpj,
   digitosIncra,
+  mascaraCpfCnpj,
   mascaraIncra,
   somenteDigitos,
   validarFormulario,
   type ErrosCjt,
   type FormularioCjt,
 } from "@/lib/cjt-formulario";
+import { ProgressoSolicitacao } from "@/components/requisicao/progresso-solicitacao";
 
 interface SigefParcela {
   codigoImovel: string;
@@ -79,7 +82,26 @@ interface RequisicaoFormProps {
   painelLabel: string;
   /** Quando presente, o formulário altera a requisição em vez de criar. */
   edicao?: RequisicaoEdicao;
+  /**
+   * Portal do solicitante: as caixas abrem uma a uma, conforme as anteriores ficam
+   * completas, com barra de progresso. O atendimento usa o formulário inteiro.
+   */
+  progressivo?: boolean;
 }
+
+const NOMES_CAIXAS = [
+  "Solicitante",
+  "Configuração da CJT",
+  "Dados do imóvel",
+  "Imóvel e documentos",
+] as const;
+
+/** Quantos polígonos cada resultado aceita (documento do cliente, item 4). */
+const DICAS_RESULTADO: Record<string, string> = {
+  "2a": "aceita apenas 1 polígono, sendo 1 matrícula",
+  "2b": "1 ou mais polígonos da mesma matrícula",
+  "2c": "aceita 1 polígono e não olha as matrículas",
+};
 
 type EtapaImovel = "consultando" | "selecao" | "semRegistro";
 
@@ -91,6 +113,7 @@ export function RequisicaoForm({
   painelHref,
   painelLabel,
   edicao,
+  progressivo = false,
 }: RequisicaoFormProps) {
   const [form, setForm] = useState<FormularioCjt>(edicao?.cjt ?? formularioVazio);
   const [erros, setErros] = useState<ErrosCjt>({});
@@ -99,7 +122,6 @@ export function RequisicaoForm({
   const [sigef, setSigef] = useState<SigefResult | null>(null);
   const [selecionada, setSelecionada] = useState<SigefParcela | null>(null);
 
-  const [procurador, setProcurador] = useState(Boolean(edicao?.emNomeDeCpf));
   const [emNomeDeCpf, setEmNomeDeCpf] = useState(edicao?.emNomeDeCpf ?? "");
   const [emNomeDeNome, setEmNomeDeNome] = useState(edicao?.emNomeDeNome ?? "");
   const [observacao, setObservacao] = useState(edicao?.observacao ?? "");
@@ -162,14 +184,35 @@ export function RequisicaoForm({
   }
 
   const campos = camposAplicaveis(form.resultado, form.situacao);
-  const bloqueado = bloqueiaAvanco(form);
   const mostrarPergunta4 = combinacaoDefinida(form);
+  // "Representante" na Pergunta 1 abre a caixa com os dados de quem é representado.
+  const procurador = form.qualidade === "1a";
   const exigeDocsImovel = etapaImovel === "semRegistro";
   const enviados = edicao?.documentosEnviados ?? [];
   const temPlanta = Boolean(planta) || enviados.includes("PLANTA");
   const temDocPropriedade =
     Boolean(docPropriedade) || enviados.includes("DOC_PROPRIEDADE");
   const temProcuracao = Boolean(procuracao) || enviados.includes("PROCURACAO");
+
+  // Cada caixa só libera a seguinte quando está completa (modo progressivo).
+  const caixa1 =
+    Boolean(form.qualidade) &&
+    form.qualidade !== "1c" &&
+    (!procurador || (cpfCnpjCompleto(emNomeDeCpf) && emNomeDeNome.trim().length > 1));
+  const caixa2 = caixa1 && mostrarPergunta4;
+  const dadosCompletos = Object.keys(validarFormulario(form)).every((c) => c === "declaracao");
+  const caixa3 = caixa2 && dadosCompletos;
+  const caixa4 =
+    caixa3 &&
+    etapaImovel !== "consultando" &&
+    (etapaImovel === "selecao" ? Boolean(selecionada) : temPlanta && temDocPropriedade) &&
+    (!procurador || temProcuracao) &&
+    form.declaracao;
+  const verCaixa2 = progressivo ? caixa1 : true;
+  const verCaixa3 = progressivo ? caixa2 : mostrarPergunta4;
+  const verCaixa4 = progressivo ? caixa3 : mostrarPergunta4;
+  const liberadas = [true, verCaixa2, verCaixa3, verCaixa4].filter(Boolean).length;
+  const entra = progressivo ? "caixa-entra" : "";
 
   async function enviar() {
     const validacao = validarFormulario(form);
@@ -188,8 +231,8 @@ export function RequisicaoForm({
       setErro("Anexe a planta do imóvel e o comprovante de propriedade.");
       return;
     }
-    if (procurador && !(temProcuracao && emNomeDeCpf && emNomeDeNome)) {
-      setErro("Informe os dados do proprietário representado e anexe a procuração.");
+    if (procurador && !(temProcuracao && cpfCnpjCompleto(emNomeDeCpf) && emNomeDeNome.trim())) {
+      setErro("Informe o CPF ou CNPJ e o nome de quem você representa e anexe a procuração.");
       return;
     }
 
@@ -281,8 +324,24 @@ export function RequisicaoForm({
 
   return (
     <div className="space-y-6">
-      <section className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-        <h2 className="font-semibold text-gray-900">Identificação do pedido</h2>
+      {progressivo && (
+        <>
+          <ProgressoSolicitacao
+            etapas={[
+              { nome: NOMES_CAIXAS[0], feita: caixa1 },
+              { nome: NOMES_CAIXAS[1], feita: caixa2 },
+              { nome: NOMES_CAIXAS[2], feita: caixa3 },
+              { nome: NOMES_CAIXAS[3], feita: caixa4 },
+            ]}
+          />
+          <p aria-live="polite" className="sr-only">
+            {`Etapas liberadas: ${liberadas} de 4. Última: ${NOMES_CAIXAS[liberadas - 1]}.`}
+          </p>
+        </>
+      )}
+
+      <section className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+        <h2 className="font-semibold text-gray-900">Solicitante</h2>
 
         <Pergunta
           numero={1}
@@ -293,26 +352,8 @@ export function RequisicaoForm({
           erro={erros.qualidade}
           onChange={(c) => responder("qualidade", c)}
         />
-        <Pergunta
-          numero={2}
-          titulo="O resultado será por:"
-          nome="cjt-resultado"
-          opcoes={RESULTADO_OPCOES}
-          valor={form.resultado}
-          erro={erros.resultado}
-          onChange={(c) => responder("resultado", c)}
-        />
-        <Pergunta
-          numero={3}
-          titulo="Meu imóvel atualmente é:"
-          nome="cjt-situacao"
-          opcoes={SITUACAO_OPCOES}
-          valor={form.situacao}
-          erro={erros.situacao}
-          onChange={(c) => responder("situacao", c)}
-        />
 
-        {bloqueado && (
+        {form.qualidade === "1c" && (
           <p
             role="alert"
             className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2"
@@ -321,10 +362,105 @@ export function RequisicaoForm({
             {MENSAGEM_NAO_SEI}
           </p>
         )}
+
+        {procurador && (
+          <div
+            role="group"
+            aria-labelledby="cjt-rep-titulo"
+            className={`${entra} rounded-md border border-emerald-200 bg-emerald-50/60 p-4 space-y-3`}
+          >
+            <h3 id="cjt-rep-titulo" className="text-sm font-semibold text-gray-900">
+              Dados de quem você representa
+            </h3>
+            <p className="text-xs text-gray-600">
+              Informe o CPF ou o CNPJ do proprietário do imóvel e o nome (pessoa física) ou a
+              razão social (empresa). A procuração é anexada no fim do formulário.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="cjt-rep-doc"
+                  className="block text-sm font-medium text-gray-900 mb-1"
+                >
+                  CPF ou CNPJ *
+                </label>
+                <input
+                  id="cjt-rep-doc"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={18}
+                  value={mascaraCpfCnpj(emNomeDeCpf)}
+                  onChange={(e) => setEmNomeDeCpf(digitosCpfCnpj(e.target.value))}
+                  aria-describedby="cjt-rep-doc-dica"
+                  placeholder="Digite o CPF ou o CNPJ"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+                <p id="cjt-rep-doc-dica" className="text-xs text-gray-600 mt-1">
+                  CPF (11 números) ou CNPJ (14 números).
+                </p>
+              </div>
+              <div>
+                <label
+                  htmlFor="cjt-rep-nome"
+                  className="block text-sm font-medium text-gray-900 mb-1"
+                >
+                  Nome ou razão social *
+                </label>
+                <input
+                  id="cjt-rep-nome"
+                  type="text"
+                  value={emNomeDeNome}
+                  onChange={(e) => setEmNomeDeNome(e.target.value)}
+                  placeholder="Como consta no documento"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
-      {mostrarPergunta4 && (
-        <section className="bg-white rounded-lg border border-gray-200 p-6 space-y-5">
+      {verCaixa2 && (
+        <section
+          className={`${entra} bg-white rounded-lg border border-gray-200 p-6 space-y-6`}
+        >
+          <h2 className="font-semibold text-gray-900">Configuração da CJT</h2>
+
+          <Pergunta
+            numero={2}
+            titulo="O resultado será por:"
+            nome="cjt-resultado"
+            opcoes={RESULTADO_OPCOES}
+            dicas={DICAS_RESULTADO}
+            valor={form.resultado}
+            erro={erros.resultado}
+            onChange={(c) => responder("resultado", c)}
+          />
+          <Pergunta
+            numero={3}
+            titulo="Meu imóvel atualmente é:"
+            nome="cjt-situacao"
+            opcoes={SITUACAO_OPCOES}
+            valor={form.situacao}
+            erro={erros.situacao}
+            onChange={(c) => responder("situacao", c)}
+          />
+
+          {(form.resultado === "2d" || form.situacao === "3e") && (
+            <p
+              role="alert"
+              className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2"
+            >
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              {MENSAGEM_NAO_SEI}
+            </p>
+          )}
+        </section>
+      )}
+
+      {verCaixa3 && (
+        <section className={`${entra} bg-white rounded-lg border border-gray-200 p-6 space-y-5`}>
           <div>
             <h2 className="font-semibold text-gray-900">
               Pergunta 4 — Dados do imóvel
@@ -459,8 +595,8 @@ export function RequisicaoForm({
         </section>
       )}
 
-      {mostrarPergunta4 && (
-        <section className="bg-white rounded-lg border border-gray-200 p-6 space-y-5">
+      {verCaixa4 && (
+        <section className={`${entra} bg-white rounded-lg border border-gray-200 p-6 space-y-5`}>
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
             <MapPin className="h-4 w-4 text-emerald-700" />
             Imóvel e documentos
@@ -529,37 +665,6 @@ export function RequisicaoForm({
                 serão preenchidos pela equipe do IGC.
               </span>
             </p>
-          )}
-
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={procurador}
-              onChange={(e) => setProcurador(e.target.checked)}
-              className="rounded border-gray-300"
-            />
-            Pedido apresentado por procurador(a) / representante
-          </label>
-
-          {procurador && (
-            <div className="grid grid-cols-2 gap-3 pl-6">
-              <input
-                type="text"
-                value={emNomeDeCpf}
-                onChange={(e) => setEmNomeDeCpf(e.target.value)}
-                placeholder="CPF do proprietário"
-                aria-label="CPF do proprietário representado"
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-              />
-              <input
-                type="text"
-                value={emNomeDeNome}
-                onChange={(e) => setEmNomeDeNome(e.target.value)}
-                placeholder="Nome do proprietário"
-                aria-label="Nome do proprietário representado"
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-              />
-            </div>
           )}
 
           {(exigeDocsImovel || procurador) && (
@@ -648,6 +753,7 @@ function Pergunta({
   titulo,
   nome,
   opcoes,
+  dicas,
   valor,
   erro,
   onChange,
@@ -656,6 +762,8 @@ function Pergunta({
   titulo: string;
   nome: string;
   opcoes: readonly { codigo: string; label: string; bloqueia: boolean }[];
+  /** Explicação curta exibida entre parênteses ao lado da opção, por código. */
+  dicas?: Record<string, string>;
   valor: string;
   erro?: string;
   onChange: (codigo: string) => void;
@@ -667,16 +775,22 @@ function Pergunta({
       </legend>
       <div className="mt-2 space-y-1.5">
         {opcoes.map((o) => (
-          <label key={o.codigo} className="flex items-center gap-2 text-sm text-gray-700">
+          <label
+            key={o.codigo}
+            className="flex flex-wrap items-baseline gap-x-2 text-sm text-gray-700"
+          >
             <input
               type="radio"
               name={nome}
               value={o.codigo}
               checked={valor === o.codigo}
               onChange={() => onChange(o.codigo)}
-              className="border-gray-300"
+              className="self-center border-gray-300"
             />
             {o.label}
+            {dicas?.[o.codigo] && (
+              <span className="text-xs text-gray-600">({dicas[o.codigo]})</span>
+            )}
           </label>
         ))}
       </div>

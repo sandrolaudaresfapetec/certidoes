@@ -36,7 +36,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-13 | Decisão: fonte da lista de municípios proibidos nos nomes de polígono | negócio | decisão | média | descartada (nomenclatura fechada, #PEND-36) |
 | #PEND-14 | Decisão: formato da "pontuação de centena" na matrícula | negócio | decisão | baixa | aberta |
 | #PEND-15 | Decisão: Pergunta 1 × checkbox "procurador" — qual controla? | negócio | decisão | média | resolvida (2026-10-06) |
-| #PEND-16 | Amarrar o fluxo do procurador à Pergunta 1 | frontend | bugfix | média | aberta |
+| #PEND-16 | Amarrar o fluxo do procurador à Pergunta 1 | frontend | bugfix | média | resolvida (2026-10-06) |
 | #PEND-17 | Acessibilidade do formulário CJT (`aria-*`, rótulo órfão) | frontend | bugfix | média | aberta |
 | #PEND-18 | Migrations SQLite não reconstroem o banco do zero | backend | bugfix | média | aberta |
 | #PEND-19 | Colunas legadas sem uso em `Process` (`processes`, `users`) | backend | refatoração | baixa | aberta |
@@ -64,6 +64,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-41 | Máscaras de entrada nos formulários (telefone, CPF, CNPJ etc.) | frontend | adição | média | aberta |
 | #PEND-42 | Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar | backend | adição | média | aberta |
 | #PEND-43 | Salvar rascunho e continuar requisição no formulário e em Minhas Requisições | frontend | adição | média | bloqueada (#PEND-42) |
+| #PEND-44 | Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1 | backend | segurança | média | aberta |
 
 ## Detalhes
 
@@ -189,6 +190,7 @@ A Pergunta 1 (Representante/Proprietário) e o checkbox "Pedido apresentado por 
 **Regra decidida (#PEND-15):** a Pergunta 1 "Representante" abre a caixa (CPF ou CNPJ + nome + procuração) e o checkbox independente deixa de existir. Hoje o campo aceita só CPF.
 
 Aplicar a regra. A API também deveria validar a coerência entre `cjtQualidade` e os dados de representação — abrir pendência de backend se o cliente confirmar. A consulta ao SIGEF pelo CPF/CNPJ do representado depende de #PEND-33.
+**Resolução:** Fase 4 da branch `feat/portal-correcoes-cjt` (2026-10-06). "Representante" abre a caixa com CPF ou CNPJ (com máscara, só números) e nome; o checkbox foi removido; a procuração segue no bloco de documentos. A validação no servidor ficou na #PEND-44.
 
 ### #PEND-17 · Acessibilidade do formulário CJT (`aria-*`, rótulo órfão)
 
@@ -324,7 +326,7 @@ Documento (Minhas Requisições, triagem): Nível 1–2 longe da divisa; 3–4 n
 **Onde:** `src/app/api/sigef/consulta/route.ts` (portal só consulta o próprio CPF; outro → 403); `src/app/api/sigef/parcelas/route.ts` (`exigirUsuarioApi`: só servidor); `src/lib/sigef.ts` (`mapearParcela`, caminho `SIGEF_REAL`, não devolve geometria)
 
 Documento (§2 e §5): o representante informa o CPF ou CNPJ de quem representa (provisório) e o solicitante precisa ver o polígono do imóvel. Hoje a consulta é sempre pelo CPF logado, o portal não consulta outro CPF/CNPJ, não alcança o acervo por mapa/código (rota só de servidor) e, no modo real, a parcela vem sem geometria (só acervo e CAR trazem). Precisa permitir a consulta pelo representado (com a regra de segurança definida), rota de parcelas com escopo de solicitante e geometria em todos os modos. No ambiente local o acervo está vazio (`SigefParcela` = 0): a geometria vem do CAR externo ou não vem.
-**Impacto no frontend:** mapa do imóvel e campo CPF/CNPJ do representado.
+**Impacto no frontend:** mapa do imóvel e campo CPF/CNPJ do representado. O campo já existe (Fase 4), mas a consulta ao SIGEF do formulário continua pelo CPF logado; ao liberar, passar o documento do representado a `/api/sigef/consulta` em `RequisicaoForm`.
 
 ### #PEND-34 · Persistir vínculo polígono nomeado ↔ parcela SIGEF
 
@@ -388,6 +390,7 @@ Achado na varredura de contraste da Fase A: o rodapé "Serviço de emissão de c
 **Responsável:** frontend · **Tipo:** adição · **Registrada em:** 2026-10-06
 
 Os campos de telefone, CPF, CNPJ e similares aceitam texto livre, sem máscara de digitação. Aplicar máscara em todo formulário que tiver esses tipos de campo. Pedido do time; não mapeado nem priorizado ainda — o levantamento dos formulários afetados fica para quando a pendência for atacada.
+**Já feito:** CPF/CNPJ de quem é representado (Fase 4, `mascaraCpfCnpj` em `src/lib/cjt-formulario.ts`, reaproveitável nos demais campos).
 
 ### #PEND-42 · Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar
 
@@ -409,3 +412,12 @@ O Status Geral do documento tem "Requisições não enviadas": o solicitante com
 
 Botão "Salvar rascunho" em `RequisicaoForm` (portal) e, em Minhas Requisições, abrir o rascunho no formulário preenchido ("Continuar") com opção de excluir. O formulário de edição já aceita dados iniciais (`edicao`), o que facilita. Só dá para fazer depois das rotas da #PEND-42.
 **Depende de:** #PEND-42.
+
+### #PEND-44 · Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1
+
+**Responsável:** backend · **Tipo:** segurança · **Registrada em:** 2026-10-06
+**Onde:** `POST /api/portal/solicitacoes` e `PATCH /api/portal/solicitacoes/[id]` (campos `emNomeDeCpf`, `emNomeDeNome`); coluna `Solicitacao.emNomeDeCpf`
+
+Hoje a rota só tira os não-dígitos de `emNomeDeCpf` e exige o nome quando há documento. Não confere o tamanho (11 ou 14 algarismos) nem o dígito verificador, aceita CNPJ numa coluna chamada "Cpf", e não cruza com a Pergunta 1: dá para enviar `qualidade` "Proprietário" com representado, ou "Representante" sem nenhum. O portal passou a exigir CPF/CNPJ completo e nome quando a resposta é "Representante" (Fase 4), mas isso é só usabilidade.
+Precisa: validar CPF (checksum) ou CNPJ (checksum); exigir os dados de representação e a procuração quando `qualidade` for "1a" e descartá-los nas demais; avaliar renomear a coluna (ex.: `representadoDocumento`).
+**Impacto no frontend:** a exibição já formata CPF ou CNPJ conforme o tamanho (`mascaraCpfCnpj`); nada a mudar quando o servidor passar a validar além de mostrar o erro devolvido.

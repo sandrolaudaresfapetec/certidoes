@@ -152,6 +152,33 @@ function quantidadeValida(valor: string): boolean {
   return /^\d+$/.test(valor.trim()) && parseInt(valor, 10) >= 1;
 }
 
+export const LIMITE_DIGITOS_CPF_CNPJ = 14;
+
+/** Algarismos de um CPF (11) ou CNPJ (14), limitados ao tamanho do CNPJ. */
+export function digitosCpfCnpj(valor: string): string {
+  return somenteDigitos(valor).slice(0, LIMITE_DIGITOS_CPF_CNPJ);
+}
+
+/**
+ * Mascara de CPF (até 11 algarismos: 000.000.000-00) ou de CNPJ (12 a 14:
+ * 00.000.000/0000-00), aplicada conforme o usuário digita.
+ */
+export function mascaraCpfCnpj(valor: string): string {
+  const d = digitosCpfCnpj(valor);
+  if (d.length <= 11) {
+    const base = [d.slice(0, 3), d.slice(3, 6), d.slice(6, 9)].filter(Boolean).join(".");
+    return d.length > 9 ? `${base}-${d.slice(9)}` : base;
+  }
+  const base = `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}`;
+  return d.length > 12 ? `${base}-${d.slice(12)}` : base;
+}
+
+/** CPF (11) ou CNPJ (14) com o tamanho completo. */
+export function cpfCnpjCompleto(valor: string): boolean {
+  const n = somenteDigitos(valor).length;
+  return n === 11 || n === 14;
+}
+
 /** Aplica a mascara xxx.xxx.xxx.xxx-x sobre os digitos do codigo INCRA/SNCR. */
 export function mascaraIncra(valor: string): string {
   const d = digitosIncra(valor);

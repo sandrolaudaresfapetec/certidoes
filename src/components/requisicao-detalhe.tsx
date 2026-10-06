@@ -3,7 +3,12 @@ import { FileText, Lock, Paperclip, Pencil } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { formatarCPF } from "@/lib/cpf";
 import { statusRequisicao, PAGAMENTO_LABEL } from "@/lib/requisicao-status";
-import { rotuloOpcao, propriedadeDeExibicao, mascaraIncra } from "@/lib/cjt-formulario";
+import {
+  rotuloOpcao,
+  propriedadeDeExibicao,
+  mascaraIncra,
+  mascaraCpfCnpj,
+} from "@/lib/cjt-formulario";
 import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
 import { AcompanhamentoRequisicao } from "@/components/requisicao/acompanhamento";
 
@@ -186,7 +191,7 @@ export function RequisicaoDetalhe({
           <Item
             rotulo="Representando"
             valor={`${requisicao.emNomeDeNome}${
-              requisicao.emNomeDeCpf ? ` (${formatarCPF(requisicao.emNomeDeCpf)})` : ""
+              requisicao.emNomeDeCpf ? ` (${mascaraCpfCnpj(requisicao.emNomeDeCpf)})` : ""
             }`}
           />
         )}

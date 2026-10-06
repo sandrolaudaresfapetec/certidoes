@@ -56,3 +56,23 @@ body {
     cursor: not-allowed;
   }
 }
+
+/* Caixas do formulário que se abrem conforme o preenchimento (portal). */
+@keyframes caixa-entra {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.caixa-entra {
+  animation: caixa-entra 0.35s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .caixa-entra {
+    animation: none;
+  }
+}

@@ -23,6 +23,7 @@ export default async function NovaSolicitacaoPage() {
           cpf={solicitante.cpf}
           criarEndpoint="/api/portal/solicitacoes"
           documentosEndpoint="/api/portal/documentos"
+          progressivo
           painelHref="/portal"
           painelLabel="Ver minhas requisições"
         />
