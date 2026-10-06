@@ -16,3 +16,49 @@ export const PAGAMENTO_LABEL: Record<string, string> = {
   PAGO: "Pago",
   ISENTO: "Isento",
 };
+
+/** Etapas mostradas ao solicitante na tela de acompanhamento, em ordem. */
+export const ETAPAS_ACOMPANHAMENTO = [
+  "Conformidade mínima",
+  "Setor de Atendimentos",
+  "Setor Técnico",
+  "Documento em assinatura",
+  "Aguardando pagamento",
+  "Liberado para download",
+] as const;
+
+export type AcompanhamentoRequisicao =
+  | { tipo: "ETAPA"; atual: number; detalhe?: string }
+  | { tipo: "SOBRESTADO" }
+  | { tipo: "CANCELADO" };
+
+const SUBETAPA_TECNICA: Record<string, string> = {
+  distribuicao_gdat: "Triagem da área",
+  analise_tecnica: "Elaboração da divisa",
+  conferencia: "Conferência da divisa",
+};
+
+/**
+ * Deriva a etapa do acompanhamento a partir do fluxo interno. Ainda não existe um
+ * "status do cliente" no backend (#PEND-27): quando existir, esta função é substituída.
+ * `atual` é o índice em ETAPAS_ACOMPANHAMENTO.
+ */
+export function acompanhamentoRequisicao(dados: {
+  situacaoProcesso: string | null;
+  pagamentoStatus: string | null;
+}): AcompanhamentoRequisicao {
+  const { situacaoProcesso: s, pagamentoStatus } = dados;
+  if (!s) return { tipo: "ETAPA", atual: 0 };
+  if (s === "sobrestado") return { tipo: "SOBRESTADO" };
+  if (s === "cancelado") return { tipo: "CANCELADO" };
+  if (s === "entrada_sdtc") return { tipo: "ETAPA", atual: 1 };
+  if (s in SUBETAPA_TECNICA) return { tipo: "ETAPA", atual: 2, detalhe: SUBETAPA_TECNICA[s] };
+  if (["assinatura_tecnico", "assinatura_gerente", "assinatura_diretor", "upload_sei"].includes(s)) {
+    return { tipo: "ETAPA", atual: 3 };
+  }
+  if (s === "finalizado") {
+    const pago = pagamentoStatus === "PAGO" || pagamentoStatus === "ISENTO";
+    return { tipo: "ETAPA", atual: pago ? 5 : 4 };
+  }
+  return { tipo: "ETAPA", atual: 1 };
+}

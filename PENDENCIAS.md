@@ -61,6 +61,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-38 | Decisão: cartela de cores e logos do IGC | negócio | decisão | média | aberta |
 | #PEND-39 | Decisão: dúvidas do documento de correções de 2026-09-16 | negócio | decisão | média | aberta |
 | #PEND-40 | Texto auxiliar em `gray-400` abaixo do contraste AA (rodapé do portal) | frontend | melhoria | baixa | aberta |
+| #PEND-41 | Máscaras de entrada nos formulários (telefone, CPF, CNPJ etc.) | frontend | adição | média | aberta |
 
 ## Detalhes
 
@@ -374,3 +375,9 @@ O documento pede "mudar todas as cores, seguindo a cartela e padrão do IGC". A 
 **Onde:** `src/app/portal/layout.tsx` (rodapé, `text-gray-400`); a classe aparece em outros textos auxiliares
 
 Achado na varredura de contraste da Fase A: o rodapé "Serviço de emissão de certidões…" tem 2,49:1 sobre `gray-50` (mínimo AA: 4,5:1), tanto em modo claro quanto escuro. Só foram varridas algumas páginas; vale uma passada nos demais usos de `text-gray-400`.
+
+### #PEND-41 · Máscaras de entrada nos formulários (telefone, CPF, CNPJ etc.)
+
+**Responsável:** frontend · **Tipo:** adição · **Registrada em:** 2026-10-06
+
+Os campos de telefone, CPF, CNPJ e similares aceitam texto livre, sem máscara de digitação. Aplicar máscara em todo formulário que tiver esses tipos de campo. Pedido do time; não mapeado nem priorizado ainda — o levantamento dos formulários afetados fica para quando a pendência for atacada.

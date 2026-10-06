@@ -9,7 +9,7 @@ import { formularioDoPayload } from "@/lib/cjt-formulario";
 export const dynamic = "force-dynamic";
 
 /** Situações em que a requisição ainda aceita alteração pelo cliente. */
-const STATUS_EDITAVEIS = ["PENDENTE", "DEVOLVIDA"];
+const STATUS_EDITAVEIS = ["DEVOLVIDA"];
 
 export default async function EditarRequisicaoPage({
   params,

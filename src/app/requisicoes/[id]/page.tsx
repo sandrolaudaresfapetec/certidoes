@@ -21,7 +21,9 @@ export default async function VisualizarRequisicaoPage({
     include: {
       solicitante: true,
       documentos: { select: { id: true, tipo: true, nomeArquivo: true } },
-      process: { select: { id: true, ordem: true, situacao: true, tipoServico: true } },
+      process: {
+        select: { id: true, ordem: true, situacao: true, tipoServico: true, expediente: true },
+      },
     },
   });
   if (!requisicao) notFound();

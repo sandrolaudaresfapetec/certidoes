@@ -1,18 +1,24 @@
 import Link from "next/link";
-import { FileText, Paperclip } from "lucide-react";
+import { FileText, Lock, Paperclip, Pencil } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { formatarCPF } from "@/lib/cpf";
 import { statusRequisicao, PAGAMENTO_LABEL } from "@/lib/requisicao-status";
 import { rotuloOpcao, propriedadeDeExibicao, mascaraIncra } from "@/lib/cjt-formulario";
 import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
+import { AcompanhamentoRequisicao } from "@/components/requisicao/acompanhamento";
 
 export type RequisicaoDetalhada = Prisma.SolicitacaoGetPayload<{
   include: {
     solicitante: true;
     documentos: { select: { id: true; tipo: true; nomeArquivo: true } };
-    process: { select: { id: true; ordem: true; situacao: true; tipoServico: true } };
+    process: {
+      select: { id: true; ordem: true; situacao: true; tipoServico: true; expediente: true };
+    };
   };
 }>;
+
+/** Status em que o solicitante aguarda a equipe e, por isso, não pode alterar o pedido. */
+const STATUS_AGUARDANDO_EQUIPE = ["PENDENTE", "EM_ANALISE", "APROVADA"];
 
 const TIPO_DOC_LABEL: Record<string, string> = {
   PLANTA: "Planta do imóvel",
@@ -34,13 +40,17 @@ function nomesPoligonos(json: string | null): string[] {
  * Visualização de uma requisição.
  * escopo="CLIENTE" oculta dados internos (contato do solicitante e processo);
  * escopo="INTERNO" é usado pelo atendimento e pelos responsáveis técnicos.
+ * `editavel` (só escopo CLIENTE) indica que a requisição foi devolvida e o solicitante
+ * pode alterá-la.
  */
 export function RequisicaoDetalhe({
   requisicao,
   escopo,
+  editavel = false,
 }: {
   requisicao: RequisicaoDetalhada;
   escopo: "CLIENTE" | "INTERNO";
+  editavel?: boolean;
 }) {
   const st = statusRequisicao(requisicao.status);
   const poligonos = nomesPoligonos(requisicao.cjtNomesPoligonos);
@@ -60,11 +70,45 @@ export function RequisicaoDetalhe({
               {requisicao.origem === "ATENDIMENTO" ? "Atendimento presencial" : "Portal do solicitante"}
             </p>
           </div>
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}>
+          <span className={`shrink-0 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}>
             {st.label}
           </span>
         </div>
+
+        {escopo === "CLIENTE" && editavel && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs text-amber-900">
+              <strong className="font-semibold">A equipe devolveu sua requisição.</strong>{" "}
+              Revise os dados e envie novamente.
+            </p>
+            <Link
+              href={`/portal/requisicoes/${requisicao.id}/editar`}
+              className="mt-3 inline-flex items-center gap-1 bg-emerald-700 text-white px-4 py-2 rounded-md text-sm hover:bg-emerald-800"
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              Alterar requisição
+            </Link>
+          </div>
+        )}
+
+        {escopo === "CLIENTE" && !editavel && STATUS_AGUARDANDO_EQUIPE.includes(requisicao.status) && (
+          <p className="mt-4 flex items-start gap-2 border-t border-gray-100 pt-3 text-xs text-gray-600">
+            <Lock className="mt-px h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+            Sua requisição está em análise e não pode ser alterada. Se a equipe precisar de
+            ajustes, ela será devolvida a você.
+          </p>
+        )}
       </div>
+
+      {escopo === "CLIENTE" && (
+        <AcompanhamentoRequisicao
+          expediente={requisicao.process?.expediente ?? null}
+          situacaoProcesso={requisicao.process?.situacao ?? null}
+          pagamentoStatus={requisicao.pagamentoStatus}
+          pagamentoValor={requisicao.pagamentoValor}
+          finalizadaEm={requisicao.finalizadaEm}
+        />
+      )}
 
       <Bloco titulo="Identificação do pedido">
         <Item rotulo="Qualidade do solicitante" valor={rotuloOpcao(requisicao.cjtQualidade)} />
@@ -74,14 +118,8 @@ export function RequisicaoDetalhe({
         {requisicao.cjtMatricula && (
           <Item rotulo="Matrícula" valor={requisicao.cjtMatricula} />
         )}
-        {requisicao.cjtQtdPoligonos != null && (
-          <Item rotulo="Quantidade de polígonos" valor={String(requisicao.cjtQtdPoligonos)} />
-        )}
-        {poligonos.length > 0 && (
-          <Item rotulo="Glebas/polígonos" valor={poligonos.join(", ")} />
-        )}
         {requisicao.cjtCodigoIncra && (
-          <Item rotulo="INCRA/SNCR" valor={mascaraIncra(requisicao.cjtCodigoIncra)} />
+          <Item rotulo="INCRA" valor={mascaraIncra(requisicao.cjtCodigoIncra)} />
         )}
         <Item
           rotulo="Declaração"
@@ -107,20 +145,42 @@ export function RequisicaoDetalhe({
                   : "—"
               }
             />
-            <Item
-              rotulo="Município"
-              valor={
-                requisicao.sigefMunicipio
-                  ? `${requisicao.sigefMunicipio}/${requisicao.sigefUf ?? ""}`
-                  : "—"
-              }
-            />
+            {escopo === "INTERNO" && (
+              <Item
+                rotulo="Município"
+                valor={
+                  requisicao.sigefMunicipio
+                    ? `${requisicao.sigefMunicipio}/${requisicao.sigefUf ?? ""}`
+                    : "—"
+                }
+              />
+            )}
           </>
         ) : (
           <p className="text-sm text-gray-600 col-span-2">
             Imóvel sem registro no INCRA — dados serão preenchidos pela equipe do
             IGC a partir dos documentos anexados.
           </p>
+        )}
+        {requisicao.cjtQtdPoligonos != null && (
+          <Item rotulo="Quantidade de polígonos" valor={String(requisicao.cjtQtdPoligonos)} />
+        )}
+        {poligonos.length > 0 && (
+          <div>
+            <dt className="text-xs text-gray-500">Polígonos</dt>
+            <dd>
+              <ul className="mt-1 flex flex-wrap gap-1.5">
+                {poligonos.map((nome) => (
+                  <li
+                    key={nome}
+                    className="rounded-full border border-gray-300 bg-gray-50 px-2.5 py-0.5 text-xs text-gray-800"
+                  >
+                    {nome}
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
         )}
         {requisicao.emNomeDeNome && (
           <Item
@@ -155,56 +215,58 @@ export function RequisicaoDetalhe({
         </Bloco>
       )}
 
-      <Bloco titulo="Andamento">
-        {requisicao.process ? (
-          <>
+      {escopo === "INTERNO" && (
+        <Bloco titulo="Andamento">
+          {requisicao.process ? (
+            <>
+              <Item
+                rotulo="Processo"
+                valor={`#${requisicao.process.ordem} — ${requisicao.process.tipoServico}`}
+              />
+              <Item
+                rotulo="Etapa atual"
+                valor={
+                  WORKFLOW_STAGES[requisicao.process.situacao as WorkflowStage]?.label ??
+                  requisicao.process.situacao
+                }
+              />
+              {escopo === "INTERNO" && (
+                <div className="col-span-2">
+                  <Link
+                    href={`/processos/${requisicao.process.id}`}
+                    className="inline-flex items-center gap-1 text-sm text-emerald-700 hover:underline"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Abrir processo
+                  </Link>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-gray-600 col-span-2">
+              Processo ainda não aberto pelo atendimento do IGC.
+            </p>
+          )}
+          {requisicao.pagamentoStatus && (
             <Item
-              rotulo="Processo"
-              valor={`#${requisicao.process.ordem} — ${requisicao.process.tipoServico}`}
+              rotulo="Pagamento"
+              valor={`${PAGAMENTO_LABEL[requisicao.pagamentoStatus] ?? requisicao.pagamentoStatus}${
+                requisicao.pagamentoValor != null
+                  ? ` — R$ ${requisicao.pagamentoValor.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                    })}`
+                  : ""
+              }`}
             />
+          )}
+          {requisicao.finalizadaEm && (
             <Item
-              rotulo="Etapa atual"
-              valor={
-                WORKFLOW_STAGES[requisicao.process.situacao as WorkflowStage]?.label ??
-                requisicao.process.situacao
-              }
+              rotulo="Finalizada em"
+              valor={new Date(requisicao.finalizadaEm).toLocaleDateString("pt-BR")}
             />
-            {escopo === "INTERNO" && (
-              <div className="col-span-2">
-                <Link
-                  href={`/processos/${requisicao.process.id}`}
-                  className="inline-flex items-center gap-1 text-sm text-emerald-700 hover:underline"
-                >
-                  <FileText className="h-4 w-4" />
-                  Abrir processo
-                </Link>
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="text-sm text-gray-600 col-span-2">
-            Processo ainda não aberto pelo atendimento do IGC.
-          </p>
-        )}
-        {requisicao.pagamentoStatus && (
-          <Item
-            rotulo="Pagamento"
-            valor={`${PAGAMENTO_LABEL[requisicao.pagamentoStatus] ?? requisicao.pagamentoStatus}${
-              requisicao.pagamentoValor != null
-                ? ` — R$ ${requisicao.pagamentoValor.toLocaleString("pt-BR", {
-                    minimumFractionDigits: 2,
-                  })}`
-                : ""
-            }`}
-          />
-        )}
-        {requisicao.finalizadaEm && (
-          <Item
-            rotulo="Finalizada em"
-            valor={new Date(requisicao.finalizadaEm).toLocaleDateString("pt-BR")}
-          />
-        )}
-      </Bloco>
+          )}
+        </Bloco>
+      )}
     </div>
   );
 }
