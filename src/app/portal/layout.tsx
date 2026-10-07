@@ -52,7 +52,7 @@ export default async function PortalLayout({
         </nav>
       )}
       <main className="max-w-5xl mx-auto px-4 py-8">{children}</main>
-      <footer className="text-center text-xs text-gray-400 pb-8">
+      <footer className="text-center text-xs text-gray-500 pb-8">
         Serviço de emissão de certidões — identidade validada pela plataforma gov.br
       </footer>
     </div>

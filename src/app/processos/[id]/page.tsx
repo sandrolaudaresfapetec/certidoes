@@ -9,20 +9,23 @@ import {
 import { formatDate, formatDateTime } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, User, FileText, MapPin, FileCheck } from "lucide-react";
+import { ArrowLeft, Clock, User, FileText, MapPin, FileCheck, Pencil, Scissors } from "lucide-react";
 import { WorkflowActions } from "@/components/workflow-actions";
-import { requireUsuario } from "@/lib/auth";
+import { podeAtender, podeUsarGeometria, requireUsuario } from "@/lib/auth";
+import { exibirCpfCnpj } from "@/lib/mascaras";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ salvo?: string }>;
 }
 
-export default async function ProcessoDetailPage({ params }: PageProps) {
+export default async function ProcessoDetailPage({ params, searchParams }: PageProps) {
   const usuario = await requireUsuario();
 
   const { id } = await params;
+  const { salvo } = await searchParams;
 
   const processo = await prisma.process.findUnique({
     where: { id },
@@ -44,6 +47,7 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
   const stageConfig = WORKFLOW_STAGES[processo.situacao as WorkflowStage];
   const etapaAtual = processo.situacao as WorkflowStage;
   const bloqueio = bloqueioDeSaida(etapaAtual, usuario, processo);
+  const mostrarCorte = await podeUsarGeometria(usuario);
   const allowedNext = bloqueio
     ? []
     : (ALLOWED_TRANSITIONS[etapaAtual] || []).filter(
@@ -75,17 +79,46 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
               Prioridade Idoso
             </span>
           )}
-          {/certid/i.test(processo.tipoServico) && (
-            <Link
-              href={`/processos/${processo.id}/certidao`}
-              className="ml-auto inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
-            >
-              <FileCheck className="h-4 w-4" />
-              {processo.dtAssDiretor ? "Ver Certidao" : "Minuta da Certidao"}
-            </Link>
-          )}
+          <div className="ml-auto flex flex-wrap gap-2">
+            {podeAtender(usuario) && (
+              <Link
+                href={`/processos/${processo.id}/editar`}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+              >
+                <Pencil className="h-4 w-4" />
+                Editar processo
+              </Link>
+            )}
+            {mostrarCorte && (
+              <Link
+                href={`/geometria?processo=${processo.id}`}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+              >
+                <Scissors className="h-4 w-4" />
+                Corte de divisas
+              </Link>
+            )}
+            {/certid/i.test(processo.tipoServico) && (
+              <Link
+                href={`/processos/${processo.id}/certidao`}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+              >
+                <FileCheck className="h-4 w-4" />
+                {processo.dtAssDiretor ? "Ver Certidao" : "Minuta da Certidao"}
+              </Link>
+            )}
+          </div>
         </div>
       </div>
+
+      {salvo && (
+        <div
+          role="status"
+          className="mb-6 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"
+        >
+          <strong className="font-semibold">Processo atualizado.</strong> As alterações foram salvas.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
@@ -101,7 +134,7 @@ export default async function ProcessoDetailPage({ params }: PageProps) {
               <InfoField label="Tipo" value={processo.tipo} />
               <InfoField label="Email" value={processo.email} />
               <InfoField label="Telefone" value={processo.telefone} />
-              <InfoField label="CPF/CNPJ" value={processo.cpfCnpj} />
+              <InfoField label="CPF/CNPJ" value={exibirCpfCnpj(processo.cpfCnpj)} />
               {processo.dtNascimentoIdoso && (
                 <InfoField
                   label="Data Nascimento (Idoso)"

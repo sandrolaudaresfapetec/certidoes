@@ -111,12 +111,12 @@ export default async function PortalHomePage({
                 <li key={s.id}>
                   <Link
                     href={`/portal/requisicoes/${s.id}`}
-                    className="px-6 py-4 flex items-center justify-between hover:bg-gray-50"
+                    className="px-6 py-4 flex items-center justify-between gap-3 hover:bg-gray-50"
                   >
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <FileText className="h-5 w-5 shrink-0 text-gray-400" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">
                           {s.protocolo}
                           {s.sigefNomeArea && (
                             <span className="text-gray-500 font-normal"> — {s.sigefNomeArea}</span>
@@ -135,7 +135,9 @@ export default async function PortalHomePage({
                         </p>
                       </div>
                     </div>
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}>
+                    <span
+                      className={`shrink-0 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}
+                    >
                       {st.label}
                     </span>
                   </Link>

@@ -67,7 +67,7 @@ export default async function QuadroPage() {
                     className="block bg-white rounded-md p-3 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-mono text-gray-400">
+                      <span className="text-xs font-mono text-gray-500">
                         #{proc.ordem}
                       </span>
                       {proc.tipo === "idoso" && (
@@ -83,7 +83,7 @@ export default async function QuadroPage() {
                       {proc.tipoServico}
                     </p>
                     {proc.municipio && (
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {proc.municipio}
                       </p>
                     )}
@@ -100,7 +100,7 @@ export default async function QuadroPage() {
                   </Link>
                 ))}
                 {items.length === 0 && (
-                  <div className="text-center py-8 text-xs text-gray-400">
+                  <div className="text-center py-8 text-xs text-gray-600">
                     Nenhum processo
                   </div>
                 )}
