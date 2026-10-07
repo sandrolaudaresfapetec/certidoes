@@ -87,6 +87,10 @@ model Solicitacao {
   pagamentoObs      String?
   finalizadaEm      DateTime?
 
+  // Devolucao ao solicitante (DDD): o motivo aparece no portal enquanto status = DEVOLVIDA
+  devolucaoMotivo   String?
+  devolvidaEm       DateTime?
+
   solicitanteId     String
   solicitante       Solicitante @relation(fields: [solicitanteId], references: [id])
 

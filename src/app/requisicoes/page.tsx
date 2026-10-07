@@ -22,7 +22,11 @@ export default async function RequisicoesPage({
 
   const where: Prisma.SolicitacaoWhereInput = {};
   if (status) where.status = status;
-  if (semProcesso === "1") where.processId = null;
+  if (semProcesso === "1") {
+    where.processId = null;
+    // Devolvida, rascunho e arquivada não aguardam abertura de processo.
+    if (!status) where.status = { notIn: ["DEVOLVIDA", "RASCUNHO", "ARQUIVADA"] };
+  }
   if (q) {
     where.OR = [
       { protocolo: { contains: q } },

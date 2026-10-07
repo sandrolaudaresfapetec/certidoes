@@ -5,7 +5,12 @@ import { prisma } from "@/lib/prisma";
 import { requireUsuario, podeAtender } from "@/lib/auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
 import { geometriaDoAcervo } from "@/components/requisicao/geometria";
-import { AberturaProcesso, FinalizacaoPagamento } from "@/components/atendimento-acoes";
+import {
+  AberturaProcesso,
+  DevolverRequisicao,
+  FinalizacaoPagamento,
+} from "@/components/atendimento-acoes";
+import { STATUS_SOLICITACAO, podeDevolver } from "@/lib/solicitacao-estados";
 import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
 import { ChatSolicitacao } from "@/components/requisicao/chat";
 
@@ -77,14 +82,42 @@ export default async function VisualizarRequisicaoPage({
         }
       />
 
+      {atendimento && requisicao.status === STATUS_SOLICITACAO.DEVOLVIDA && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <p>
+            <strong className="font-semibold">
+              Devolvida ao solicitante
+              {requisicao.devolvidaEm &&
+                ` em ${new Date(requisicao.devolvidaEm).toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })}`}
+              .
+            </strong>{" "}
+            Aguardando o reenvio. Abertura de processo e pagamento ficam bloqueados até lá.
+          </p>
+          {requisicao.devolucaoMotivo && (
+            <blockquote className="mt-2 whitespace-pre-wrap rounded-md border border-red-200 bg-white px-3 py-2 text-gray-900">
+              {requisicao.devolucaoMotivo}
+            </blockquote>
+          )}
+        </div>
+      )}
+
       {atendimento && (
         <div className="space-y-6">
-          {!requisicao.process && <AberturaProcesso requisicaoId={requisicao.id} />}
-          <FinalizacaoPagamento
-            requisicaoId={requisicao.id}
-            statusInicial={requisicao.pagamentoStatus}
-            valorInicial={requisicao.pagamentoValor}
-          />
+          {podeDevolver(requisicao) && <DevolverRequisicao requisicaoId={requisicao.id} />}
+          {requisicao.status !== STATUS_SOLICITACAO.DEVOLVIDA && (
+            <>
+              {!requisicao.process && <AberturaProcesso requisicaoId={requisicao.id} />}
+              <FinalizacaoPagamento
+                requisicaoId={requisicao.id}
+                statusInicial={requisicao.pagamentoStatus}
+                valorInicial={requisicao.pagamentoValor}
+              />
+            </>
+          )}
         </div>
       )}
     </div>

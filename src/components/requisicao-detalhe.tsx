@@ -92,13 +92,26 @@ export function RequisicaoDetalhe({
               <strong className="font-semibold">A equipe devolveu sua requisição.</strong>{" "}
               Revise os dados e envie novamente.
             </p>
-            <Link
-              href={`/portal/requisicoes/${requisicao.id}/editar`}
-              className="mt-3 inline-flex items-center gap-1 bg-emerald-700 text-white px-4 py-2 rounded-md text-sm hover:bg-emerald-800"
-            >
-              <Pencil className="h-4 w-4" aria-hidden="true" />
-              Alterar requisição
-            </Link>
+            {requisicao.devolucaoMotivo && (
+              <blockquote className="mt-2 whitespace-pre-wrap rounded-md border border-amber-200 bg-white px-3 py-2 text-sm text-gray-900 [overflow-wrap:anywhere]">
+                {requisicao.devolucaoMotivo}
+              </blockquote>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                href={`/portal/requisicoes/${requisicao.id}/editar`}
+                className="inline-flex items-center gap-1 bg-emerald-700 text-white px-4 py-2 rounded-md text-sm hover:bg-emerald-800"
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Alterar requisição
+              </Link>
+              <a
+                href="#conversa"
+                className="inline-flex items-center rounded-md border border-gray-400 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
+              >
+                Ver conversa
+              </a>
+            </div>
           </div>
         )}
 

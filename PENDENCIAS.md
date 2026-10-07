@@ -46,7 +46,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-23 | Restos do Litestream no `package.json` | infra | refatoração | baixa | aberta |
 | #PEND-24 | Sem testes automatizados nas bibliotecas de regra | backend | adição | média | aberta |
 | #PEND-25 | Chat da solicitação (não existe modelo, rota nem tela) | backend | adição | alta | resolvida (2026-10-07) |
-| #PEND-26 | Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA` | backend | adição | alta | em andamento |
+| #PEND-26 | Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA` | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-27 | Modelo de status da requisição para o solicitante (5 gerais + 6 etapas) | backend | adição | alta | aberta |
 | #PEND-28 | Download da certidão emitida pelo solicitante | backend | adição | média | aberta |
 | #PEND-29 | Pedido de arquivamento pelo solicitante (regra de custo/tempo) | backend | adição | média | bloqueada (#PEND-27) |
@@ -280,6 +280,7 @@ O documento pede que o cliente "não possa editar enquanto não tiver sido devol
 **Impacto no frontend:** esconder "Alterar requisição" fora de `DEVOLVIDA` (feito na tela, mas não é segurança); botão "Devolver" no backoffice.
 **Andamento (2026-10-07):** (a) feito — o `PATCH` só aceita `DEVOLVIDA`. Falta (b), a ação "devolver" no backoffice.
 **Verificado (2026-10-07):** busca em `src/app/api` e `src/lib`: `DEVOLVIDA` só aparece em `STATUS_EDITAVEIS`, no rótulo e no filtro "Devolvidas" (`requisicao-status.ts`); nenhuma rota ou ação grava esse status. **Efeito atual:** como ninguém consegue devolver, o solicitante não consegue mais editar uma requisição enviada (antes editava em `PENDENTE`). A tela já reflete isso (aviso "não pode ser alterada" e botão "Alterar requisição" só em `DEVOLVIDA`), então não há erro visível, mas o fluxo de correção fica parado até a ação "devolver" existir. Bloqueia o item 11 do documento do cliente de ponta a ponta.
+**Resolução:** Fase 2 do plano de atendimento CJT, branch `feat/portal-correcoes-cjt` (2026-10-07). Rota `POST /api/requisicoes/[id]/devolver` (ADMIN e SDTC): só devolve requisição pendente, sem processo e sem finalização, com motivo de 10 a 1000 caracteres; a transição é condicional (duas devoluções ao mesmo tempo, só a primeira vale), grava `devolucaoMotivo` e `devolvidaEm` (migration `20261007130000_devolucao_requisicao`, nos dois schemas) e posta o motivo no chat. Requisição devolvida não aceita abertura de processo nem pagamento (409). O reenvio pelo portal volta o status para `PENDENTE` e avisa o atendimento no chat. Telas: `DevolverRequisicao` em `src/components/atendimento-acoes.tsx`, caixa "Devolvida" no atendimento e motivo com botão "Ver conversa" no portal; a lista do atendimento "Aguardando abertura de processo" deixa de mostrar devolvidas. Regras puras em `src/lib/solicitacao-estados.ts` (`podeDevolver`, `validarMotivoDevolucao`).
 
 ### #PEND-27 · Modelo de status da requisição para o solicitante (5 gerais + 6 etapas)
 

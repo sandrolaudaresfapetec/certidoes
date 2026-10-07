@@ -141,7 +141,11 @@ export function ChatSolicitacao({
   const idErro = `${idCampo}-erro`;
 
   return (
-    <section className="bg-white rounded-lg border border-gray-200" aria-labelledby={`${idCampo}-titulo`}>
+    <section
+      id="conversa"
+      className="bg-white rounded-lg border border-gray-200"
+      aria-labelledby={`${idCampo}-titulo`}
+    >
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-4">
         <div className="min-w-0">
           <h2 id={`${idCampo}-titulo`} className="text-sm font-semibold text-gray-900">

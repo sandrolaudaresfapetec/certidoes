@@ -35,6 +35,47 @@ export type StatusSolicitacao = (typeof STATUS_SOLICITACAO)[keyof typeof STATUS_
  */
 export const STATUS_EDITAVEIS_PELO_CLIENTE: readonly string[] = [STATUS_SOLICITACAO.DEVOLVIDA];
 
+/** Situações em que a DDD pode devolver a requisição ao solicitante. */
+export const STATUS_DEVOLVIVEIS: readonly string[] = [
+  STATUS_SOLICITACAO.PENDENTE,
+  STATUS_SOLICITACAO.EM_ANALISE,
+];
+
+export const MOTIVO_DEVOLUCAO_MIN = 10;
+export const MOTIVO_DEVOLUCAO_MAX = 1000;
+
+/**
+ * Devolução só enquanto não há processo aberto nem finalização: depois disso os dados
+ * alimentam a análise técnica e o solicitante não os altera mais.
+ */
+export function podeDevolver(requisicao: {
+  status: string;
+  processId?: string | null;
+  finalizadaEm?: Date | string | null;
+}): boolean {
+  return (
+    !requisicao.processId &&
+    !requisicao.finalizadaEm &&
+    STATUS_DEVOLVIVEIS.includes(requisicao.status)
+  );
+}
+
+export function validarMotivoDevolucao(
+  motivo: unknown
+): { ok: true; motivo: string } | { ok: false; erro: string } {
+  const limpo = typeof motivo === "string" ? motivo.trim() : "";
+  if (limpo.length < MOTIVO_DEVOLUCAO_MIN) {
+    return {
+      ok: false,
+      erro: `Escreva o motivo com pelo menos ${MOTIVO_DEVOLUCAO_MIN} caracteres.`,
+    };
+  }
+  if (limpo.length > MOTIVO_DEVOLUCAO_MAX) {
+    return { ok: false, erro: `O motivo pode ter até ${MOTIVO_DEVOLUCAO_MAX} caracteres.` };
+  }
+  return { ok: true, motivo: limpo };
+}
+
 /** Fonte única da regra "o solicitante ainda pode editar" (API e telas do portal). */
 export function clientePodeEditar(requisicao: {
   status: string;

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { REQUISICAO_STATUS, statusRequisicao } from "./requisicao-status";
-import { STATUS_SOLICITACAO, clientePodeEditar } from "./solicitacao-estados";
+import {
+  MOTIVO_DEVOLUCAO_MAX,
+  STATUS_SOLICITACAO,
+  clientePodeEditar,
+  podeDevolver,
+  validarMotivoDevolucao,
+} from "./solicitacao-estados";
 
 describe("clientePodeEditar", () => {
   it("só deixa editar requisição devolvida, sem processo e sem finalização", () => {
@@ -26,5 +32,38 @@ describe("rótulos de status", () => {
 
   it("status desconhecido cai em Pendente", () => {
     expect(statusRequisicao("XYZ")).toBe(REQUISICAO_STATUS.PENDENTE);
+  });
+});
+
+describe("podeDevolver", () => {
+  it("devolve requisição pendente, sem processo e sem finalização", () => {
+    expect(podeDevolver({ status: "PENDENTE" })).toBe(true);
+    expect(podeDevolver({ status: "EM_ANALISE" })).toBe(true);
+    expect(podeDevolver({ status: "PENDENTE", processId: "p1" })).toBe(false);
+    expect(podeDevolver({ status: "PENDENTE", finalizadaEm: new Date() })).toBe(false);
+  });
+
+  it.each(["DEVOLVIDA", "APROVADA", "CONCLUIDA", "RASCUNHO", "ARQUIVADA"])(
+    "não devolve em %s",
+    (status) => {
+      expect(podeDevolver({ status })).toBe(false);
+    }
+  );
+});
+
+describe("validarMotivoDevolucao", () => {
+  it("exige pelo menos 10 caracteres úteis", () => {
+    expect(validarMotivoDevolucao("curto")).toMatchObject({ ok: false });
+    expect(validarMotivoDevolucao("         x         ")).toMatchObject({ ok: false });
+    expect(validarMotivoDevolucao(undefined)).toMatchObject({ ok: false });
+    expect(validarMotivoDevolucao("  matrícula divergente  ")).toEqual({
+      ok: true,
+      motivo: "matrícula divergente",
+    });
+  });
+
+  it("recusa mais que o máximo", () => {
+    expect(validarMotivoDevolucao("a".repeat(MOTIVO_DEVOLUCAO_MAX))).toMatchObject({ ok: true });
+    expect(validarMotivoDevolucao("a".repeat(MOTIVO_DEVOLUCAO_MAX + 1))).toMatchObject({ ok: false });
   });
 });

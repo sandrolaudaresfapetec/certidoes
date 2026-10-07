@@ -3,6 +3,120 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { MOTIVO_DEVOLUCAO_MAX, MOTIVO_DEVOLUCAO_MIN } from "@/lib/solicitacao-estados";
+
+/**
+ * Devolução da requisição ao solicitante (#PEND-26). Confirmação inline, no próprio cartão:
+ * o motivo é obrigatório e vai ao chat do solicitante.
+ */
+export function DevolverRequisicao({ requisicaoId }: { requisicaoId: string }) {
+  const router = useRouter();
+  const [aberto, setAberto] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function fechar() {
+    setAberto(false);
+    setMotivo("");
+    setErro(null);
+  }
+
+  async function devolver(e: React.FormEvent) {
+    e.preventDefault();
+    if (motivo.trim().length < MOTIVO_DEVOLUCAO_MIN) {
+      setErro(`Escreva o motivo com pelo menos ${MOTIVO_DEVOLUCAO_MIN} caracteres.`);
+      return;
+    }
+    setLoading(true);
+    setErro(null);
+    try {
+      const res = await fetch(`/api/requisicoes/${requisicaoId}/devolver`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErro(data.error || "Não foi possível devolver a requisição.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setErro("Erro de conexão. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <h3 className="font-semibold text-gray-900">Devolver ao solicitante</h3>
+      <p className="mt-1 text-xs text-gray-600">
+        O solicitante recebe o motivo no chat, pode corrigir os dados e reenviar. Enquanto isso a
+        requisição sai da fila.
+      </p>
+      {!aberto ? (
+        <button
+          type="button"
+          onClick={() => setAberto(true)}
+          className="mt-3 rounded-md border border-gray-400 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
+        >
+          Devolver requisição
+        </button>
+      ) : (
+        <form
+          onSubmit={devolver}
+          noValidate
+          className="mt-3 grid gap-2 rounded-md border border-red-200 bg-red-50 p-4"
+        >
+          <label htmlFor="devolver-motivo" className="text-xs font-semibold text-red-900">
+            Motivo da devolução
+          </label>
+          <textarea
+            id="devolver-motivo"
+            value={motivo}
+            maxLength={MOTIVO_DEVOLUCAO_MAX}
+            autoFocus
+            onChange={(e) => {
+              setMotivo(e.target.value);
+              setErro(null);
+            }}
+            placeholder="Explique o que o solicitante precisa corrigir"
+            aria-invalid={erro ? true : undefined}
+            aria-describedby={erro ? "devolver-erro" : "devolver-dica"}
+            className="min-h-20 w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+          />
+          <p id="devolver-dica" className="text-xs text-red-900">
+            {motivo.length} de {MOTIVO_DEVOLUCAO_MAX} caracteres (mínimo {MOTIVO_DEVOLUCAO_MIN})
+          </p>
+          {erro && (
+            <p id="devolver-erro" role="alert" className="text-xs text-red-700">
+              {erro}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-md bg-red-700 px-4 py-2 text-sm text-white hover:bg-red-800 disabled:opacity-50"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              Confirmar devolução
+            </button>
+            <button
+              type="button"
+              onClick={fechar}
+              className="rounded-md border border-gray-400 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
 
 /** Abertura de Processo a partir de uma requisição (Atendimento). */
 export function AberturaProcesso({ requisicaoId }: { requisicaoId: string }) {

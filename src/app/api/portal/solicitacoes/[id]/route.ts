@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirSolicitanteApi } from "@/lib/portal-auth";
 import { clientePodeEditar } from "@/lib/solicitacao-estados";
+import { mensagemDeSistema } from "@/lib/chat";
 import {
   formularioDoPayload,
   normalizarParaPersistencia,
@@ -87,6 +88,14 @@ export async function PATCH(
       status: "PENDENTE",
       ...cjt,
     },
+  });
+
+  // Aviso no chat para o atendimento saber que a correção chegou (chave única por reenvio).
+  await mensagemDeSistema({
+    solicitacaoId: solicitacao.id,
+    texto: "O solicitante reenviou a requisição corrigida.",
+    chave: `REENVIO:${Date.now()}`,
+    tipo: "EVENTO",
   });
 
   return NextResponse.json(solicitacao);
