@@ -2,7 +2,9 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Scissors, Loader2, Map as MapIcon, MousePointerClick, Tractor } from "lucide-react";
+import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
 
 /** Poligono de demonstracao: cobre a triplice Brotas / Torrinha / Sao Pedro (SP). */
 const IMOVEL_EXEMPLO = {
@@ -66,12 +68,31 @@ function popupParcela(parcela: any) {
   );
 }
 
+/** Processo ligado ao mapa por `?processo=` (botão "Corte de divisas" da tela do processo). */
+type Vinculo =
+  | { estado: "nenhum" }
+  | { estado: "carregando" }
+  | { estado: "erro"; mensagem: string }
+  | {
+      estado: "ok";
+      id: string;
+      ordem: number;
+      interessado: string;
+      municipio: string | null;
+      etapa: string;
+      parcelaCodigo: string | null;
+    };
+
 export default function GeometriaPage() {
   const mapRef = useRef<any>(null);
   const layersRef = useRef<any[]>([]);
   const [pronto, setPronto] = useState(false);
   const [geojson, setGeojson] = useState(JSON.stringify(IMOVEL_EXEMPLO, null, 2));
   const [processId, setProcessId] = useState("");
+  const [vinculo, setVinculo] = useState<Vinculo>({ estado: "nenhum" });
+  const [avisoParcela, setAvisoParcela] = useState<string | null>(null);
+  const [processoGravado, setProcessoGravado] = useState<string | null>(null);
+  const parcelaDoProcessoRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [resultado, setResultado] = useState<any>(null);
@@ -97,6 +118,70 @@ export default function GeometriaPage() {
   const pedidoBboxRef = useRef(0);
   const pedidoPontoRef = useRef(0);
   const pedidoSigefRef = useRef(0);
+
+  // Lê `?processo=` ao abrir e carrega o processo (rota GET /api/processes/[id]).
+  useEffect(() => {
+    (async () => {
+      const id = new URLSearchParams(window.location.search).get("processo");
+      if (!id) return;
+      setProcessId(id);
+      setVinculo({ estado: "carregando" });
+      try {
+        const res = await fetch(`/api/processes/${encodeURIComponent(id)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            res.status === 404 ? "Processo não encontrado." : data.error || "Erro ao carregar o processo."
+          );
+        }
+        setVinculo({
+          estado: "ok",
+          id: data.id,
+          ordem: data.ordem,
+          interessado: data.interessado,
+          municipio: data.municipio ?? null,
+          etapa: WORKFLOW_STAGES[data.situacao as WorkflowStage]?.label ?? data.situacao,
+          parcelaCodigo: data.sigefParcelaCodigo ?? null,
+        });
+      } catch (e) {
+        setProcessId("");
+        setVinculo({ estado: "erro", mensagem: (e as Error).message });
+      }
+    })();
+  }, []);
+
+  // Com o mapa pronto, carrega como polígono em análise a parcela SIGEF do processo (se estiver no acervo).
+  useEffect(() => {
+    if (!pronto || vinculo.estado !== "ok" || parcelaDoProcessoRef.current) return;
+    parcelaDoProcessoRef.current = true;
+    const codigo = vinculo.parcelaCodigo;
+    (async () => {
+      if (!codigo) {
+        setAvisoParcela(
+          "Este processo não tem parcela do SIGEF registrada. Escolha o imóvel no mapa (CAR ou SIGEF) ou cole o GeoJSON."
+        );
+        return;
+      }
+      try {
+        const res = await fetch(`/api/sigef/parcelas?codigo=${encodeURIComponent(codigo)}`);
+        const data = await res.json();
+        if (!res.ok || !data.parcelas?.length) throw new Error("fora do acervo");
+        usarParcela(data.parcelas[0]);
+      } catch {
+        setAvisoParcela(
+          `A parcela ${codigo} deste processo não está no acervo SIGEF importado. Escolha o imóvel no mapa (CAR ou SIGEF) ou cole o GeoJSON.`
+        );
+      }
+    })();
+  }, [pronto, vinculo]);
+
+  function desvincular() {
+    setVinculo({ estado: "nenhum" });
+    setProcessId("");
+    setAvisoParcela(null);
+    setProcessoGravado(null);
+    window.history.replaceState(null, "", "/geometria");
+  }
 
   useEffect(() => {
     if (!document.getElementById("leaflet-css")) {
@@ -408,6 +493,7 @@ export default function GeometriaPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro no corte");
       setResultado(data);
+      setProcessoGravado(processId || null);
       data.fragmentos.forEach((f: any, i: number) =>
         desenharImovel({ type: "Feature", properties: {}, geometry: f.geometria }, CORES[i % CORES.length])
       );
@@ -424,6 +510,33 @@ export default function GeometriaPage() {
         <MapIcon className="h-6 w-6 text-emerald-700" />
         Corte de Divisas — Geometria do Imovel
       </h1>
+
+      {vinculo.estado === "carregando" && (
+        <p role="status" className="text-sm text-gray-600">Carregando o processo vinculado…</p>
+      )}
+      {vinculo.estado === "erro" && (
+        <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <strong className="font-semibold">{vinculo.mensagem}</strong> A tela segue sem vínculo com processo.
+        </p>
+      )}
+      {vinculo.estado === "ok" && (
+        <div
+          role="status"
+          className={`rounded-md border p-3 text-sm ${
+            avisoParcela ? "border-amber-200 bg-amber-50 text-amber-900" : "border-blue-200 bg-blue-50 text-blue-900"
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span>
+              <strong className="font-semibold">Processo vinculado:</strong> #{vinculo.ordem} · {vinculo.interessado}
+              {vinculo.municipio ? ` · ${vinculo.municipio}` : ""} · {vinculo.etapa}
+            </span>
+            <Link href={`/processos/${vinculo.id}`} className="underline">Abrir processo</Link>
+            <button type="button" onClick={desvincular} className="underline">Desvincular</button>
+          </div>
+          {avisoParcela && <p className="mt-1">{avisoParcela}</p>}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
@@ -519,12 +632,24 @@ export default function GeometriaPage() {
           <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded p-2">
             Poligono em analise: {carInfo ?? ROTULO_EXEMPLO}
           </p>
-          <input
-            value={processId}
-            onChange={(e) => setProcessId(e.target.value)}
-            placeholder="ID do processo (opcional — vincula a rastreabilidade)"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-          />
+          {vinculo.estado === "ok" ? (
+            <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+              Corte será gravado no processo <strong>#{vinculo.ordem}</strong>.
+            </p>
+          ) : (
+            <>
+              <input
+                value={processId}
+                onChange={(e) => setProcessId(e.target.value)}
+                aria-label="ID do processo"
+                placeholder="ID do processo (opcional — vincula a rastreabilidade)"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-gray-600">
+                Dica: para abrir o mapa já ligado a um processo, use o botão &quot;Corte de divisas&quot; na tela do processo.
+              </p>
+            </>
+          )}
           <button
             onClick={calcular}
             disabled={loading || !pronto}
@@ -543,6 +668,15 @@ export default function GeometriaPage() {
                 : "bg-emerald-100 text-emerald-800"}`}>
                 Caso: {resultado.classificacao}
               </span>
+              {processoGravado && (
+                <p className="mt-2 text-sm text-gray-800">
+                  Corte gravado no processo{" "}
+                  {vinculo.estado === "ok" && vinculo.id === processoGravado ? `#${vinculo.ordem}` : "informado"}.{" "}
+                  <Link href={`/processos/${processoGravado}/certidao`} className="text-blue-700 underline">
+                    Ver minuta da certidão
+                  </Link>
+                </p>
+              )}
               <p className="text-xs text-gray-500 mt-2">
                 Linhas usadas: {resultado.linhasUsadas.map((l: any) => l.codigo).join(", ") || "nenhuma"} ·
                 Registro: {resultado.corteId}

@@ -9,7 +9,7 @@ import {
 import { formatDate, formatDateTime } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, User, FileText, MapPin, FileCheck, Pencil } from "lucide-react";
+import { ArrowLeft, Clock, User, FileText, MapPin, FileCheck, Pencil, Scissors } from "lucide-react";
 import { WorkflowActions } from "@/components/workflow-actions";
 import { podeAtender, requireUsuario } from "@/lib/auth";
 
@@ -87,6 +87,13 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
                 Editar processo
               </Link>
             )}
+            <Link
+              href={`/geometria?processo=${processo.id}`}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+            >
+              <Scissors className="h-4 w-4" />
+              Corte de divisas
+            </Link>
             {/certid/i.test(processo.tipoServico) && (
               <Link
                 href={`/processos/${processo.id}/certidao`}

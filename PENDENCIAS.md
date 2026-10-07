@@ -27,7 +27,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-4 | Listar/baixar documentos anexados na tela da requisição | frontend | adição | alta | bloqueada (#PEND-3) |
 | #PEND-5 | Tela de edição do processo e atribuição de técnico/conferente | frontend | adição | alta | resolvida (2026-10-07) |
 | #PEND-6 | GERENTE (quem distribui) não consegue atribuir técnico/conferente | backend | bugfix | alta | aberta |
-| #PEND-7 | `/geometria` fora da navegação e sem vínculo com o processo | frontend | melhoria | média | aberta |
+| #PEND-7 | `/geometria` fora da navegação e sem vínculo com o processo | frontend | melhoria | média | resolvida (2026-10-07) |
 | #PEND-8 | Leaflet carregado do unpkg em runtime, sem `integrity` | frontend | melhoria | baixa | aberta |
 | #PEND-9 | Múltiplos proprietários: regra do "e outros" não implementada | backend | adição | média | aberta |
 | #PEND-10 | Nomes de gleba/polígono: não rejeita matrícula nem município | backend | adição | média | descartada (substituída por #PEND-36) |
@@ -128,6 +128,7 @@ A etapa `distribuicao_gdat` é movida por GERENTE/ADMIN, mas `tecnicoRespId`/`te
 **Onde:** `src/components/sidebar.tsx`, `src/app/processos/[id]/page.tsx`, `src/app/geometria/page.tsx`
 
 Nenhum link aponta para `/geometria`; lá dentro o vínculo com o processo é um campo de texto onde se cola o ID. `POST /api/geometria/corte` já aceita `processId` e a certidão já lê o corte mais recente do processo. Falta o item de menu e um botão no processo que abra o mapa com processo/imóvel preenchidos.
+**Resolução:** Fase 4 do plano de melhorias, branch `feat/portal-correcoes-cjt` (2026-10-07). Item "Corte de Divisas" em `src/components/sidebar.tsx`; botão "Corte de divisas" em `src/app/processos/[id]/page.tsx`; `src/app/geometria/page.tsx` lê `?processo=`, mostra a faixa "Processo vinculado" (com "Desvincular"), carrega a parcela do processo quando está no acervo (`GET /api/sigef/parcelas?codigo=`) e, depois do corte, mostra "Corte gravado no processo #N" com o link da minuta.
 
 ### #PEND-8 · Leaflet carregado do unpkg em runtime, sem `integrity`
 
