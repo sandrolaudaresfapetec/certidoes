@@ -92,7 +92,8 @@ curl -X POST http://localhost:3000/api/seed    # dados de demonstração (só en
 - **Acessibilidade** (exigência da Especificação Funcional CJT): rótulo associado a todo controle (`label`/`htmlFor` ou `aria-*`), uso completo por teclado, erro em texto e não só em cor. Vale para todo formulário novo.
 - **Campos e botões seguem a regra global de `src/app/globals.css` (camada `base`) — não a redefina por componente:** placeholder `#6B7280`, texto digitado `#111827` em peso 400 (nunca negrito), cursor de mão em todo botão, checkbox e radio (e no rótulo que os envolve) e `not-allowed` nos desabilitados. Para uma exceção intencional, use um utilitário (ex.: `cursor-default`). Rótulo que envolve checkbox/radio deve ser filho direto (`<label><input …/>texto</label>`) para a regra alcançá-lo.
 - **Não duplique constantes:** use `REQUISICAO_STATUS`, `WORKFLOW_STAGES`, `PAPEIS` etc. em vez de reescrever rótulos.
-- **`src/components/requisicao-form.tsx` é compartilhado** pelo portal (`/portal/nova-solicitacao`) e pelo atendimento (`/requisicoes/nova`): teste os dois ao alterá-lo.
+- **`src/components/requisicao-form.tsx` é compartilhado** pelo portal (`/portal/nova-solicitacao`) e pelo atendimento (`/requisicoes/nova`): teste os dois ao alterá-lo. A prop `variante` (`"SOLICITANTE"` ou `"ATENDIMENTO"`) escolhe caixas progressivas e tela de envio.
+- **Histórico do que já foi implementado** (pedido do cliente → arquivo → URL → decisões → limites) fica em [`docs/`](docs/): comece por [`docs/correcoes-cjt-portal.md`](docs/correcoes-cjt-portal.md). Ao concluir um trabalho relevante, registre-o lá ou em um arquivo novo da mesma pasta.
 
 ## 6. Antes de dizer "terminei"
 
