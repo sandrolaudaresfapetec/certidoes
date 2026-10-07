@@ -135,10 +135,11 @@ Passo a passo completo em `docs/MIGRACAO-POSTGIS.md`.
   `./scripts/fly-db-push.sh <senha>` — abre túnel WireGuard (`fly proxy`) e roda
   da sua máquina, sem SSH.
 
-### Enriquecimento da simulacao SIGEF com CAR/SICAR
+### Parcelas SIGEF (acervo do INCRA) no modulo de geometria
 
-Com `SIGEF_CAR=true` (padrao), as parcelas simuladas usam **geometrias reais** de
-imoveis do CAR, via GeoServer publico (`geoserver.car.gov.br/geoserver/sicar/wfs`,
-camada `sicar:sicar_imoveis_<uf>`). Isso alimenta o modulo de corte de divisas
-(`/geometria`) com poligonos reais do estado de Sao Paulo. O CAR nao expoe CPF do titular, entao
-a associacao CPF -> imovel segue simulada. Endpoint auxiliar: `GET /api/car/imoveis?uf=SP`.
+O modulo de corte de divisas (`/geometria`) trabalha exclusivamente com as parcelas
+certificadas do SIGEF importadas do shapefile do Acervo Fundiario do INCRA
+(`scripts/import-sigef-shp.ts`, tabela `SigefParcela`). A tela permite exibir as
+parcelas da janela do mapa, selecionar uma parcela por clique ou buscar pelo codigo.
+Endpoint: `GET /api/sigef/parcelas` (`bbox=`, `lon=&lat=`, `codigo=` ou `uf=`).
+Quando o acervo nao esta importado, a consulta por CPF/CNPJ devolve dados 100% simulados.

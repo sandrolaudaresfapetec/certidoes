@@ -1,10 +1,10 @@
-import { requireUsuario } from "@/lib/auth";
+import { requireGeometria } from "@/lib/auth";
 
 export default async function GeometriaLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireUsuario();
+  await requireGeometria();
   return children;
 }
