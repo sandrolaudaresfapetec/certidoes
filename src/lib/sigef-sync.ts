@@ -282,6 +282,9 @@ export type ResultadoSincronizacao = {
 /** Protecao contra download truncado: nao apaga o acervo se o arquivo veio pequeno demais. */
 const FRACAO_MINIMA_PARA_REMOVER = 0.5;
 
+/** Execucoes EXECUTANDO mais antigas que isto sao consideradas abandonadas (processo morto sem encerrar). */
+const JANELA_EXECUCAO_MS = 6 * 60 * 60 * 1000;
+
 export async function sincronizarAcervo(opcoes: OpcoesSincronizacao = {}): Promise<ResultadoSincronizacao> {
   const uf = (opcoes.uf ?? process.env.SIGEF_SYNC_UF ?? "SP").toUpperCase();
   const tamanhoLote = opcoes.lote ?? Number(process.env.SIGEF_SYNC_LOTE ?? 300);
@@ -289,6 +292,16 @@ export async function sincronizarAcervo(opcoes: OpcoesSincronizacao = {}): Promi
   const log = opcoes.log ?? ((m: string) => console.log(`[sigef-sync] ${m}`));
   const url = opcoes.arquivo ? `file://${path.resolve(opcoes.arquivo)}` : urlAcervo(uf);
   const fonte = fonteAcervo(uf);
+
+  const emAndamento = await prisma.sigefSincronizacao.findFirst({
+    where: { uf, status: "EXECUTANDO", iniciadoEm: { gte: new Date(Date.now() - JANELA_EXECUCAO_MS) } },
+    select: { id: true, iniciadoEm: true },
+  });
+  if (emAndamento) {
+    const mensagem = `Ja existe uma sincronizacao em andamento para ${uf} (${emAndamento.id}, iniciada em ${emAndamento.iniciadoEm.toISOString()})`;
+    log(mensagem);
+    return { id: emAndamento.id, status: "ERRO", lidas: 0, inseridas: 0, atualizadas: 0, removidas: 0, mensagem };
+  }
 
   const execucao = await prisma.sigefSincronizacao.create({
     data: { uf, status: "EXECUTANDO", fonteUrl: url },
