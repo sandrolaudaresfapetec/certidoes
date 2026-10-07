@@ -8,6 +8,7 @@ import {
   LIMITE_POLIGONOS_MAXIMO,
   ajustarNomesPoligonos,
   formularioDoPayload,
+  lerPoligonos,
 } from "@/lib/cjt-formulario";
 import { clientePodeEditar } from "@/lib/solicitacao-estados";
 
@@ -112,6 +113,10 @@ export default async function EditarRequisicaoPage({
             matricula: requisicao.cjtMatricula,
             qtdPoligonos: requisicao.cjtQtdPoligonos,
             nomesPoligonos: nomes,
+            parcelasPoligonos: ajustarNomesPoligonos(
+              lerPoligonos(requisicao.cjtPoligonos, null).map((p) => p.parcelaCodigo ?? ""),
+              nomes.length
+            ),
             codigoIncra: requisicao.cjtCodigoIncra,
             declaracao: requisicao.cjtDeclaracaoAceita,
           }),

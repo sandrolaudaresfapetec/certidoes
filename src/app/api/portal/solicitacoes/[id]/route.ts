@@ -4,6 +4,7 @@ import { exigirSolicitanteApi } from "@/lib/portal-auth";
 import { clientePodeEditar } from "@/lib/solicitacao-estados";
 import { mensagemDeSistema } from "@/lib/chat";
 import { dadosDoRascunho } from "@/lib/solicitacao-rascunho";
+import { resolverPoligonos } from "@/lib/poligonos-parcelas-servidor";
 import { STATUS_SOLICITACAO } from "@/lib/solicitacao-estados";
 import {
   formularioDoPayload,
@@ -70,11 +71,22 @@ export async function PATCH(
 
   const formulario = formularioDoPayload(body.cjt);
   // Pedido liberado pela DDD pode passar de 12 polígonos (#PEND-31).
-  const erroCjt = primeiroErro(validarFormulario(formulario, { liberado: Boolean(atual.liberadaEm) }));
+  const erroCjt = primeiroErro(
+    validarFormulario(formulario, { liberado: Boolean(atual.liberadaEm), exigirParcelas: tipoViaSigef })
+  );
   if (erroCjt) {
     return NextResponse.json({ error: erroCjt }, { status: 400 });
   }
   const cjt = normalizarParaPersistencia(formulario);
+
+  // Gleba com 2+ polígonos: cada polígono liga a uma parcela do SIGEF do solicitante (#PEND-34).
+  const vinculo = await resolverPoligonos({
+    cpf: solicitante.cpf,
+    formulario,
+    tipoViaSigef,
+    parcelaPrincipal: body.sigefParcelaCodigo,
+  });
+  if (!vinculo.ok) return NextResponse.json({ error: vinculo.erro }, { status: 400 });
 
   // Representante informa CPF/CNPJ válido e nome de quem representa (#PEND-44).
   const representacao = validarRepresentacao({
@@ -109,6 +121,7 @@ export async function PATCH(
       // Requisição devolvida volta à fila de atendimento depois da correção.
       status: "PENDENTE",
       ...cjt,
+      cjtPoligonos: vinculo.cjtPoligonos,
     },
   });
 

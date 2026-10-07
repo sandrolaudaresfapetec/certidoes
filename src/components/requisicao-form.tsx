@@ -29,6 +29,7 @@ import {
   perguntaMatriculaAplicavel,
   cpfCnpjCompleto,
   digitosCpfCnpj,
+  erroParcelasPoligonos,
   digitosIncra,
   mascaraCpfCnpj,
   mascaraIncra,
@@ -41,6 +42,7 @@ import { ProgressoSolicitacao } from "@/components/requisicao/progresso-solicita
 import { MapaImovel } from "@/components/requisicao/mapa-imovel";
 import { useConclusaoSolicitacao } from "@/components/requisicao/introducao-cjt";
 import { NomesPoligonos } from "@/components/requisicao/nomes-poligonos";
+import { PoligonosParcelas } from "@/components/requisicao/poligonos-parcelas";
 
 interface SigefParcela {
   codigoImovel: string;
@@ -221,7 +223,25 @@ export function RequisicaoForm({
           ? Math.min(qtd, permitirMais ? LIMITE_POLIGONOS_MAXIMO : LIMITE_POLIGONOS_ENVIO)
           : qtd
       ),
+      parcelasPoligonos: ajustarNomesPoligonos(
+        atual.parcelasPoligonos,
+        Number.isFinite(qtd)
+          ? Math.min(qtd, permitirMais ? LIMITE_POLIGONOS_MAXIMO : LIMITE_POLIGONOS_ENVIO)
+          : qtd
+      ),
     }));
+  }
+
+  /** O imóvel principal da requisição é a parcela do primeiro polígono. */
+  function escolherParcelaDoPoligono(indice: number, parcelaCodigo: string) {
+    setForm((atual) => {
+      const lista = ajustarNomesPoligonos(atual.parcelasPoligonos, atual.nomesPoligonos.length);
+      lista[indice] = parcelaCodigo;
+      return { ...atual, parcelasPoligonos: lista };
+    });
+    if (indice === 0) {
+      setSelecionada(sigef?.parcelas.find((p) => p.parcelaCodigo === parcelaCodigo) ?? null);
+    }
   }
 
   const campos = camposAplicaveis(form.resultado, form.situacao);
@@ -229,6 +249,11 @@ export function RequisicaoForm({
   const nomesInformados = campos.includes("nomesPoligonos")
     ? form.nomesPoligonos.map((n) => n.trim()).filter(Boolean)
     : [];
+  // Gleba com 2 ou mais polígonos e imóvel do SIGEF: cada polígono escolhe a sua parcela (#PEND-34).
+  const usaVinculo =
+    campos.includes("nomesPoligonos") &&
+    etapaImovel === "selecao" &&
+    form.nomesPoligonos.length >= 2;
   // "Representante" na Pergunta 1 abre a caixa com os dados de quem é representado.
   const procurador = form.qualidade === "1a";
   const exigeDocsImovel = etapaImovel === "semRegistro";
@@ -259,7 +284,11 @@ export function RequisicaoForm({
   const caixa4 =
     caixa3 &&
     etapaImovel !== "consultando" &&
-    (etapaImovel === "selecao" ? Boolean(selecionada) : temPlanta && temDocPropriedade) &&
+    (etapaImovel === "selecao"
+      ? usaVinculo
+        ? !erroParcelasPoligonos(form.parcelasPoligonos, form.nomesPoligonos.length)
+        : Boolean(selecionada)
+      : temPlanta && temDocPropriedade) &&
     (!procurador || temProcuracao) &&
     form.declaracao;
   const verCaixa2 = progressivo ? caixa1 : true;
@@ -269,7 +298,10 @@ export function RequisicaoForm({
   const entra = progressivo ? "caixa-entra" : "";
 
   async function enviar() {
-    const validacao: ErrosCjt = validarFormulario(form, { liberado: permitirMais });
+    const validacao: ErrosCjt = validarFormulario(form, {
+      liberado: permitirMais,
+      exigirParcelas: usaVinculo,
+    });
     setErros(validacao);
     if (Object.keys(validacao).length > 0) return;
 
@@ -320,6 +352,7 @@ export function RequisicaoForm({
             matricula: limpo.matricula,
             qtdPoligonos: limpo.qtdPoligonos,
             nomesPoligonos: limpo.nomesPoligonos,
+            parcelasPoligonos: limpo.parcelasPoligonos,
             codigoIncra: limpo.codigoIncra,
             declaracao: limpo.declaracao,
           },
@@ -394,6 +427,7 @@ export function RequisicaoForm({
             matricula: limpo.matricula,
             qtdPoligonos: limpo.qtdPoligonos,
             nomesPoligonos: limpo.nomesPoligonos,
+            parcelasPoligonos: limpo.parcelasPoligonos,
             codigoIncra: limpo.codigoIncra,
             declaracao: limpo.declaracao,
           },
@@ -907,6 +941,17 @@ export function RequisicaoForm({
 
           {etapaImovel === "selecao" && sigef && (
             <div>
+              {usaVinculo ? (
+                <PoligonosParcelas
+                  id="cjt-parcelas"
+                  nomes={form.nomesPoligonos}
+                  parcelas={sigef.parcelas}
+                  valores={form.parcelasPoligonos}
+                  onChange={escolherParcelaDoPoligono}
+                  erro={erros.parcelasPoligonos}
+                />
+              ) : (
+                <>
               <p className="text-sm text-gray-600 mb-3">
                 Selecione o imóvel para o qual a certidão será emitida:
               </p>
@@ -973,10 +1018,13 @@ export function RequisicaoForm({
                   )}
                 </figure>
               )}
+                </>
+              )}
               <button
                 type="button"
                 onClick={() => {
                   setSelecionada(null);
+                  setForm((a) => ({ ...a, parcelasPoligonos: [] }));
                   setEtapaImovel("semRegistro");
                 }}
                 className="mt-3 text-xs text-gray-500 underline underline-offset-2"

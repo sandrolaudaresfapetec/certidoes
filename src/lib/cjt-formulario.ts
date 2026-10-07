@@ -81,6 +81,8 @@ export interface FormularioCjt {
   matricula: string;
   qtdPoligonos: string;
   nomesPoligonos: string[];
+  /** Parcela do SIGEF de cada polígono, na mesma ordem dos nomes (gleba com 2 ou mais). */
+  parcelasPoligonos: string[];
   codigoIncra: string;
   declaracao: boolean;
 }
@@ -95,6 +97,7 @@ export function formularioVazio(): FormularioCjt {
     matricula: "",
     qtdPoligonos: "",
     nomesPoligonos: [],
+    parcelasPoligonos: [],
     codigoIncra: "",
     declaracao: false,
   };
@@ -188,7 +191,10 @@ export function limparCamposNaoAplicaveis(form: FormularioCjt): FormularioCjt {
     limpo.matricula = "";
   }
   if (!campos.includes("qtdPoligonos")) limpo.qtdPoligonos = "";
-  if (!campos.includes("nomesPoligonos")) limpo.nomesPoligonos = [];
+  if (!campos.includes("nomesPoligonos")) {
+    limpo.nomesPoligonos = [];
+    limpo.parcelasPoligonos = [];
+  }
   if (!campos.includes("codigoIncra")) limpo.codigoIncra = "";
   return limpo;
 }
@@ -308,7 +314,7 @@ export type ErrosCjt = Partial<Record<keyof FormularioCjt | "combinacao", string
 
 export function validarFormulario(
   form: FormularioCjt,
-  opcoes: { liberado?: boolean } = {}
+  opcoes: { liberado?: boolean; exigirParcelas?: boolean } = {}
 ): ErrosCjt {
   const erros: ErrosCjt = {};
 
@@ -368,6 +374,18 @@ export function validarFormulario(
     }
   }
 
+  // Gleba com 2 ou mais polígonos e imóvel do SIGEF: cada polígono indica a sua parcela (#PEND-34).
+  if (
+    campos.includes("nomesPoligonos") &&
+    opcoes.exigirParcelas &&
+    form.nomesPoligonos.length >= 2 &&
+    !erros.qtdPoligonos &&
+    !erros.nomesPoligonos
+  ) {
+    const erroParcelas = erroParcelasPoligonos(form.parcelasPoligonos, form.nomesPoligonos.length);
+    if (erroParcelas) erros.parcelasPoligonos = erroParcelas;
+  }
+
   if (campos.includes("codigoIncra")) {
     const digitos = somenteDigitos(form.codigoIncra);
     if (digitos.length > 0 && digitos.length !== LIMITE_DIGITOS_INCRA) {
@@ -392,6 +410,7 @@ export interface DadosCjtPersistidos {
   cjtMatricula: string | null;
   cjtQtdPoligonos: number | null;
   cjtNomesPoligonos: string | null;
+  cjtPoligonos: string | null;
   cjtCodigoIncra: string | null;
   cjtDeclaracaoAceita: boolean;
 }
@@ -427,6 +446,9 @@ export function normalizarParaPersistencia(form: FormularioCjt): DadosCjtPersist
     cjtNomesPoligonos: campos.includes("nomesPoligonos")
       ? JSON.stringify(limpo.nomesPoligonos.map((n) => n.trim()))
       : null,
+    cjtPoligonos: campos.includes("nomesPoligonos")
+      ? poligonosJson(limpo.nomesPoligonos, limpo.parcelasPoligonos)
+      : null,
     cjtCodigoIncra:
       campos.includes("codigoIncra") && incra.length === LIMITE_DIGITOS_INCRA ? incra : null,
     cjtDeclaracaoAceita: limpo.declaracao,
@@ -442,6 +464,7 @@ export interface DadosCjtRascunho {
   cjtMatricula: string | null;
   cjtQtdPoligonos: number | null;
   cjtNomesPoligonos: string | null;
+  cjtPoligonos: string | null;
   cjtCodigoIncra: string | null;
   cjtDeclaracaoAceita: boolean;
 }
@@ -479,6 +502,7 @@ export function normalizarRascunho(form: FormularioCjt): DadosCjtRascunho {
         : somenteDigitos(limpo.matricula).slice(0, 30) || null,
     cjtQtdPoligonos: Number.isInteger(qtd) && qtd <= LIMITE_POLIGONOS_RASCUNHO ? qtd : null,
     cjtNomesPoligonos: nomes.some(Boolean) ? JSON.stringify(nomes) : null,
+    cjtPoligonos: poligonosJson(nomes, limpo.parcelasPoligonos.map((p) => p.trim().slice(0, 60))),
     cjtCodigoIncra: somenteDigitos(limpo.codigoIncra).slice(0, LIMITE_DIGITOS_INCRA) || null,
     cjtDeclaracaoAceita: limpo.declaracao,
   };
@@ -504,6 +528,9 @@ export function formularioDoPayload(raw: unknown): FormularioCjt {
         ? String(bruto.qtdPoligonos)
         : texto(bruto.qtdPoligonos),
     nomesPoligonos: nomes,
+    parcelasPoligonos: Array.isArray(bruto.parcelasPoligonos)
+      ? bruto.parcelasPoligonos.map((p) => texto(p))
+      : [],
     codigoIncra: texto(bruto.codigoIncra),
     declaracao: bruto.declaracao === true,
   };
@@ -529,6 +556,62 @@ export function validarRepresentacao(dados: {
   }
   if (nome.length < 2) return { ok: false, erro: "Informe o nome do proprietário representado." };
   return { ok: true, cpf, nome };
+}
+
+/** Polígono nomeado ligado à parcela do SIGEF (gleba com 2 ou mais polígonos). */
+export interface PoligonoVinculado {
+  nome: string;
+  parcelaCodigo: string | null;
+  nomeArea?: string | null;
+  areaHa?: number | null;
+}
+
+/** Todo polígono indica uma parcela, e cada parcela só pode ser usada uma vez. */
+export function erroParcelasPoligonos(parcelas: string[], quantidade: number): string | null {
+  const lista = Array.from({ length: quantidade }, (_, i) => (parcelas[i] ?? "").trim());
+  if (lista.some((p) => !p)) return "Indique a parcela de cada polígono.";
+  if (new Set(lista).size !== lista.length) return "Cada polígono precisa de uma parcela diferente.";
+  return null;
+}
+
+/** Pares nome/parcela em JSON; null quando nenhuma parcela foi indicada. */
+export function poligonosJson(nomes: string[], parcelas: string[]): string | null {
+  const pares: PoligonoVinculado[] = nomes.map((nome, i) => ({
+    nome: nome.trim(),
+    parcelaCodigo: (parcelas[i] ?? "").trim() || null,
+  }));
+  return pares.some((p) => p.parcelaCodigo) ? JSON.stringify(pares) : null;
+}
+
+/**
+ * Polígonos de uma requisição: os pares guardados (`cjtPoligonos`) ou, nas requisições
+ * antigas, só os nomes (`cjtNomesPoligonos`), sem parcela.
+ */
+export function lerPoligonos(
+  cjtPoligonos: string | null | undefined,
+  cjtNomesPoligonos: string | null | undefined
+): PoligonoVinculado[] {
+  const tentar = (json: string | null | undefined): unknown => {
+    if (!json) return null;
+    try {
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  };
+  const pares = tentar(cjtPoligonos);
+  if (Array.isArray(pares)) {
+    return pares
+      .filter((p): p is Record<string, unknown> => typeof p === "object" && p !== null)
+      .map((p) => ({
+        nome: String(p.nome ?? ""),
+        parcelaCodigo: typeof p.parcelaCodigo === "string" ? p.parcelaCodigo : null,
+        nomeArea: typeof p.nomeArea === "string" ? p.nomeArea : null,
+        areaHa: typeof p.areaHa === "number" ? p.areaHa : null,
+      }));
+  }
+  const nomes = tentar(cjtNomesPoligonos);
+  return Array.isArray(nomes) ? nomes.map((n) => ({ nome: String(n), parcelaCodigo: null })) : [];
 }
 
 /** Primeira mensagem de erro da validacao, para resposta HTTP 400. */

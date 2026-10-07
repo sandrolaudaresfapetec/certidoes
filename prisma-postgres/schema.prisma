@@ -74,6 +74,7 @@ model Solicitacao {
   cjtInformaMatricula String?  // SIM | NAO: "Quero informar o numero da matricula?" (usucapiao, 3b/3c)
   cjtQtdPoligonos     Int?
   cjtNomesPoligonos   String?  // JSON array com um nome por poligono
+  cjtPoligonos        String?  // JSON [{nome, parcelaCodigo, nomeArea, areaHa}]: parcela do SIGEF de cada poligono (gleba com 2+)
   cjtCodigoIncra      String?  // 13 algarismos, sem mascara
   cjtDeclaracaoAceita Boolean  @default(false)
 

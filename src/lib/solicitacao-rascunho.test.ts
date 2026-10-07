@@ -17,6 +17,7 @@ describe("normalizarRascunho", () => {
       cjtMatricula: null,
       cjtQtdPoligonos: null,
       cjtNomesPoligonos: null,
+      cjtPoligonos: null,
       cjtCodigoIncra: null,
       cjtDeclaracaoAceita: false,
     });

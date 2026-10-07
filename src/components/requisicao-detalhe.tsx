@@ -12,6 +12,9 @@ import {
 import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
 import { AcompanhamentoRequisicao } from "@/components/requisicao/acompanhamento";
 import { MapaImovel } from "@/components/requisicao/mapa-imovel";
+import { MapaPoligonos } from "@/components/requisicao/mapa-poligonos";
+import { corDoPoligono } from "@/lib/cores-poligonos";
+import type { PoligonoDetalhe } from "@/lib/poligonos-detalhe";
 
 export type RequisicaoDetalhada = Prisma.SolicitacaoGetPayload<{
   include: {
@@ -55,6 +58,7 @@ export function RequisicaoDetalhe({
   editavel = false,
   geometriaImovel = null,
   chat = null,
+  poligonosVinculados = [],
 }: {
   requisicao: RequisicaoDetalhada;
   escopo: "CLIENTE" | "INTERNO";
@@ -62,6 +66,8 @@ export function RequisicaoDetalhe({
   geometriaImovel?: unknown | null;
   /** Cartão do chat (montado pela página, que carrega as mensagens). */
   chat?: React.ReactNode;
+  /** Polígonos nomeados ligados às parcelas do SIGEF (gleba com 2 ou mais); vazio se não houver. */
+  poligonosVinculados?: PoligonoDetalhe[];
 }) {
   const st = statusRequisicao(requisicao.status);
   const poligonos = nomesPoligonos(requisicao.cjtNomesPoligonos);
@@ -188,7 +194,48 @@ export function RequisicaoDetalhe({
       <Bloco
         titulo="Imóvel"
         rodape={
-          requisicao.tipoViaSigef ? (
+          poligonosVinculados.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500">
+                    <th className="py-1 pr-2 font-normal">Polígono</th>
+                    <th className="py-1 pr-2 font-normal">Parcela do SIGEF</th>
+                    <th className="py-1 font-normal">Área</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {poligonosVinculados.map((p, i) => (
+                    <tr key={p.nome} className="border-t border-gray-100 align-top">
+                      <td className="py-1.5 pr-2 text-gray-900 [overflow-wrap:anywhere]">
+                        <span
+                          className="mr-2 inline-block h-3 w-3 rounded-sm border border-gray-400 align-[-1px]"
+                          style={{ background: corDoPoligono(i) }}
+                          aria-hidden="true"
+                        />
+                        {p.nome}
+                      </td>
+                      <td className="py-1.5 pr-2 text-gray-800 [overflow-wrap:anywhere]">
+                        {p.nomeArea ?? "—"}
+                        <span className="block text-xs text-gray-500">{p.parcelaCodigo}</span>
+                      </td>
+                      <td className="py-1.5 text-gray-800 whitespace-nowrap">
+                        {p.areaHa != null ? `${p.areaHa.toLocaleString("pt-BR")} ha` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <MapaPoligonos
+                camadas={poligonosVinculados.map((p, i) => ({
+                  geometria: p.geometria,
+                  rotulo: p.nome,
+                  cor: corDoPoligono(i),
+                }))}
+                descricao={`Polígonos: ${poligonosVinculados.map((p) => p.nome).join(", ")}`}
+              />
+            </div>
+          ) : requisicao.tipoViaSigef ? (
             <div className="mt-4">
               <MapaImovel
                 geometria={geometriaImovel}
@@ -235,7 +282,7 @@ export function RequisicaoDetalhe({
         {requisicao.cjtQtdPoligonos != null && (
           <Item rotulo="Quantidade de polígonos" valor={String(requisicao.cjtQtdPoligonos)} />
         )}
-        {poligonos.length > 0 && (
+        {poligonos.length > 0 && poligonosVinculados.length === 0 && (
           <div>
             <dt className="text-xs text-gray-500">Polígonos</dt>
             <dd>

@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   MATRICULA_USUCAPIAO,
   erroNomenclatura,
+  erroParcelasPoligonos,
   formularioDoPayload,
   formularioVazio,
+  lerPoligonos,
   limparCamposNaoAplicaveis,
   normalizarParaPersistencia,
+  normalizarRascunho,
+  poligonosJson,
   validarFormulario,
   validarRepresentacao,
   type FormularioCjt,
@@ -244,5 +248,77 @@ describe("limite de polígonos liberado pela DDD (#PEND-31)", () => {
   it("liberado ainda exige um nome para cada polígono", () => {
     const f = { ...gleba(14), nomesPoligonos: Array.from({ length: 12 }, (_, i) => `Gleba ${i + 1}`) };
     expect(validarFormulario(f, { liberado: true }).nomesPoligonos).toBeDefined();
+  });
+});
+
+describe("polígonos ligados às parcelas (#PEND-34)", () => {
+  const gleba = (parcelas: string[], nomes = ["Gleba A", "Gleba B"]) =>
+    formulario({
+      qualidade: "1b",
+      resultado: "2b",
+      situacao: "3d",
+      propriedadeDe: "Maria",
+      matricula: "123",
+      qtdPoligonos: String(nomes.length),
+      nomesPoligonos: nomes,
+      parcelasPoligonos: parcelas,
+    });
+
+  it("sem exigir parcelas, o formulário passa como antes", () => {
+    expect(validarFormulario(gleba([]))).toEqual({});
+  });
+
+  it("exigindo parcelas, cada polígono indica uma e elas não se repetem", () => {
+    const opcoes = { exigirParcelas: true };
+    expect(validarFormulario(gleba(["P-1", "P-2"]), opcoes)).toEqual({});
+    expect(validarFormulario(gleba(["P-1", ""]), opcoes).parcelasPoligonos).toContain("Indique");
+    expect(validarFormulario(gleba([]), opcoes).parcelasPoligonos).toBeDefined();
+    expect(validarFormulario(gleba(["P-1", "P-1"]), opcoes).parcelasPoligonos).toContain("diferente");
+  });
+
+  it("um polígono só não exige vínculo", () => {
+    expect(validarFormulario(gleba([], ["Gleba A"]), { exigirParcelas: true })).toEqual({});
+  });
+
+  it("erroParcelasPoligonos confere a quantidade pedida", () => {
+    expect(erroParcelasPoligonos(["a", "b"], 2)).toBeNull();
+    expect(erroParcelasPoligonos(["a"], 2)).toBeDefined();
+  });
+
+  it("guarda os pares nome/parcela e lê de volta", () => {
+    const dados = normalizarParaPersistencia(gleba(["P-1", "P-2"]));
+    expect(JSON.parse(dados.cjtPoligonos!)).toEqual([
+      { nome: "Gleba A", parcelaCodigo: "P-1" },
+      { nome: "Gleba B", parcelaCodigo: "P-2" },
+    ]);
+    expect(lerPoligonos(dados.cjtPoligonos, dados.cjtNomesPoligonos).map((p) => p.parcelaCodigo)).toEqual(["P-1", "P-2"]);
+  });
+
+  it("sem parcela indicada não guarda vínculo; requisição antiga cai nos nomes", () => {
+    expect(poligonosJson(["A", "B"], [])).toBeNull();
+    expect(normalizarParaPersistencia(gleba([])).cjtPoligonos).toBeNull();
+    expect(lerPoligonos(null, '["Gleba A","Gleba B"]')).toEqual([
+      { nome: "Gleba A", parcelaCodigo: null },
+      { nome: "Gleba B", parcelaCodigo: null },
+    ]);
+    expect(lerPoligonos(null, null)).toEqual([]);
+  });
+
+  it("fora de Gleba o vínculo é descartado", () => {
+    const f = { ...gleba(["P-1", "P-2"]), resultado: "2a" as const };
+    expect(normalizarParaPersistencia(f).cjtPoligonos).toBeNull();
+  });
+
+  it("o rascunho guarda o vínculo parcial", () => {
+    const r = normalizarRascunho(gleba(["P-1", ""]));
+    expect(JSON.parse(r.cjtPoligonos!)).toEqual([
+      { nome: "Gleba A", parcelaCodigo: "P-1" },
+      { nome: "Gleba B", parcelaCodigo: null },
+    ]);
+  });
+
+  it("lê as parcelas do corpo da requisição", () => {
+    expect(formularioDoPayload({ parcelasPoligonos: ["P-1", 7, "P-3"] }).parcelasPoligonos).toEqual(["P-1", "", "P-3"]);
+    expect(formularioDoPayload({}).parcelasPoligonos).toEqual([]);
   });
 });

@@ -54,7 +54,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-31 | Solicitação com 13+ polígonos: congelar e liberar pela DDD | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-32 | Nível de complexidade 1–9 (hoje são 4 classes) | backend | adição | média | aberta |
 | #PEND-33 | SIGEF no portal: CPF/CNPJ do representado, parcelas e geometria | backend | adição | média | aberta |
-| #PEND-34 | Persistir vínculo polígono nomeado ↔ parcela SIGEF | backend | adição | média | aberta |
+| #PEND-34 | Persistir vínculo polígono nomeado ↔ parcela SIGEF | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-35 | Matrícula "Usucapião" na validação e na persistência | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-36 | Nomenclatura de polígonos e S/M–S/E validadas no servidor | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-37 | Decisão: o que é "incluir e-mail para finalizar o cadastro (ou SMS)" | negócio | decisão | média | aberta |
@@ -65,7 +65,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-42 | Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-43 | Salvar rascunho e continuar requisição no formulário e em Minhas Requisições | frontend | adição | média | resolvida (2026-10-07) |
 | #PEND-44 | Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1 | backend | segurança | média | resolvida (2026-10-07) |
-| #PEND-45 | Associar cada polígono nomeado ao polígono do mapa (UI) | frontend | adição | média | bloqueada (#PEND-34) |
+| #PEND-45 | Associar cada polígono nomeado ao polígono do mapa (UI) | frontend | adição | média | resolvida (2026-10-07) |
 | #PEND-46 | Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio | backend | bugfix | baixa | descartada (obsoleta: CAR removido em `f34b945`) |
 | #PEND-47 | Layout raiz: `main` sem `min-w-0` deixa conteúdo largo esticar a página no celular | frontend | melhoria | baixa | aberta |
 | #PEND-48 | `PATCH /api/processes/[id]` não valida tipos nem data vazia (devolve 500) | backend | bugfix | média | aberta |
@@ -353,6 +353,7 @@ Documento (§2 e §5): o representante informa o CPF ou CNPJ de quem representa 
 
 Documento (§5): o cliente "precisa indicar quem é quem", isto é, qual polígono do SIGEF corresponde a cada gleba/polígono nomeado, unificando contagem e nomes com a tela do imóvel. O modelo não relaciona nome e parcela, e a API aceita uma só parcela. Precisa persistir a associação (nome ↔ código da parcela) e aceitar várias parcelas.
 **Impacto no frontend:** UI de associação no bloco do imóvel (#PEND-45). A Fase 6 já mostra o mapa do imóvel e, ao lado, a lista dos nomes informados; falta só a associação.
+**Resolução:** Fase 6 do plano de atendimento CJT, branch `feat/portal-correcoes-cjt` (2026-10-07). Coluna `Solicitacao.cjtPoligonos` (JSON `[{nome, parcelaCodigo, nomeArea, areaHa}]`) nos dois schemas, migration `20261007160000_cjt_poligonos_parcelas`. Em gleba com 2 ou mais polígonos e imóvel do SIGEF, cada polígono indica uma parcela (`validarFormulario(form, { exigirParcelas })`). O servidor (`src/lib/poligonos-parcelas.ts`, `poligonos-parcelas-servidor.ts`) confere o vínculo contra a consulta ao SIGEF do CPF do solicitante: recusa parcela fora da consulta, repetida, ou imóvel principal diferente da parcela do primeiro polígono, e grava nome e área vindos da consulta. O rascunho guarda o vínculo parcial. Limite: o contorno só aparece quando o acervo local tem a geometria da parcela.
 
 ### #PEND-35 · Matrícula "Usucapião" na validação e na persistência
 
@@ -454,6 +455,7 @@ Precisa: validar CPF (checksum) ou CNPJ (checksum); exigir os dados de represent
 
 Item 16 do documento: "mostrar de alguma maneira um indicativo de quem é cada Gleba… o cliente precisa indicar quem é quem". A Fase 6 mostra o contorno do imóvel (`MapaImovel`) e a lista de nomes (Pergunta 4), com o aviso de que a equipe do IGC relaciona nome e polígono. Falta a interface em que o solicitante marca no mapa qual polígono é cada nome (numerar as partes do contorno e escolher o nome de cada uma). Só vale fazer depois que o backend gravar o vínculo.
 **Depende de:** #PEND-34 (persistência do vínculo e de várias parcelas); #PEND-33 (geometria por parcela em todos os modos).
+**Resolução:** Fase 6 do plano de atendimento CJT (2026-10-07). Formulário: seletor de parcela por polígono (`poligonos-parcelas.tsx`), parcela já usada desabilitada, mapa com cor e nome de cada polígono (`mapa-poligonos.tsx`, cores em `src/lib/cores-poligonos.ts`). Detalhe da requisição (portal e atendimento): tabela polígono → parcela → área e mapa com todos os contornos (`carregarPoligonosDetalhe`).
 
 ### #PEND-46 · Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio
 

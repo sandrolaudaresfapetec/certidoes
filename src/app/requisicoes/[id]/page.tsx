@@ -20,6 +20,7 @@ import {
 } from "@/lib/solicitacao-estados";
 import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
 import { ChatSolicitacao } from "@/components/requisicao/chat";
+import { carregarPoligonosDetalhe } from "@/lib/poligonos-detalhe";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,9 @@ export default async function VisualizarRequisicaoPage({
 
   const atendimento = podeAtender(usuario);
 
+  // Polígonos nomeados ligados às parcelas do SIGEF (gleba com 2 ou mais).
+  const poligonosVinculados = await carregarPoligonosDetalhe(requisicao);
+
   // Chat só para o atendimento (ADMIN e SDTC); abrir a tela conta como leitura.
   const chatDisponivel = atendimento && chatVisivel(requisicao.status, requisicao.congeladaEm);
   const mensagens = chatDisponivel ? await listarMensagens(requisicao.id) : [];
@@ -75,6 +79,7 @@ export default async function VisualizarRequisicaoPage({
         requisicao={requisicao}
         escopo="INTERNO"
         geometriaImovel={geometriaImovel}
+        poligonosVinculados={poligonosVinculados}
         chat={
           chatDisponivel ? (
             <ChatSolicitacao

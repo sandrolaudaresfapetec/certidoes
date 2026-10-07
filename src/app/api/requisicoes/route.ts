@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirAtendimentoApi } from "@/lib/auth";
 import { criarComProtocolo } from "@/lib/protocolo";
+import { resolverPoligonos } from "@/lib/poligonos-parcelas-servidor";
 import {
   formularioDoPayload,
   normalizarParaPersistencia,
@@ -36,11 +37,20 @@ export async function POST(request: NextRequest) {
 
   const formulario = formularioDoPayload(body.cjt);
   // O atendimento é a própria DDD: não tem o limite de 12 polígonos (#PEND-31).
-  const erroCjt = primeiroErro(validarFormulario(formulario, { liberado: true }));
+  const erroCjt = primeiroErro(validarFormulario(formulario, { liberado: true, exigirParcelas: tipoViaSigef }));
   if (erroCjt) {
     return NextResponse.json({ error: erroCjt }, { status: 400 });
   }
   const cjt = normalizarParaPersistencia(formulario);
+
+  // Gleba com 2+ polígonos: cada polígono liga a uma parcela do SIGEF do solicitante (#PEND-34).
+  const vinculo = await resolverPoligonos({
+    cpf: solicitante.cpf,
+    formulario,
+    tipoViaSigef,
+    parcelaPrincipal: body.sigefParcelaCodigo,
+  });
+  if (!vinculo.ok) return NextResponse.json({ error: vinculo.erro }, { status: 400 });
 
   // Representante informa CPF/CNPJ válido e nome de quem representa (#PEND-44).
   const representacao = validarRepresentacao({
@@ -75,6 +85,7 @@ export async function POST(request: NextRequest) {
       origem: "ATENDIMENTO",
       abertaPorUserId: sessao.usuario.id,
       ...cjt,
+      cjtPoligonos: vinculo.cjtPoligonos,
     },
     })
   );

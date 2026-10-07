@@ -8,6 +8,7 @@ import { geometriaDoAcervo } from "@/components/requisicao/geometria";
 import { clientePodeEditar } from "@/lib/solicitacao-estados";
 import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
 import { ChatSolicitacao } from "@/components/requisicao/chat";
+import { carregarPoligonosDetalhe } from "@/lib/poligonos-detalhe";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,9 @@ export default async function AcompanharRequisicaoPage({
   // O cliente só altera a requisição depois que a equipe a devolve.
   const editavel = clientePodeEditar(requisicao);
 
+  // Polígonos nomeados ligados às parcelas do SIGEF (gleba com 2 ou mais).
+  const poligonosVinculados = await carregarPoligonosDetalhe(requisicao);
+
   // Chat: abrir a tela conta como leitura (some o selo "novas" da lista).
   const chatDisponivel = chatVisivel(requisicao.status, requisicao.congeladaEm);
   const mensagens = chatDisponivel ? await listarMensagens(requisicao.id) : [];
@@ -67,6 +71,7 @@ export default async function AcompanharRequisicaoPage({
       <RequisicaoDetalhe requisicao={requisicao} escopo="CLIENTE"
         editavel={editavel}
         geometriaImovel={geometriaImovel}
+        poligonosVinculados={poligonosVinculados}
         chat={
           chatDisponivel ? (
             <ChatSolicitacao

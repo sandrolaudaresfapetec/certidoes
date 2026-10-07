@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { exigirSolicitanteApi } from "@/lib/portal-auth";
 import { criarComProtocolo } from "@/lib/protocolo";
 import { dadosDoRascunho } from "@/lib/solicitacao-rascunho";
+import { resolverPoligonos } from "@/lib/poligonos-parcelas-servidor";
 import { STATUS_SOLICITACAO } from "@/lib/solicitacao-estados";
 import {
   formularioDoPayload,
@@ -73,11 +74,20 @@ export async function POST(request: NextRequest) {
   // O formulario CJT e revalidado no servidor: campos fora da combinacao
   // ativa sao descartados antes de persistir (Especificacao Funcional v1.0).
   const formulario = formularioDoPayload(body.cjt);
-  const erroCjt = primeiroErro(validarFormulario(formulario));
+  const erroCjt = primeiroErro(validarFormulario(formulario, { exigirParcelas: tipoViaSigef }));
   if (erroCjt) {
     return NextResponse.json({ error: erroCjt }, { status: 400 });
   }
   const cjt = normalizarParaPersistencia(formulario);
+
+  // Gleba com 2+ polígonos: cada polígono liga a uma parcela do SIGEF do solicitante (#PEND-34).
+  const vinculo = await resolverPoligonos({
+    cpf: solicitante.cpf,
+    formulario,
+    tipoViaSigef,
+    parcelaPrincipal: body.sigefParcelaCodigo,
+  });
+  if (!vinculo.ok) return NextResponse.json({ error: vinculo.erro }, { status: 400 });
 
   // Representante informa CPF/CNPJ válido e nome de quem representa (#PEND-44).
   const representacao = validarRepresentacao({
@@ -112,6 +122,7 @@ export async function POST(request: NextRequest) {
       observacao: (body.observacao ?? "").toString() || null,
       solicitanteId: solicitante.id,
       ...cjt,
+      cjtPoligonos: vinculo.cjtPoligonos,
     },
     })
   );
