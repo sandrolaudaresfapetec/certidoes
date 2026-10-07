@@ -80,6 +80,7 @@ export default async function EditarRequisicaoPage({
             resultado: requisicao.cjtResultado,
             situacao: requisicao.cjtSituacao,
             propriedadeDe: requisicao.cjtPropriedadeDe,
+            informaMatricula: requisicao.cjtInformaMatricula,
             matricula: requisicao.cjtMatricula,
             qtdPoligonos: requisicao.cjtQtdPoligonos,
             nomesPoligonos: nomes,

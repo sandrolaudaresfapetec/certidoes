@@ -8,6 +8,8 @@
  * sao persistidos nem transmitidos).
  */
 
+import { validarCpfOuCnpj } from "./cpf";
+
 export const QUALIDADE_OPCOES = [
   { codigo: "1a", label: "Representante", bloqueia: false },
   { codigo: "1b", label: "Proprietário", bloqueia: false },
@@ -29,6 +31,13 @@ export const SITUACAO_OPCOES = [
   { codigo: "3e", label: "Não sei", bloqueia: true },
 ] as const;
 
+/** Pergunta 3.1 (usucapião): "Quero informar o número da matrícula?". */
+export const INFORMA_MATRICULA_OPCOES = [
+  { codigo: "SIM", label: "Sim", bloqueia: false },
+  { codigo: "NAO", label: "Não", bloqueia: false },
+  { codigo: "NAO_SEI", label: "Não sei", bloqueia: true },
+] as const;
+
 export type QualidadeCodigo = (typeof QUALIDADE_OPCOES)[number]["codigo"];
 export type ResultadoCodigo = (typeof RESULTADO_OPCOES)[number]["codigo"];
 export type SituacaoCodigo = (typeof SITUACAO_OPCOES)[number]["codigo"];
@@ -40,8 +49,21 @@ export const MENSAGEM_NAO_SEI =
 export const LIMITE_NOME_POLIGONO = 15;
 export const ALERTA_QTD_POLIGONOS = 6;
 
+/**
+ * Acima disso o pedido não segue o fluxo normal: fica congelado até a DDD liberar (#PEND-31).
+ * Enquanto o congelamento não existe, o servidor recusa o envio.
+ */
+export const LIMITE_POLIGONOS_ENVIO = 12;
+
+/** Valor gravado em `cjtMatricula` quando o solicitante não tem o número (usucapião). */
+export const MATRICULA_USUCAPIAO = "Usucapião";
+
+/** Resposta de "Quero informar o número da matrícula?" (usucapião, situações 3b e 3c). */
+export type InformaMatricula = "SIM" | "NAO" | "NAO_SEI";
+
 export type CampoCjt =
   | "propriedadeDe"
+  | "informaMatricula"
   | "matricula"
   | "qtdPoligonos"
   | "nomesPoligonos"
@@ -52,6 +74,7 @@ export interface FormularioCjt {
   resultado: ResultadoCodigo | "";
   situacao: SituacaoCodigo | "";
   propriedadeDe: string;
+  informaMatricula: InformaMatricula | "";
   matricula: string;
   qtdPoligonos: string;
   nomesPoligonos: string[];
@@ -65,6 +88,7 @@ export function formularioVazio(): FormularioCjt {
     resultado: "",
     situacao: "",
     propriedadeDe: "",
+    informaMatricula: "",
     matricula: "",
     qtdPoligonos: "",
     nomesPoligonos: [],
@@ -81,12 +105,39 @@ const SITUACOES_ESPOLIO: SituacaoCodigo[] = ["3a", "3c"];
 
 export const PREFIXO_ESPOLIO = "Espólio de";
 
+/** Situações de usucapião (3b e 3c): abrem a pergunta "Quero informar o número da matrícula?". */
+const SITUACOES_USUCAPIAO: SituacaoCodigo[] = ["3b", "3c"];
+
+/**
+ * A pergunta da matrícula só existe onde o campo Matrícula existe (resultado por Matrícula
+ * ou Gleba) e a situação é de usucapião.
+ */
+export function perguntaMatriculaAplicavel(
+  resultado: ResultadoCodigo | "",
+  situacao: SituacaoCodigo | ""
+): boolean {
+  return (
+    (resultado === "2a" || resultado === "2b") &&
+    SITUACOES_USUCAPIAO.includes(situacao as SituacaoCodigo)
+  );
+}
+
 export function bloqueiaAvanco(form: FormularioCjt): boolean {
-  return form.qualidade === "1c" || form.resultado === "2d" || form.situacao === "3e";
+  return (
+    form.qualidade === "1c" ||
+    form.resultado === "2d" ||
+    form.situacao === "3e" ||
+    (perguntaMatriculaAplicavel(form.resultado, form.situacao) &&
+      form.informaMatricula === "NAO_SEI")
+  );
 }
 
 export function combinacaoDefinida(form: FormularioCjt): boolean {
-  return Boolean(form.qualidade && form.resultado && form.situacao) && !bloqueiaAvanco(form);
+  return (
+    Boolean(form.qualidade && form.resultado && form.situacao) &&
+    !bloqueiaAvanco(form) &&
+    (!perguntaMatriculaAplicavel(form.resultado, form.situacao) || Boolean(form.informaMatricula))
+  );
 }
 
 export function exigeEspolio(situacao: SituacaoCodigo | ""): boolean {
@@ -107,6 +158,9 @@ export function camposAplicaveis(
   if (SITUACOES_COM_PROPRIETARIO.includes(situacao as SituacaoCodigo)) {
     campos.push("propriedadeDe");
   }
+  if (perguntaMatriculaAplicavel(resultado, situacao)) {
+    campos.push("informaMatricula");
+  }
   if (resultado === "2a" || resultado === "2b") {
     campos.push("matricula");
   }
@@ -122,7 +176,14 @@ export function limparCamposNaoAplicaveis(form: FormularioCjt): FormularioCjt {
   const campos = camposAplicaveis(form.resultado, form.situacao);
   const limpo: FormularioCjt = { ...form };
   if (!campos.includes("propriedadeDe")) limpo.propriedadeDe = "";
+  if (!campos.includes("informaMatricula")) limpo.informaMatricula = "";
   if (!campos.includes("matricula")) limpo.matricula = "";
+  // "Não" preenche a matrícula com a palavra Usucapião; o literal só vale nesse ramo.
+  if (limpo.informaMatricula === "NAO" && campos.includes("matricula")) {
+    limpo.matricula = MATRICULA_USUCAPIAO;
+  } else if (limpo.matricula === MATRICULA_USUCAPIAO) {
+    limpo.matricula = "";
+  }
   if (!campos.includes("qtdPoligonos")) limpo.qtdPoligonos = "";
   if (!campos.includes("nomesPoligonos")) limpo.nomesPoligonos = [];
   if (!campos.includes("codigoIncra")) limpo.codigoIncra = "";
@@ -194,6 +255,52 @@ export function ajustarNomesPoligonos(nomes: string[], quantidade: number): stri
   return ajustado;
 }
 
+/** Tipos de nome de polígono; "" = apenas o complemento (documento do cliente, item 8). */
+export type TipoNomePoligono = "Gleba" | "Parte" | "Parcela" | "";
+
+export const LIMITE_COMPLEMENTO = 3;
+const PADRAO_COMPLEMENTO = /^[A-Za-z0-9-]{1,3}$/;
+
+/** Separa "Gleba A-1" em tipo e complemento; null quando o nome foge do padrão. */
+export function separarNome(nome: string): { tipo: TipoNomePoligono; complemento: string } | null {
+  const comTipo = /^(Gleba|Parte|Parcela) (\S+)$/.exec(nome);
+  if (comTipo && PADRAO_COMPLEMENTO.test(comTipo[2])) {
+    return { tipo: comTipo[1] as TipoNomePoligono, complemento: comTipo[2] };
+  }
+  return PADRAO_COMPLEMENTO.test(nome) ? { tipo: "", complemento: nome } : null;
+}
+
+/** Nomes que aparecem mais de uma vez (sem diferenciar maiúsculas). */
+export function nomesRepetidos(nomes: string[]): Set<string> {
+  const vistos = new Set<string>();
+  const repetidos = new Set<string>();
+  for (const n of nomes) {
+    const chave = n.trim().toLowerCase();
+    if (!chave) continue;
+    if (vistos.has(chave)) repetidos.add(chave);
+    vistos.add(chave);
+  }
+  return repetidos;
+}
+
+/**
+ * Valida a nomenclatura fechada dos polígonos (tipo + complemento de até 3 caracteres).
+ * Vale na tela e no servidor (#PEND-36).
+ */
+export function erroNomenclatura(nomes: string[]): string | null {
+  const partes = nomes.map((n) => separarNome(n.trim()));
+  if (partes.some((p) => p === null)) {
+    return `Informe o complemento de cada polígono: até ${LIMITE_COMPLEMENTO} caracteres, com letras sem acento, números ou “-”.`;
+  }
+  if (new Set(partes.map((p) => p!.tipo)).size > 1) {
+    return "Use o mesmo tipo de nome em todos os polígonos.";
+  }
+  if (nomesRepetidos(nomes).size > 0) {
+    return "Não repita nomes de polígono na mesma solicitação.";
+  }
+  return null;
+}
+
 export type ErrosCjt = Partial<Record<keyof FormularioCjt | "combinacao", string>>;
 
 export function validarFormulario(form: FormularioCjt): ErrosCjt {
@@ -205,7 +312,13 @@ export function validarFormulario(form: FormularioCjt): ErrosCjt {
   if (bloqueiaAvanco(form)) erros.combinacao = MENSAGEM_NAO_SEI;
   if (Object.keys(erros).length > 0) return erros;
 
+  // O servidor deriva o que a combinação ativa define (ex.: matrícula "Usucapião" no ramo Não).
+  form = limparCamposNaoAplicaveis(form);
   const campos = camposAplicaveis(form.resultado, form.situacao);
+
+  if (campos.includes("informaMatricula") && !form.informaMatricula) {
+    erros.informaMatricula = "Selecione uma opção.";
+  }
 
   if (campos.includes("propriedadeDe")) {
     const nome = form.propriedadeDe.trim();
@@ -216,9 +329,13 @@ export function validarFormulario(form: FormularioCjt): ErrosCjt {
     }
   }
 
-  if (campos.includes("matricula")) {
-    const digitos = somenteDigitos(form.matricula);
-    if (!digitos) erros.matricula = "Informe o número da matrícula (somente algarismos).";
+  if (campos.includes("matricula") && form.informaMatricula !== "NAO") {
+    const matricula = form.matricula.trim();
+    if (!matricula) {
+      erros.matricula = "Informe o número da matrícula (somente algarismos).";
+    } else if (!/^\d+$/.test(matricula)) {
+      erros.matricula = "A matrícula deve ter somente algarismos.";
+    }
   }
 
   if (campos.includes("qtdPoligonos")) {
@@ -227,14 +344,18 @@ export function validarFormulario(form: FormularioCjt): ErrosCjt {
     } else {
       const qtd = parseInt(form.qtdPoligonos, 10);
       const nomes = form.nomesPoligonos.map((n) => n.trim());
-      if (nomes.length !== qtd) {
+      if (qtd > LIMITE_POLIGONOS_ENVIO) {
+        erros.qtdPoligonos =
+          "Pedidos com 13 ou mais polígonos exigem análise da DDD e ainda não podem ser enviados por aqui. Fale com o atendimento do IGC para seguir.";
+      } else if (nomes.length !== qtd) {
         erros.nomesPoligonos = "Informe um nome para cada polígono.";
       } else if (nomes.some((n) => !n)) {
         erros.nomesPoligonos = "Nenhum nome de gleba/polígono pode ficar vazio.";
       } else if (nomes.some((n) => n.length > LIMITE_NOME_POLIGONO)) {
         erros.nomesPoligonos = `Cada nome deve ter até ${LIMITE_NOME_POLIGONO} caracteres.`;
-      } else if (new Set(nomes.map((n) => n.toLowerCase())).size !== nomes.length) {
-        erros.nomesPoligonos = "Não repita nomes de gleba/polígono na mesma solicitação.";
+      } else {
+        const erroNomes = erroNomenclatura(nomes);
+        if (erroNomes) erros.nomesPoligonos = erroNomes;
       }
     }
   }
@@ -259,6 +380,7 @@ export interface DadosCjtPersistidos {
   cjtResultado: string;
   cjtSituacao: string;
   cjtPropriedadeDe: string | null;
+  cjtInformaMatricula: string | null;
   cjtMatricula: string | null;
   cjtQtdPoligonos: number | null;
   cjtNomesPoligonos: string | null;
@@ -283,7 +405,16 @@ export function normalizarParaPersistencia(form: FormularioCjt): DadosCjtPersist
     cjtPropriedadeDe: campos.includes("propriedadeDe")
       ? limpo.propriedadeDe.trim() || null
       : null,
-    cjtMatricula: campos.includes("matricula") ? somenteDigitos(limpo.matricula) || null : null,
+    cjtInformaMatricula:
+      campos.includes("informaMatricula") &&
+      (limpo.informaMatricula === "SIM" || limpo.informaMatricula === "NAO")
+        ? limpo.informaMatricula
+        : null,
+    cjtMatricula: !campos.includes("matricula")
+      ? null
+      : limpo.informaMatricula === "NAO"
+        ? MATRICULA_USUCAPIAO
+        : somenteDigitos(limpo.matricula) || null,
     cjtQtdPoligonos: campos.includes("qtdPoligonos") && Number.isInteger(qtd) ? qtd : null,
     cjtNomesPoligonos: campos.includes("nomesPoligonos")
       ? JSON.stringify(limpo.nomesPoligonos.map((n) => n.trim()))
@@ -307,6 +438,7 @@ export function formularioDoPayload(raw: unknown): FormularioCjt {
     resultado: texto(bruto.resultado) as FormularioCjt["resultado"],
     situacao: texto(bruto.situacao) as FormularioCjt["situacao"],
     propriedadeDe: texto(bruto.propriedadeDe),
+    informaMatricula: texto(bruto.informaMatricula) as FormularioCjt["informaMatricula"],
     matricula: texto(bruto.matricula),
     qtdPoligonos:
       typeof bruto.qtdPoligonos === "number"
@@ -316,6 +448,28 @@ export function formularioDoPayload(raw: unknown): FormularioCjt {
     codigoIncra: texto(bruto.codigoIncra),
     declaracao: bruto.declaracao === true,
   };
+}
+
+/**
+ * Representação (#PEND-44): quem escolhe "Representante" na Pergunta 1 informa o CPF ou CNPJ
+ * (com dígitos verificadores válidos) e o nome de quem representa. Quem é proprietário não
+ * representa ninguém: os dados de representação, se vierem, são descartados.
+ */
+export function validarRepresentacao(dados: {
+  qualidade: string;
+  emNomeDeCpf: unknown;
+  emNomeDeNome: unknown;
+}): { ok: true; cpf: string | null; nome: string | null } | { ok: false; erro: string } {
+  if (dados.qualidade !== "1a") return { ok: true, cpf: null, nome: null };
+
+  const cpf = typeof dados.emNomeDeCpf === "string" ? somenteDigitos(dados.emNomeDeCpf) : "";
+  const nome = typeof dados.emNomeDeNome === "string" ? dados.emNomeDeNome.trim() : "";
+  if (!cpf) return { ok: false, erro: "Informe o CPF ou CNPJ do proprietário representado." };
+  if (!validarCpfOuCnpj(cpf)) {
+    return { ok: false, erro: "O CPF ou CNPJ do proprietário representado é inválido." };
+  }
+  if (nome.length < 2) return { ok: false, erro: "Informe o nome do proprietário representado." };
+  return { ok: true, cpf, nome };
 }
 
 /** Primeira mensagem de erro da validacao, para resposta HTTP 400. */

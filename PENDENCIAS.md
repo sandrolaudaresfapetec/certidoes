@@ -55,8 +55,8 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-32 | Nível de complexidade 1–9 (hoje são 4 classes) | backend | adição | média | aberta |
 | #PEND-33 | SIGEF no portal: CPF/CNPJ do representado, parcelas e geometria | backend | adição | média | aberta |
 | #PEND-34 | Persistir vínculo polígono nomeado ↔ parcela SIGEF | backend | adição | média | aberta |
-| #PEND-35 | Matrícula "Usucapião" na validação e na persistência | backend | adição | média | aberta |
-| #PEND-36 | Nomenclatura de polígonos e S/M–S/E validadas no servidor | backend | adição | média | aberta |
+| #PEND-35 | Matrícula "Usucapião" na validação e na persistência | backend | adição | média | resolvida (2026-10-07) |
+| #PEND-36 | Nomenclatura de polígonos e S/M–S/E validadas no servidor | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-37 | Decisão: o que é "incluir e-mail para finalizar o cadastro (ou SMS)" | negócio | decisão | média | aberta |
 | #PEND-38 | Decisão: cartela de cores e logos do IGC | negócio | decisão | média | aberta |
 | #PEND-39 | Decisão: dúvidas do documento de correções de 2026-09-16 | negócio | decisão | média | aberta |
@@ -64,7 +64,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-41 | Máscaras de entrada nos formulários (telefone, CPF, CNPJ etc.) | frontend | adição | média | resolvida (2026-10-07) |
 | #PEND-42 | Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar | backend | adição | média | aberta |
 | #PEND-43 | Salvar rascunho e continuar requisição no formulário e em Minhas Requisições | frontend | adição | média | bloqueada (#PEND-42) |
-| #PEND-44 | Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1 | backend | segurança | média | aberta |
+| #PEND-44 | Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1 | backend | segurança | média | resolvida (2026-10-07) |
 | #PEND-45 | Associar cada polígono nomeado ao polígono do mapa (UI) | frontend | adição | média | bloqueada (#PEND-34) |
 | #PEND-46 | Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio | backend | bugfix | baixa | descartada (obsoleta: CAR removido em `f34b945`) |
 | #PEND-47 | Layout raiz: `main` sem `min-w-0` deixa conteúdo largo esticar a página no celular | frontend | melhoria | baixa | aberta |
@@ -164,6 +164,7 @@ A spec (§4) proíbe nomes de município ou matrícula; hoje isso é só dica de
 
 A matriz exige número; o material operacional orienta escrever "usucapião" no campo. O sistema segue a matriz. Se o IGC aceitar a literal, mudam a validação, a coluna e a exibição na certidão.
 **Resolução:** decidido no documento de correções de 2026-09-16 (Nova Requisição §2): nos casos Usucapião e Espólio com usucapião, pergunta "Quero informar o número da matrícula?" — Sim: fluxo normal; Não: o campo Matrícula é preenchido com "Usucapião", visível e travado; Não sei: interrompe. Implementação: #PEND-35 (backend) e o ramo na tela (frontend).
+**Implementação (2026-10-07):** feita na Fase 3 do plano de atendimento CJT, ver #PEND-35.
 
 ### #PEND-12 · Decisão: INCRA/SNCR — campo vazio ou opção "Não se aplica"?
 
@@ -359,6 +360,7 @@ Documento (§5): o cliente "precisa indicar quem é quem", isto é, qual polígo
 
 Decisão do cliente (#PEND-11): "Quero informar o número da matrícula?" — Não preenche "Usucapião" no campo. Hoje a validação exige algarismos e a normalização descarta letras, então a literal seria recusada ou zerada. Precisa aceitar "Usucapião" quando a resposta for Não (casos 2a/2b com situação 3b/3c) e, de preferência, persistir a resposta em campo próprio.
 **Impacto no frontend:** o ramo na tela (pergunta, campo travado) só pode ser integrado depois disto.
+**Resolução:** Fase 3 do plano de atendimento CJT, branch `feat/portal-correcoes-cjt` (2026-10-07). Coluna `Solicitacao.cjtInformaMatricula` (SIM | NAO) nos dois schemas, migration `20261007140000_cjt_informa_matricula`. Em `src/lib/cjt-formulario.ts`: pergunta 3.1 "Quero informar o número da matrícula?" nos casos 3b/3c com resultado Matrícula ou Gleba (`perguntaMatriculaAplicavel`); "Não" grava a matrícula como `Usucapião` (`MATRICULA_USUCAPIAO`) e o literal só vale nesse ramo; "Não sei" interrompe; a matrícula passou a recusar letras no servidor em vez de descartá-las. Tela: pergunta 3.1 e campo Matrícula travado (`requisicao-form.tsx`); a edição hidrata a resposta.
 
 ### #PEND-36 · Nomenclatura de polígonos e S/M–S/E validadas no servidor
 
@@ -367,6 +369,7 @@ Decisão do cliente (#PEND-11): "Quero informar o número da matrícula?" — N�
 
 Documento (§3–4): o nome do polígono segue um padrão fechado — Gleba, Parte ou Parcela (ou só o complemento) mais um complemento de até 3 caracteres entre letras sem "ç", números e "-" — e "Propriedade de" não pode ter "S/M" nem "S/E" ("e sua mulher", "e seu esposo"). O servidor valida só 1–15 caracteres e unicidade. A tela vai impor o padrão, mas a API precisa validar também (um cliente adulterado contorna a tela).
 **Estado na tela (Fase 5):** o padrão é imposto em `src/components/requisicao/nomes-poligonos.tsx` (tipo único por pedido, complemento de 1 a 3 caracteres `[A-Za-z0-9-]`, sem repetição). Em "Propriedade de" só há a explicação sobre "S/M" e "S/E"; a recusa por texto ficou de fora de propósito (erra com nomes legítimos) e, se o cliente quiser, deve ser feita no servidor. Substitui #PEND-10 e dispensa #PEND-13.
+**Resolução:** Fase 3 do plano de atendimento CJT (2026-10-07). `separarNome`, `erroNomenclatura`, `nomesRepetidos` e `LIMITE_COMPLEMENTO` foram para `src/lib/cjt-formulario.ts` (o componente `nomes-poligonos.tsx` os reexporta) e `validarFormulario` aplica a nomenclatura fechada (tipo único + complemento de até 3 caracteres) no servidor; a tela usa a mesma função. Também: 13 ou mais polígonos são recusados no envio normal (`LIMITE_POLIGONOS_ENVIO = 12`, a fila de liberação é a #PEND-31) e a tela não gera mais de 12 campos de nome.
 
 ### #PEND-37 · Decisão: o que é "incluir e-mail para finalizar o cadastro (ou SMS)"
 
@@ -440,6 +443,7 @@ Botão "Salvar rascunho" em `RequisicaoForm` (portal) e, em Minhas Requisições
 Hoje a rota só tira os não-dígitos de `emNomeDeCpf` e exige o nome quando há documento. Não confere o tamanho (11 ou 14 algarismos) nem o dígito verificador, aceita CNPJ numa coluna chamada "Cpf", e não cruza com a Pergunta 1: dá para enviar `qualidade` "Proprietário" com representado, ou "Representante" sem nenhum. O portal passou a exigir CPF/CNPJ completo e nome quando a resposta é "Representante" (Fase 4), mas isso é só usabilidade.
 Precisa: validar CPF (checksum) ou CNPJ (checksum); exigir os dados de representação e a procuração quando `qualidade` for "1a" e descartá-los nas demais; avaliar renomear a coluna (ex.: `representadoDocumento`).
 **Impacto no frontend:** a exibição já formata CPF ou CNPJ conforme o tamanho (`mascaraCpfCnpj`); nada a mudar quando o servidor passar a validar além de mostrar o erro devolvido.
+**Resolução:** Fase 3 do plano de atendimento CJT (2026-10-07). `validarRepresentacao` em `src/lib/cjt-formulario.ts` (com `validarCNPJ` e `validarCpfOuCnpj` em `src/lib/cpf.ts`) é usada pelas três rotas de criação e edição: "Representante" exige CPF ou CNPJ com dígitos verificadores válidos e nome; "Proprietário" descarta os dados de representação.
 
 ### #PEND-45 · Associar cada polígono nomeado ao polígono do mapa (UI)
 

@@ -8,6 +8,7 @@ import {
   normalizarParaPersistencia,
   primeiroErro,
   validarFormulario,
+  validarRepresentacao,
 } from "@/lib/cjt-formulario";
 
 /**
@@ -50,21 +51,24 @@ export async function PATCH(
     );
   }
 
-  const emNomeDeCpf = (body.emNomeDeCpf ?? "").toString().replace(/\D/g, "") || null;
-  const emNomeDeNome = (body.emNomeDeNome ?? "").toString().trim() || null;
-  if (emNomeDeCpf && !emNomeDeNome) {
-    return NextResponse.json(
-      { error: "Informe o nome do proprietário representado." },
-      { status: 400 }
-    );
-  }
-
   const formulario = formularioDoPayload(body.cjt);
   const erroCjt = primeiroErro(validarFormulario(formulario));
   if (erroCjt) {
     return NextResponse.json({ error: erroCjt }, { status: 400 });
   }
   const cjt = normalizarParaPersistencia(formulario);
+
+  // Representante informa CPF/CNPJ válido e nome de quem representa (#PEND-44).
+  const representacao = validarRepresentacao({
+    qualidade: formulario.qualidade,
+    emNomeDeCpf: body.emNomeDeCpf,
+    emNomeDeNome: body.emNomeDeNome,
+  });
+  if (!representacao.ok) {
+    return NextResponse.json({ error: representacao.erro }, { status: 400 });
+  }
+  const emNomeDeCpf = representacao.cpf;
+  const emNomeDeNome = representacao.nome;
 
   const solicitacao = await prisma.solicitacao.update({
     where: { id: atual.id },

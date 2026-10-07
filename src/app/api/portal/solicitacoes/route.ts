@@ -7,6 +7,7 @@ import {
   normalizarParaPersistencia,
   primeiroErro,
   validarFormulario,
+  validarRepresentacao,
 } from "@/lib/cjt-formulario";
 
 /** GET /api/portal/solicitacoes — lista as solicitações do solicitante logado. */
@@ -52,15 +53,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const emNomeDeCpf = (body.emNomeDeCpf ?? "").toString().replace(/\D/g, "") || null;
-  const emNomeDeNome = (body.emNomeDeNome ?? "").toString().trim() || null;
-  if (emNomeDeCpf && !emNomeDeNome) {
-    return NextResponse.json(
-      { error: "Informe o nome do proprietário representado." },
-      { status: 400 }
-    );
-  }
-
   // O formulario CJT e revalidado no servidor: campos fora da combinacao
   // ativa sao descartados antes de persistir (Especificacao Funcional v1.0).
   const formulario = formularioDoPayload(body.cjt);
@@ -69,6 +61,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: erroCjt }, { status: 400 });
   }
   const cjt = normalizarParaPersistencia(formulario);
+
+  // Representante informa CPF/CNPJ válido e nome de quem representa (#PEND-44).
+  const representacao = validarRepresentacao({
+    qualidade: formulario.qualidade,
+    emNomeDeCpf: body.emNomeDeCpf,
+    emNomeDeNome: body.emNomeDeNome,
+  });
+  if (!representacao.ok) {
+    return NextResponse.json({ error: representacao.erro }, { status: 400 });
+  }
+  const emNomeDeCpf = representacao.cpf;
+  const emNomeDeNome = representacao.nome;
 
   const solicitacao = await criarComProtocolo((protocolo) =>
     prisma.solicitacao.create({

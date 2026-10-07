@@ -70,7 +70,8 @@ model Solicitacao {
   cjtResultado        String?  // 2a Matricula | 2b Gleba | 2c Area
   cjtSituacao         String?  // 3a Espolio | 3b Usucapiao | 3c Espolio com usucapiao | 3d Regular/comum
   cjtPropriedadeDe    String?
-  cjtMatricula        String?  // somente algarismos
+  cjtMatricula        String?  // somente algarismos, ou "Usucapiao" quando cjtInformaMatricula = NAO
+  cjtInformaMatricula String?  // SIM | NAO: "Quero informar o numero da matricula?" (usucapiao, 3b/3c)
   cjtQtdPoligonos     Int?
   cjtNomesPoligonos   String?  // JSON array com um nome por poligono
   cjtCodigoIncra      String?  // 13 algarismos, sem mascara

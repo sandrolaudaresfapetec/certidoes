@@ -7,6 +7,7 @@ import {
   normalizarParaPersistencia,
   primeiroErro,
   validarFormulario,
+  validarRepresentacao,
 } from "@/lib/cjt-formulario";
 
 /**
@@ -40,6 +41,16 @@ export async function POST(request: NextRequest) {
   }
   const cjt = normalizarParaPersistencia(formulario);
 
+  // Representante informa CPF/CNPJ válido e nome de quem representa (#PEND-44).
+  const representacao = validarRepresentacao({
+    qualidade: formulario.qualidade,
+    emNomeDeCpf: body.emNomeDeCpf,
+    emNomeDeNome: body.emNomeDeNome,
+  });
+  if (!representacao.ok) {
+    return NextResponse.json({ error: representacao.erro }, { status: 400 });
+  }
+
   const solicitacao = await criarComProtocolo((protocolo) =>
     prisma.solicitacao.create({
     data: {
@@ -56,8 +67,8 @@ export async function POST(request: NextRequest) {
       sigefUf: tipoViaSigef ? body.sigefUf || null : null,
       sigefStatus: tipoViaSigef ? body.sigefStatus || null : null,
       sigefOrigem: tipoViaSigef ? body.sigefOrigem || null : null,
-      emNomeDeCpf: (body.emNomeDeCpf ?? "").toString().replace(/\D/g, "") || null,
-      emNomeDeNome: (body.emNomeDeNome ?? "").toString().trim() || null,
+      emNomeDeCpf: representacao.cpf,
+      emNomeDeNome: representacao.nome,
       observacao: (body.observacao ?? "").toString() || null,
       solicitanteId: solicitante.id,
       origem: "ATENDIMENTO",

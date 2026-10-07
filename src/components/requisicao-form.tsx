@@ -15,6 +15,9 @@ import {
   SITUACAO_OPCOES,
   MENSAGEM_NAO_SEI,
   ALERTA_QTD_POLIGONOS,
+  INFORMA_MATRICULA_OPCOES,
+  LIMITE_POLIGONOS_ENVIO,
+  MATRICULA_USUCAPIAO,
   PREFIXO_ESPOLIO,
   ajustarNomesPoligonos,
   camposAplicaveis,
@@ -22,6 +25,7 @@ import {
   exigeEspolio,
   formularioVazio,
   limparCamposNaoAplicaveis,
+  perguntaMatriculaAplicavel,
   cpfCnpjCompleto,
   digitosCpfCnpj,
   digitosIncra,
@@ -35,10 +39,7 @@ import {
 import { ProgressoSolicitacao } from "@/components/requisicao/progresso-solicitacao";
 import { MapaImovel } from "@/components/requisicao/mapa-imovel";
 import { useConclusaoSolicitacao } from "@/components/requisicao/introducao-cjt";
-import {
-  NomesPoligonos,
-  erroNomenclatura,
-} from "@/components/requisicao/nomes-poligonos";
+import { NomesPoligonos } from "@/components/requisicao/nomes-poligonos";
 
 interface SigefParcela {
   codigoImovel: string;
@@ -185,7 +186,10 @@ export function RequisicaoForm({
 
   // Trocar uma resposta anterior recalcula a pergunta 4 e descarta os valores
   // que deixaram de ser aplicáveis (item 7 dos requisitos de interface).
-  function responder(campo: "qualidade" | "resultado" | "situacao", codigo: string) {
+  function responder(
+    campo: "qualidade" | "resultado" | "situacao" | "informaMatricula",
+    codigo: string
+  ) {
     setForm((atual) =>
       limparCamposNaoAplicaveis({ ...atual, [campo]: codigo } as FormularioCjt)
     );
@@ -197,7 +201,11 @@ export function RequisicaoForm({
     setForm((atual) => ({
       ...atual,
       qtdPoligonos: valor,
-      nomesPoligonos: ajustarNomesPoligonos(atual.nomesPoligonos, qtd),
+      // Acima do limite do envio normal não se geram campos (o servidor também recusa).
+      nomesPoligonos: ajustarNomesPoligonos(
+        atual.nomesPoligonos,
+        Number.isFinite(qtd) ? Math.min(qtd, LIMITE_POLIGONOS_ENVIO) : qtd
+      ),
     }));
   }
 
@@ -221,16 +229,8 @@ export function RequisicaoForm({
     form.qualidade !== "1c" &&
     (!procurador || (cpfCnpjCompleto(emNomeDeCpf) && emNomeDeNome.trim().length > 1));
   const caixa2 = caixa1 && mostrarPergunta4;
-  // Validação do servidor mais a nomenclatura fechada dos polígonos, que só a tela impõe (#PEND-36).
-  function validarComNomenclatura(): ErrosCjt {
-    const v = validarFormulario(form);
-    if (!v.nomesPoligonos && campos.includes("nomesPoligonos")) {
-      const erroNomes = erroNomenclatura(form.nomesPoligonos);
-      if (erroNomes) v.nomesPoligonos = erroNomes;
-    }
-    return v;
-  }
-  const dadosCompletos = Object.keys(validarComNomenclatura()).every((c) => c === "declaracao");
+  // As mesmas regras do servidor, inclusive a nomenclatura fechada dos polígonos (#PEND-36).
+  const dadosCompletos = Object.keys(validarFormulario(form)).every((c) => c === "declaracao");
   const caixa3 = caixa2 && dadosCompletos;
   const caixa4 =
     caixa3 &&
@@ -245,7 +245,7 @@ export function RequisicaoForm({
   const entra = progressivo ? "caixa-entra" : "";
 
   async function enviar() {
-    const validacao = validarComNomenclatura();
+    const validacao: ErrosCjt = validarFormulario(form);
     setErros(validacao);
     if (Object.keys(validacao).length > 0) return;
 
@@ -292,6 +292,7 @@ export function RequisicaoForm({
             resultado: limpo.resultado,
             situacao: limpo.situacao,
             propriedadeDe: limpo.propriedadeDe,
+            informaMatricula: limpo.informaMatricula,
             matricula: limpo.matricula,
             qtdPoligonos: limpo.qtdPoligonos,
             nomesPoligonos: limpo.nomesPoligonos,
@@ -528,7 +529,24 @@ export function RequisicaoForm({
             onChange={(c) => responder("situacao", c)}
           />
 
-          {(form.resultado === "2d" || form.situacao === "3e") && (
+          {perguntaMatriculaAplicavel(form.resultado, form.situacao) && (
+            <div className="border-l-4 border-emerald-200 pl-4">
+              <Pergunta
+                numero="3.1"
+                titulo="Quero informar o número da matrícula?"
+                nome="cjt-informa-matricula"
+                opcoes={INFORMA_MATRICULA_OPCOES}
+                valor={form.informaMatricula}
+                erro={erros.informaMatricula}
+                onChange={(c) => responder("informaMatricula", c)}
+              />
+            </div>
+          )}
+
+          {(form.resultado === "2d" ||
+            form.situacao === "3e" ||
+            (perguntaMatriculaAplicavel(form.resultado, form.situacao) &&
+              form.informaMatricula === "NAO_SEI")) && (
             <p
               role="alert"
               className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2"
@@ -600,24 +618,48 @@ export function RequisicaoForm({
               label="Matrícula *"
               erro={erros.matricula}
               dica={
-                <p>
-                  Somente algarismos. Não colocar CRI, Trans, Transcrição, “-”, “/” ou outros
-                  caracteres.
-                </p>
+                form.informaMatricula === "NAO" ? (
+                  <p>
+                    Preenchido automaticamente porque você informou que não tem o número da
+                    matrícula.
+                  </p>
+                ) : (
+                  <p>
+                    Somente algarismos. Não colocar CRI, Trans, Transcrição, “-”, “/” ou outros
+                    caracteres.
+                  </p>
+                )
               }
             >
-              <input
-                id="cjt-matricula"
-                type="text"
-                inputMode="numeric"
-                value={form.matricula}
-                onChange={(e) =>
-                  setForm((a) => ({ ...a, matricula: somenteDigitos(e.target.value) }))
-                }
-                aria-describedby={descrito("cjt-matricula", true, erros.matricula)}
-                aria-invalid={erros.matricula ? true : undefined}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-              />
+              {form.informaMatricula === "NAO" ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    id="cjt-matricula"
+                    type="text"
+                    value={MATRICULA_USUCAPIAO}
+                    readOnly
+                    aria-readonly="true"
+                    aria-describedby={descrito("cjt-matricula", true, erros.matricula)}
+                    className="min-w-0 flex-1 cursor-not-allowed rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700"
+                  />
+                  <span className="whitespace-nowrap text-xs text-gray-600">
+                    Preenchido automaticamente
+                  </span>
+                </div>
+              ) : (
+                <input
+                  id="cjt-matricula"
+                  type="text"
+                  inputMode="numeric"
+                  value={form.matricula}
+                  onChange={(e) =>
+                    setForm((a) => ({ ...a, matricula: somenteDigitos(e.target.value) }))
+                  }
+                  aria-describedby={descrito("cjt-matricula", true, erros.matricula)}
+                  aria-invalid={erros.matricula ? true : undefined}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+              )}
             </Campo>
           )}
 
@@ -637,7 +679,18 @@ export function RequisicaoForm({
                 aria-invalid={erros.qtdPoligonos ? true : undefined}
                 className="w-32 border border-gray-300 rounded-md px-3 py-2 text-sm"
               />
-              {parseInt(form.qtdPoligonos, 10) >= ALERTA_QTD_POLIGONOS && (
+              {parseInt(form.qtdPoligonos, 10) > LIMITE_POLIGONOS_ENVIO && (
+                <p
+                  role="alert"
+                  className="mt-2 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900"
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  Pedidos com {LIMITE_POLIGONOS_ENVIO + 1} ou mais polígonos exigem análise da DDD e
+                  ainda não podem ser enviados por aqui. Fale com o atendimento do IGC para seguir.
+                </p>
+              )}
+              {parseInt(form.qtdPoligonos, 10) >= ALERTA_QTD_POLIGONOS &&
+                parseInt(form.qtdPoligonos, 10) <= LIMITE_POLIGONOS_ENVIO && (
                 <p
                   role="status"
                   className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
@@ -881,7 +934,7 @@ function Pergunta({
   erro,
   onChange,
 }: {
-  numero: number;
+  numero: number | string;
   titulo: string;
   nome: string;
   opcoes: readonly { codigo: string; label: string; bloqueia: boolean }[];
@@ -894,7 +947,7 @@ function Pergunta({
   return (
     <fieldset>
       <legend className="text-sm font-medium text-gray-900">
-        {numero}. {titulo}
+        {typeof numero === "number" ? `${numero}.` : numero} {titulo}
       </legend>
       <div className="mt-2 space-y-1.5">
         {opcoes.map((o) => (
