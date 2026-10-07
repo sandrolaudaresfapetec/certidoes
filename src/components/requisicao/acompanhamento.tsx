@@ -82,7 +82,7 @@ export function AcompanhamentoRequisicao({
   pagamentoValor,
   finalizadaEm,
 }: AcompanhamentoProps) {
-  const acomp = acompanhamentoRequisicao({ situacaoProcesso, pagamentoStatus });
+  const acomp = acompanhamentoRequisicao({ situacaoProcesso, pagamentoStatus, finalizadaEm });
   const ultima = ETAPAS_ACOMPANHAMENTO.length - 1;
   const mostrarRodape = Boolean(pagamentoStatus) || Boolean(finalizadaEm);
 

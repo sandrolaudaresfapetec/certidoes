@@ -28,11 +28,14 @@ body {
 /* Padrões de interação: valem para toda a plataforma. Estão em `base` para um
    componente poder optar por outro valor com um utilitário (ex.: cursor-default). */
 @layer base {
-  /* Cor fixa: sem isso o campo herda a do body (#ededed no modo escuro do sistema). */
+  /* Cores fixas: sem isso o campo herda a do body (#ededed no modo escuro do sistema)
+     e, sem fundo, o texto escuro some sobre o body escuro. */
   input,
   textarea,
   select {
     color: #111827;
+    background-color: #ffffff;
+    color-scheme: light;
     font-weight: 400;
   }
 
