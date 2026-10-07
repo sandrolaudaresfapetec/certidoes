@@ -95,7 +95,7 @@ curl -X POST http://localhost:3000/api/seed    # dados de demonstração (só en
 - **CPF, CNPJ e telefone têm máscara de digitação.** Use `CampoMascarado` (`src/components/campo-mascarado.tsx`) com as funções de `src/lib/mascaras.ts` (`mascaraCpf`, `mascaraCpfCnpj`, `mascaraTelefone`); em telas de leitura, `exibirCpfCnpj`. A máscara é só de exibição: ao enviar, CPF/CNPJ vão só com números (`digitosCpfCnpj`) e o telefone vai formatado, como a API e o banco já esperam.
 - **Não duplique constantes:** use `REQUISICAO_STATUS`, `WORKFLOW_STAGES`, `PAPEIS` etc. em vez de reescrever rótulos.
 - **`src/components/requisicao-form.tsx` é compartilhado** pelo portal (`/portal/nova-solicitacao`) e pelo atendimento (`/requisicoes/nova`): teste os dois ao alterá-lo. A prop `variante` (`"SOLICITANTE"` ou `"ATENDIMENTO"`) escolhe caixas progressivas e tela de envio.
-- **Histórico do que já foi implementado** (pedido do cliente → arquivo → URL → decisões → limites) fica em [`docs/`](docs/): comece por [`docs/correcoes-cjt-portal.md`](docs/correcoes-cjt-portal.md). Ao concluir um trabalho relevante, registre-o lá ou em um arquivo novo da mesma pasta.
+- **Histórico do que já foi implementado** (pedido do cliente → arquivo → URL → decisões → limites) fica em [`docs/`](docs/): comece por [`docs/correcoes-cjt-portal.md`](docs/correcoes-cjt-portal.md) (portal do solicitante) e [`docs/melhorias-frontend-backoffice.md`](docs/melhorias-frontend-backoffice.md) (edição do processo, corte de divisas, máscaras, contraste). Ao concluir um trabalho relevante, registre-o lá ou em um arquivo novo da mesma pasta.
 
 ## 6. Antes de dizer "terminei"
 

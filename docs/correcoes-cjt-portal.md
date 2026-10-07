@@ -65,7 +65,7 @@ Fora da lista dos 16, a pedido do time, antes das fases (`f371f7a`): **padrão g
 | `GRUPOS_STATUS_GERAL` (`src/lib/requisicao-status.ts`) | Grupos do Status Geral; grupo com lista vazia aparece como "em breve". |
 | `acompanhamentoRequisicao()` (`requisicao-status.ts`) | Deriva a etapa do acompanhamento; será substituída pelo modelo oficial do backend. |
 
-**Dependências novas** (`package.json`): `leaflet` e `@types/leaflet`. A tela `/geometria` ainda carrega o Leaflet do CDN (#PEND-8).
+**Dependências novas** (`package.json`): `leaflet` e `@types/leaflet`. A tela `/geometria` passou a usar o mesmo pacote em vez do CDN (#PEND-8; ver [`melhorias-frontend-backoffice.md`](melhorias-frontend-backoffice.md)).
 
 ## 5. Decisões aplicadas
 
