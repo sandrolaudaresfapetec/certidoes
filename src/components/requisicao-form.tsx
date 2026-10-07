@@ -588,7 +588,7 @@ export function RequisicaoForm({
                   }
                   aria-describedby={descrito("cjt-propriedade", true, erros.propriedadeDe)}
                   aria-invalid={erros.propriedadeDe ? true : undefined}
-                  className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  className="w-full min-w-0 flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
                 />
               </div>
             </Campo>
@@ -716,11 +716,11 @@ export function RequisicaoForm({
                             : "border-gray-200 hover:border-emerald-300"
                         }`}
                       >
-                        <span className="font-medium text-gray-900 flex items-center gap-2">
+                        <span className="font-medium text-gray-900 flex items-center gap-2 [overflow-wrap:anywhere]">
                           {p.nomeArea || "Imóvel rural"}
                           {ativa && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
                         </span>
-                        <span className="block text-xs text-gray-600 mt-1">
+                        <span className="block text-xs text-gray-600 mt-1 [overflow-wrap:anywhere]">
                           Código do imóvel {p.codigoImovel} ·{" "}
                           {p.areaHectares.toLocaleString("pt-BR")} ha · {p.municipio}/
                           {p.uf} · {p.status}

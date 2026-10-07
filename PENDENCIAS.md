@@ -67,6 +67,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-44 | Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1 | backend | segurança | média | aberta |
 | #PEND-45 | Associar cada polígono nomeado ao polígono do mapa (UI) | frontend | adição | média | bloqueada (#PEND-34) |
 | #PEND-46 | Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio | backend | bugfix | baixa | aberta |
+| #PEND-47 | Layout raiz: `main` sem `min-w-0` deixa conteúdo largo esticar a página no celular | frontend | melhoria | baixa | aberta |
 
 ## Detalhes
 
@@ -440,3 +441,10 @@ Item 16 do documento: "mostrar de alguma maneira um indicativo de quem é cada G
 
 Em desenvolvimento a mesma consulta devolve ora parcelas com dados completos (11,72 ha, Ribeirão Branco/SP), ora parcelas enriquecidas com o CAR em que `areaHectares` é 0 e `municipio` é vazio (lista mostra "0 ha · /SP"). A resposta varia entre chamadas. Afeta só o ambiente simulado, mas atrapalha testes e demonstrações.
 **Impacto no frontend:** nenhum; o texto do mapa para leitores de tela ignora área e município ausentes.
+
+### #PEND-47 · Layout raiz: `main` sem `min-w-0` deixa conteúdo largo esticar a página no celular
+
+**Responsável:** frontend · **Tipo:** melhoria · **Registrada em:** 2026-10-07
+**Onde:** `src/app/layout.tsx` (`<main className="flex-1 bg-gray-50 min-h-screen …">` dentro de `body` com `flex`)
+
+O `main` é item de um contêiner flex e tem `min-width: auto`: qualquer descendente com largura mínima maior que a tela (texto sem espaço, `input` com largura intrínseca) alarga o `main` e a página ganha rolagem horizontal. Apareceu em 375 px na lista de Minhas Requisições (nome de área com código do CAR sem espaços) e no campo "Propriedade de" ao lado do rótulo "Espólio de". Foi corrigido caso a caso (`min-w-0` e `[overflow-wrap:anywhere]` nos itens da lista e nos botões de imóvel; `w-full min-w-0` no campo). A correção na raiz (`min-w-0` no `main`) não foi aplicada porque muda o comportamento de todo o backoffice (tabelas largas passariam a vazar do `main` em vez de esticá-lo); precisa de uma passada nas telas do backoffice antes.
