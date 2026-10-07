@@ -32,7 +32,10 @@ export default async function AcompanharRequisicaoPage({
   });
   if (!requisicao) notFound();
   // Rascunho não tem acompanhamento: o solicitante volta para continuar o formulário.
-  if (requisicao.status === "RASCUNHO") redirect(`/portal/requisicoes/${id}/editar`);
+  // (rascunho que já foi congelado tem conversa com a DDD e mostra o acompanhamento)
+  if (requisicao.status === "RASCUNHO" && !requisicao.congeladaEm) {
+    redirect(`/portal/requisicoes/${id}/editar`);
+  }
 
   // Contorno do imóvel no acervo SIGEF importado (vazio até a importação; #PEND-33).
   const parcela = requisicao.sigefParcelaCodigo
@@ -47,7 +50,7 @@ export default async function AcompanharRequisicaoPage({
   const editavel = clientePodeEditar(requisicao);
 
   // Chat: abrir a tela conta como leitura (some o selo "novas" da lista).
-  const chatDisponivel = chatVisivel(requisicao.status);
+  const chatDisponivel = chatVisivel(requisicao.status, requisicao.congeladaEm);
   const mensagens = chatDisponivel ? await listarMensagens(requisicao.id) : [];
   if (chatDisponivel) await marcarLido(requisicao.id, "SOLICITANTE");
 
@@ -70,7 +73,7 @@ export default async function AcompanharRequisicaoPage({
               endpoint={`/api/portal/solicitacoes/${requisicao.id}/mensagens`}
               lado="SOLICITANTE"
               inicial={mensagens}
-              aceitaInicial={chatAceitaMensagens(requisicao.status)}
+              aceitaInicial={chatAceitaMensagens(requisicao.status, requisicao.congeladaEm)}
               titulo="Conversa com o IGC"
               subtitulo="Todas as comunicações e pedidos de complementação são feitos aqui."
               rotuloCampo="Mensagem para o IGC"

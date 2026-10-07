@@ -69,7 +69,8 @@ export async function PATCH(
   }
 
   const formulario = formularioDoPayload(body.cjt);
-  const erroCjt = primeiroErro(validarFormulario(formulario));
+  // Pedido liberado pela DDD pode passar de 12 polígonos (#PEND-31).
+  const erroCjt = primeiroErro(validarFormulario(formulario, { liberado: Boolean(atual.liberadaEm) }));
   if (erroCjt) {
     return NextResponse.json({ error: erroCjt }, { status: 400 });
   }

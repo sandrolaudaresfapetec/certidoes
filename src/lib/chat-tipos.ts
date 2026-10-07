@@ -30,13 +30,16 @@ export interface MensagemChat {
   createdAt: string;
 }
 
-/** Em rascunho comum o chat nem existe; arquivada só permite ler. */
-export function chatVisivel(status: string): boolean {
-  return status !== STATUS_SOLICITACAO.RASCUNHO;
+/**
+ * Em rascunho comum o chat nem existe; o rascunho que já foi congelado (13+ polígonos) tem
+ * conversa com a DDD. Arquivada só permite ler.
+ */
+export function chatVisivel(status: string, congeladaEm?: Date | string | null): boolean {
+  return status !== STATUS_SOLICITACAO.RASCUNHO || Boolean(congeladaEm);
 }
 
-export function chatAceitaMensagens(status: string): boolean {
-  return chatVisivel(status) && status !== STATUS_SOLICITACAO.ARQUIVADA;
+export function chatAceitaMensagens(status: string, congeladaEm?: Date | string | null): boolean {
+  return chatVisivel(status, congeladaEm) && status !== STATUS_SOLICITACAO.ARQUIVADA;
 }
 
 export function validarTextoMensagem(

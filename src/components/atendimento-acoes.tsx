@@ -6,6 +6,85 @@ import { Loader2 } from "lucide-react";
 import { MOTIVO_DEVOLUCAO_MAX, MOTIVO_DEVOLUCAO_MIN } from "@/lib/solicitacao-estados";
 
 /**
+ * Liberação de um pedido congelado por ter 13 ou mais polígonos (#PEND-31). A mensagem
+ * opcional vai ao chat do solicitante.
+ */
+export function LiberarRequisicao({ requisicaoId }: { requisicaoId: string }) {
+  const router = useRouter();
+  const [mensagem, setMensagem] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function liberar(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setErro(null);
+    try {
+      const res = await fetch(`/api/requisicoes/${requisicaoId}/liberar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mensagem }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErro(data.error || "Não foi possível liberar o preenchimento.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setErro("Erro de conexão. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={liberar}
+      noValidate
+      className="bg-white border border-gray-200 rounded-lg p-6 space-y-3"
+    >
+      <h3 className="font-semibold text-gray-900">Liberar preenchimento</h3>
+      <p className="text-xs text-gray-600">
+        O solicitante volta a poder editar e enviar. A requisição só entra na fila depois do
+        envio.
+      </p>
+      <div>
+        <label htmlFor="liberar-mensagem" className="block text-xs text-gray-600 mb-1">
+          Mensagem ao solicitante (opcional)
+        </label>
+        <textarea
+          id="liberar-mensagem"
+          value={mensagem}
+          maxLength={1000}
+          onChange={(e) => {
+            setMensagem(e.target.value);
+            setErro(null);
+          }}
+          placeholder="Ex.: Documentos conferidos. Pode continuar."
+          aria-invalid={erro ? true : undefined}
+          aria-describedby={erro ? "liberar-erro" : undefined}
+          className="min-h-14 w-full resize-y rounded-md border border-gray-300 px-3 py-2 text-sm"
+        />
+      </div>
+      {erro && (
+        <p id="liberar-erro" role="alert" className="text-xs text-red-600">
+          {erro}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={loading}
+        className="inline-flex items-center gap-2 rounded-md bg-blue-700 px-4 py-2 text-sm text-white hover:bg-blue-800 disabled:opacity-50"
+      >
+        {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+        Liberar preenchimento
+      </button>
+    </form>
+  );
+}
+
+/**
  * Devolução da requisição ao solicitante (#PEND-26). Confirmação inline, no próprio cartão:
  * o motivo é obrigatório e vai ao chat do solicitante.
  */

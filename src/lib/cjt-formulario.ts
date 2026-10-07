@@ -55,6 +55,9 @@ export const ALERTA_QTD_POLIGONOS = 6;
  */
 export const LIMITE_POLIGONOS_ENVIO = 12;
 
+/** Teto por solicitação, mesmo liberada pela DDD. */
+export const LIMITE_POLIGONOS_MAXIMO = 100;
+
 /** Valor gravado em `cjtMatricula` quando o solicitante não tem o número (usucapião). */
 export const MATRICULA_USUCAPIAO = "Usucapião";
 
@@ -303,7 +306,10 @@ export function erroNomenclatura(nomes: string[]): string | null {
 
 export type ErrosCjt = Partial<Record<keyof FormularioCjt | "combinacao", string>>;
 
-export function validarFormulario(form: FormularioCjt): ErrosCjt {
+export function validarFormulario(
+  form: FormularioCjt,
+  opcoes: { liberado?: boolean } = {}
+): ErrosCjt {
   const erros: ErrosCjt = {};
 
   if (!codigoValido(form.qualidade, QUALIDADE_OPCOES)) erros.qualidade = "Selecione uma opção.";
@@ -344,9 +350,11 @@ export function validarFormulario(form: FormularioCjt): ErrosCjt {
     } else {
       const qtd = parseInt(form.qtdPoligonos, 10);
       const nomes = form.nomesPoligonos.map((n) => n.trim());
-      if (qtd > LIMITE_POLIGONOS_ENVIO) {
+      if (qtd > LIMITE_POLIGONOS_MAXIMO) {
+        erros.qtdPoligonos = `O máximo é ${LIMITE_POLIGONOS_MAXIMO} polígonos por solicitação. Fale com o atendimento do IGC.`;
+      } else if (qtd > LIMITE_POLIGONOS_ENVIO && !opcoes.liberado) {
         erros.qtdPoligonos =
-          "Pedidos com 13 ou mais polígonos exigem análise da DDD e ainda não podem ser enviados por aqui. Fale com o atendimento do IGC para seguir.";
+          "Pedidos com 13 ou mais polígonos exigem análise da DDD antes de continuar. Use “Enviar para análise da DDD” para que a equipe libere o preenchimento.";
       } else if (nomes.length !== qtd) {
         erros.nomesPoligonos = "Informe um nome para cada polígono.";
       } else if (nomes.some((n) => !n)) {

@@ -92,6 +92,10 @@ model Solicitacao {
   devolucaoMotivo   String?
   devolvidaEm       DateTime?
 
+  // Pedido com 13+ poligonos: congelado ate a DDD liberar (#PEND-31)
+  congeladaEm       DateTime?
+  liberadaEm        DateTime?
+
   solicitanteId     String
   solicitante       Solicitante @relation(fields: [solicitanteId], references: [id])
 

@@ -58,3 +58,12 @@ describe("contarNaoLidas", () => {
     expect(contarNaoLidas(mensagens, t(4), "ATENDIMENTO")).toBe(0);
   });
 });
+
+describe("chat do pedido congelado (#PEND-31)", () => {
+  it("rascunho que já foi congelado tem conversa", () => {
+    expect(chatVisivel("RASCUNHO", new Date())).toBe(true);
+    expect(chatAceitaMensagens("RASCUNHO", new Date())).toBe(true);
+    expect(chatVisivel("RASCUNHO", null)).toBe(false);
+    expect(chatAceitaMensagens("AGUARDANDO_LIBERACAO", new Date())).toBe(true);
+  });
+});

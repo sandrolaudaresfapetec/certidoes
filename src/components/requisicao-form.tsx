@@ -17,6 +17,7 @@ import {
   ALERTA_QTD_POLIGONOS,
   INFORMA_MATRICULA_OPCOES,
   LIMITE_POLIGONOS_ENVIO,
+  LIMITE_POLIGONOS_MAXIMO,
   MATRICULA_USUCAPIAO,
   PREFIXO_ESPOLIO,
   ajustarNomesPoligonos,
@@ -66,6 +67,7 @@ interface SigefResult {
 export interface RequisicaoEdicao {
   /** Endpoint PATCH da própria requisição. */
   endpoint: string;
+  id: string;
   cjt: FormularioCjt;
   tipoViaSigef: boolean;
   sigefParcelaCodigo: string | null;
@@ -76,6 +78,8 @@ export interface RequisicaoEdicao {
   documentosEnviados: string[];
   /** Rascunho salvo (#PEND-42): continuar e enviar, não é uma alteração de requisição enviada. */
   rascunho?: boolean;
+  /** Pedido congelado (13+ polígonos) que a DDD liberou: passa do limite de 12 polígonos. */
+  liberada?: boolean;
 }
 
 interface RequisicaoFormProps {
@@ -151,13 +155,16 @@ export function RequisicaoForm({
   const [rascunhoId, setRascunhoId] = useState<string | null>(null);
   const [rascunhoSalvo, setRascunhoSalvo] = useState<{ protocolo: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // Pedido com 13+ polígonos encaminhado à DDD nesta tela (#PEND-31).
+  const [encaminhado, setEncaminhado] = useState<{ id: string; protocolo: string } | null>(null);
+  const [encaminhando, setEncaminhando] = useState(false);
 
   // Ao concluir, leva a tela e o foco para a confirmação.
   useEffect(() => {
-    if (!protocolo) return;
+    if (!protocolo && !encaminhado) return;
     window.scrollTo({ top: 0 });
     tituloEnvioRef.current?.focus();
-  }, [protocolo]);
+  }, [protocolo, encaminhado]);
 
   useEffect(() => {
     (async () => {
@@ -210,7 +217,9 @@ export function RequisicaoForm({
       // Acima do limite do envio normal não se geram campos (o servidor também recusa).
       nomesPoligonos: ajustarNomesPoligonos(
         atual.nomesPoligonos,
-        Number.isFinite(qtd) ? Math.min(qtd, LIMITE_POLIGONOS_ENVIO) : qtd
+        Number.isFinite(qtd)
+          ? Math.min(qtd, permitirMais ? LIMITE_POLIGONOS_MAXIMO : LIMITE_POLIGONOS_ENVIO)
+          : qtd
       ),
     }));
   }
@@ -226,6 +235,8 @@ export function RequisicaoForm({
   const enviados = edicao?.documentosEnviados ?? [];
   // Alterar uma requisição já enviada (devolvida); rascunho continuado conta como envio novo.
   const reenvio = Boolean(edicao) && !edicao?.rascunho;
+  // O atendimento é a própria DDD e o pedido liberado já passou por ela: sem o limite de 12.
+  const permitirMais = variante === "ATENDIMENTO" || Boolean(edicao?.liberada);
   const podeRascunho = variante === "SOLICITANTE" && (!edicao || Boolean(edicao.rascunho));
   const alvoEnvio =
     edicao?.endpoint ?? (rascunhoId ? `${criarEndpoint}/${rascunhoId}` : criarEndpoint);
@@ -241,7 +252,9 @@ export function RequisicaoForm({
     (!procurador || (cpfCnpjCompleto(emNomeDeCpf) && emNomeDeNome.trim().length > 1));
   const caixa2 = caixa1 && mostrarPergunta4;
   // As mesmas regras do servidor, inclusive a nomenclatura fechada dos polígonos (#PEND-36).
-  const dadosCompletos = Object.keys(validarFormulario(form)).every((c) => c === "declaracao");
+  const dadosCompletos = Object.keys(validarFormulario(form, { liberado: permitirMais })).every(
+    (c) => c === "declaracao"
+  );
   const caixa3 = caixa2 && dadosCompletos;
   const caixa4 =
     caixa3 &&
@@ -256,7 +269,7 @@ export function RequisicaoForm({
   const entra = progressivo ? "caixa-entra" : "";
 
   async function enviar() {
-    const validacao: ErrosCjt = validarFormulario(form);
+    const validacao: ErrosCjt = validarFormulario(form, { liberado: permitirMais });
     setErros(validacao);
     if (Object.keys(validacao).length > 0) return;
 
@@ -346,8 +359,10 @@ export function RequisicaoForm({
   }
 
   /** Guarda o que já foi respondido, sem validar nem enviar (#PEND-42). Anexos não entram. */
-  async function salvarRascunho() {
-    if (salvando) return;
+  async function salvarRascunho(
+    silencioso = false
+  ): Promise<{ id: string; protocolo: string } | null> {
+    if (salvando) return null;
     setSalvando(true);
     setErro(null);
     setRascunhoSalvo(null);
@@ -387,12 +402,69 @@ export function RequisicaoForm({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Não foi possível salvar o rascunho.");
       setRascunhoId(data.id);
-      setRascunhoSalvo({ protocolo: data.protocolo });
+      if (!silencioso) setRascunhoSalvo({ protocolo: data.protocolo });
+      return { id: data.id, protocolo: data.protocolo };
     } catch (e) {
       setErro((e as Error).message);
+      return null;
     } finally {
       setSalvando(false);
     }
+  }
+
+  /** Pedido com 13+ polígonos: guarda o rascunho e o encaminha à DDD, que libera depois (#PEND-31). */
+  async function encaminharDDD() {
+    if (encaminhando) return;
+    setEncaminhando(true);
+    setErro(null);
+    try {
+      const salvo = await salvarRascunho(true);
+      if (!salvo) return;
+      const res = await fetch(`${criarEndpoint}/${salvo.id}/congelar`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErro(data.error || "Não foi possível encaminhar o pedido à DDD.");
+        return;
+      }
+      setEncaminhado({ id: salvo.id, protocolo: salvo.protocolo });
+      marcarConcluida();
+    } catch {
+      setErro("Erro de conexão. Tente novamente.");
+    } finally {
+      setEncaminhando(false);
+    }
+  }
+
+  if (encaminhado) {
+    return (
+      <section
+        aria-labelledby="envio-titulo"
+        className="bg-white rounded-lg border border-gray-200 p-8 text-center"
+      >
+        <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-3" aria-hidden="true" />
+        <h2
+          id="envio-titulo"
+          ref={tituloEnvioRef}
+          tabIndex={-1}
+          className="text-lg font-semibold text-gray-900 outline-none"
+        >
+          Solicitação encaminhada à DDD
+        </h2>
+        <p className="text-sm text-gray-600 mt-1">
+          Protocolo <strong>{encaminhado.protocolo}</strong>
+        </p>
+        <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-gray-700">
+          O preenchimento está pausado até a equipe liberar. Acompanhe e responda pela conversa da
+          solicitação.
+        </p>
+        <Link
+          href={`/portal/requisicoes/${encaminhado.id}#conversa`}
+          className="mt-5 inline-flex items-center rounded-md bg-emerald-700 px-4 py-2 text-sm text-white hover:bg-emerald-800"
+        >
+          Abrir conversa
+        </Link>
+      </section>
+    );
   }
 
   if (protocolo) {
@@ -740,18 +812,38 @@ export function RequisicaoForm({
                 aria-invalid={erros.qtdPoligonos ? true : undefined}
                 className="w-32 border border-gray-300 rounded-md px-3 py-2 text-sm"
               />
-              {parseInt(form.qtdPoligonos, 10) > LIMITE_POLIGONOS_ENVIO && (
-                <p
+              {!permitirMais && parseInt(form.qtdPoligonos, 10) > LIMITE_POLIGONOS_ENVIO && (
+                <div
                   role="alert"
-                  className="mt-2 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900"
+                  className="mt-2 space-y-3 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900"
                 >
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                  Pedidos com {LIMITE_POLIGONOS_ENVIO + 1} ou mais polígonos exigem análise da DDD e
-                  ainda não podem ser enviados por aqui. Fale com o atendimento do IGC para seguir.
-                </p>
+                  <p className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span>
+                      <strong className="font-semibold">Atenção: {form.qtdPoligonos} polígonos.</strong>{" "}
+                      Pedidos com {LIMITE_POLIGONOS_ENVIO + 1} ou mais polígonos exigem análise da DDD
+                      antes de continuar. Vamos guardar o que você já preencheu e abrir uma conversa
+                      com a equipe técnica, que pode pedir informações comprobatórias. Depois da
+                      liberação você continua o preenchimento.
+                    </span>
+                  </p>
+                  {variante === "SOLICITANTE" && (
+                    <button
+                      type="button"
+                      onClick={encaminharDDD}
+                      disabled={encaminhando || salvando}
+                      className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+                    >
+                      {encaminhando && (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      )}
+                      Enviar para análise da DDD
+                    </button>
+                  )}
+                </div>
               )}
               {parseInt(form.qtdPoligonos, 10) >= ALERTA_QTD_POLIGONOS &&
-                parseInt(form.qtdPoligonos, 10) <= LIMITE_POLIGONOS_ENVIO && (
+                (permitirMais || parseInt(form.qtdPoligonos, 10) <= LIMITE_POLIGONOS_ENVIO) && (
                 <p
                   role="status"
                   className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
@@ -762,7 +854,9 @@ export function RequisicaoForm({
             </Campo>
           )}
 
-          {campos.includes("nomesPoligonos") && form.nomesPoligonos.length > 0 && (
+          {campos.includes("nomesPoligonos") &&
+            form.nomesPoligonos.length > 0 &&
+            (permitirMais || parseInt(form.qtdPoligonos, 10) <= LIMITE_POLIGONOS_ENVIO) && (
             <NomesPoligonos
               id="cjt-nomes"
               nomes={form.nomesPoligonos}
@@ -1000,7 +1094,7 @@ export function RequisicaoForm({
           <div className="rounded-lg border border-gray-200 bg-white px-6 py-4">
             <button
               type="button"
-              onClick={salvarRascunho}
+              onClick={() => salvarRascunho()}
               disabled={salvando || enviando}
               className="inline-flex items-center gap-2 rounded-md border border-gray-400 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50"
             >

@@ -78,7 +78,12 @@ export function acompanhamentoRequisicao(dados: {
  */
 export const GRUPOS_STATUS_GERAL = [
   { chave: "nao-enviadas", rotulo: "Não enviadas", status: ["RASCUNHO"] },
-  { chave: "em-analise", rotulo: "Em análise", status: ["PENDENTE", "EM_ANALISE"] },
+  {
+    chave: "em-analise",
+    rotulo: "Em análise",
+    // Congelada (13+ polígonos) e aguardando resposta também estão com a DDD.
+    status: ["PENDENTE", "EM_ANALISE", "AGUARDANDO_LIBERACAO", "AGUARDANDO_CLIENTE"],
+  },
   { chave: "devolvidas", rotulo: "Devolvidas", status: ["DEVOLVIDA"] },
   { chave: "arquivadas", rotulo: "Arquivadas", status: [] as string[] }, // PEND-29: ["ARQUIVADA"]
   { chave: "concluidas", rotulo: "Concluídas", status: ["APROVADA", "CONCLUIDA"] },

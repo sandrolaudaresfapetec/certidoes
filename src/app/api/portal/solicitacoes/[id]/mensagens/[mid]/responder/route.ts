@@ -18,12 +18,12 @@ export async function POST(
 
   const requisicao = await prisma.solicitacao.findFirst({
     where: { id, solicitanteId: sessao.solicitante.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, congeladaEm: true },
   });
-  if (!requisicao || !chatVisivel(requisicao.status)) {
+  if (!requisicao || !chatVisivel(requisicao.status, requisicao.congeladaEm)) {
     return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
   }
-  if (!chatAceitaMensagens(requisicao.status)) {
+  if (!chatAceitaMensagens(requisicao.status, requisicao.congeladaEm)) {
     return NextResponse.json(
       { error: "Esta solicitação foi arquivada e não aceita respostas." },
       { status: 409 }

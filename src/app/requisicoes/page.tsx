@@ -5,6 +5,7 @@ import { formatarCPF } from "@/lib/cpf";
 import { statusRequisicao } from "@/lib/requisicao-status";
 import { RequisicaoFiltros } from "@/components/requisicao-filtros";
 import { requireUsuario, podeAtender } from "@/lib/auth";
+import { STATUS_FORA_DA_FILA } from "@/lib/solicitacao-estados";
 import type { Prisma } from "@prisma/client";
 import { naoLidasPorSolicitacao } from "@/lib/chat";
 import { SeloMensagensNovas } from "@/components/requisicao/selo-mensagens-novas";
@@ -20,16 +21,16 @@ export default async function RequisicoesPage({
   const usuario = await requireUsuario();
   const atendimento = podeAtender(usuario);
 
-  const where: Prisma.SolicitacaoWhereInput = {};
-  // Rascunho é só do solicitante: nunca aparece para o atendimento, nem filtrando por ele.
-  const ocultos = ["RASCUNHO"];
+  // Rascunho é só do solicitante: o atendimento só o vê depois de congelado (13+ polígonos).
+  const where: Prisma.SolicitacaoWhereInput = {
+    NOT: { status: "RASCUNHO", congeladaEm: null },
+  };
+  if (status) where.status = status;
   if (semProcesso === "1") {
     where.processId = null;
-    // Devolvida e arquivada não aguardam abertura de processo.
-    if (!status) ocultos.push("DEVOLVIDA", "ARQUIVADA");
+    // Só o que está na fila: sem rascunho, congelada, devolvida, arquivada etc.
+    if (!status) where.status = { notIn: [...STATUS_FORA_DA_FILA] };
   }
-  if (status && !ocultos.includes(status)) where.status = status;
-  else where.status = { notIn: ocultos };
   if (q) {
     where.OR = [
       { protocolo: { contains: q } },

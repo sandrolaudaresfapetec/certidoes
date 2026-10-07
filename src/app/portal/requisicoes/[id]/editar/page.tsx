@@ -4,7 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoForm } from "@/components/requisicao-form";
-import { formularioDoPayload } from "@/lib/cjt-formulario";
+import {
+  LIMITE_POLIGONOS_MAXIMO,
+  ajustarNomesPoligonos,
+  formularioDoPayload,
+} from "@/lib/cjt-formulario";
 import { clientePodeEditar } from "@/lib/solicitacao-estados";
 
 export const dynamic = "force-dynamic";
@@ -53,9 +57,16 @@ export default async function EditarRequisicaoPage({
     );
   }
 
-  const nomes = requisicao.cjtNomesPoligonos
+  const nomesGuardados = requisicao.cjtNomesPoligonos
     ? (JSON.parse(requisicao.cjtNomesPoligonos) as string[])
     : [];
+  // Liberado pela DDD com mais de 12 polígonos: o rascunho guardou só 12 nomes; completa a lista.
+  const liberada = Boolean(requisicao.liberadaEm);
+  const qtd = requisicao.cjtQtdPoligonos;
+  const nomes =
+    liberada && qtd
+      ? ajustarNomesPoligonos(nomesGuardados, Math.min(qtd, LIMITE_POLIGONOS_MAXIMO))
+      : nomesGuardados;
 
   return (
     <div>
@@ -72,6 +83,16 @@ export default async function EditarRequisicaoPage({
             })}. Complete as respostas e envie quando estiver pronto. Nada é analisado pelo IGC antes do envio.`
           : "Revise as respostas e os dados do imóvel. As alterações substituem os dados enviados anteriormente."}
       </p>
+      {requisicao.congeladaEm && (
+        <p className="mb-6 -mt-3 text-sm">
+          <Link
+            href={`/portal/requisicoes/${requisicao.id}#conversa`}
+            className="text-emerald-800 underline"
+          >
+            Ver conversa com a DDD
+          </Link>
+        </p>
+      )}
 
       <RequisicaoForm
         cpf={solicitante.cpf}
@@ -100,7 +121,9 @@ export default async function EditarRequisicaoPage({
           emNomeDeNome: requisicao.emNomeDeNome,
           observacao: requisicao.observacao,
           documentosEnviados: requisicao.documentos.map((d) => d.tipo),
+          id: requisicao.id,
           rascunho,
+          liberada,
         }}
       />
     </div>

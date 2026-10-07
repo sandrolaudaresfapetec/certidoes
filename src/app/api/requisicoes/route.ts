@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
   }
 
   const formulario = formularioDoPayload(body.cjt);
-  const erroCjt = primeiroErro(validarFormulario(formulario));
+  // O atendimento é a própria DDD: não tem o limite de 12 polígonos (#PEND-31).
+  const erroCjt = primeiroErro(validarFormulario(formulario, { liberado: true }));
   if (erroCjt) {
     return NextResponse.json({ error: erroCjt }, { status: 400 });
   }

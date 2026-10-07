@@ -9,8 +9,15 @@ import {
   AberturaProcesso,
   DevolverRequisicao,
   FinalizacaoPagamento,
+  LiberarRequisicao,
 } from "@/components/atendimento-acoes";
-import { STATUS_SOLICITACAO, podeDevolver, visivelAoAtendimento } from "@/lib/solicitacao-estados";
+import {
+  STATUS_SOLICITACAO,
+  bloqueioAcaoAtendimento,
+  podeDevolver,
+  podeLiberar,
+  visivelAoAtendimento,
+} from "@/lib/solicitacao-estados";
 import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
 import { ChatSolicitacao } from "@/components/requisicao/chat";
 
@@ -35,7 +42,7 @@ export default async function VisualizarRequisicaoPage({
     },
   });
   // Rascunho é só do solicitante: o atendimento não o enxerga, nem pelo link direto.
-  if (!requisicao || !visivelAoAtendimento(requisicao.status)) notFound();
+  if (!requisicao || !visivelAoAtendimento(requisicao.status, requisicao.congeladaEm)) notFound();
 
   // Contorno do imóvel no acervo SIGEF importado (vazio até a importação; #PEND-33).
   const parcela = requisicao.sigefParcelaCodigo
@@ -49,7 +56,7 @@ export default async function VisualizarRequisicaoPage({
   const atendimento = podeAtender(usuario);
 
   // Chat só para o atendimento (ADMIN e SDTC); abrir a tela conta como leitura.
-  const chatDisponivel = atendimento && chatVisivel(requisicao.status);
+  const chatDisponivel = atendimento && chatVisivel(requisicao.status, requisicao.congeladaEm);
   const mensagens = chatDisponivel ? await listarMensagens(requisicao.id) : [];
   if (chatDisponivel) await marcarLido(requisicao.id, "ATENDIMENTO");
 
@@ -74,7 +81,7 @@ export default async function VisualizarRequisicaoPage({
               endpoint={`/api/requisicoes/${requisicao.id}/mensagens`}
               lado="ATENDIMENTO"
               inicial={mensagens}
-              aceitaInicial={chatAceitaMensagens(requisicao.status)}
+              aceitaInicial={chatAceitaMensagens(requisicao.status, requisicao.congeladaEm)}
               titulo="Conversa com o solicitante"
               subtitulo={`${requisicao.solicitante.nome} · ${requisicao.protocolo}`}
               rotuloCampo="Mensagem para o solicitante"
@@ -106,10 +113,35 @@ export default async function VisualizarRequisicaoPage({
         </div>
       )}
 
+      {atendimento && requisicao.status === STATUS_SOLICITACAO.AGUARDANDO_LIBERACAO && (
+        <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">
+          <strong className="font-semibold">
+            Pedido congelado: {requisicao.cjtQtdPoligonos} polígonos.
+          </strong>{" "}
+          Aguardando a liberação da DDD. Abertura de processo e pagamento ficam bloqueados.
+        </div>
+      )}
+
+      {atendimento && requisicao.status === STATUS_SOLICITACAO.RASCUNHO && requisicao.liberadaEm && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <strong className="font-semibold">
+            Liberada em{" "}
+            {new Date(requisicao.liberadaEm).toLocaleString("pt-BR", {
+              timeZone: "America/Sao_Paulo",
+              dateStyle: "short",
+              timeStyle: "short",
+            })}
+            .
+          </strong>{" "}
+          Aguardando o solicitante concluir o preenchimento e enviar.
+        </div>
+      )}
+
       {atendimento && (
         <div className="space-y-6">
+          {podeLiberar(requisicao) && <LiberarRequisicao requisicaoId={requisicao.id} />}
           {podeDevolver(requisicao) && <DevolverRequisicao requisicaoId={requisicao.id} />}
-          {requisicao.status !== STATUS_SOLICITACAO.DEVOLVIDA && (
+          {bloqueioAcaoAtendimento(requisicao.status) === null && (
             <>
               {!requisicao.process && <AberturaProcesso requisicaoId={requisicao.id} />}
               <FinalizacaoPagamento

@@ -14,9 +14,9 @@ import {
 async function requisicaoDoChat(id: string, solicitanteId: string) {
   const requisicao = await prisma.solicitacao.findFirst({
     where: { id, solicitanteId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, congeladaEm: true },
   });
-  if (!requisicao || !chatVisivel(requisicao.status)) {
+  if (!requisicao || !chatVisivel(requisicao.status, requisicao.congeladaEm)) {
     return {
       erro: NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 }),
     };
@@ -42,7 +42,7 @@ export async function GET(
 
   const mensagens = await listarMensagens(id);
   await marcarLido(id, "SOLICITANTE");
-  return NextResponse.json({ mensagens, aceita: chatAceitaMensagens(r.requisicao.status) });
+  return NextResponse.json({ mensagens, aceita: chatAceitaMensagens(r.requisicao.status, r.requisicao.congeladaEm) });
 }
 
 /** POST /api/portal/solicitacoes/[id]/mensagens — o solicitante escreve no chat. */
@@ -56,7 +56,7 @@ export async function POST(
 
   const r = await requisicaoDoChat(id, sessao.solicitante.id);
   if ("erro" in r) return r.erro;
-  if (!chatAceitaMensagens(r.requisicao.status)) {
+  if (!chatAceitaMensagens(r.requisicao.status, r.requisicao.congeladaEm)) {
     return NextResponse.json(
       { error: "Esta solicitação foi arquivada e não aceita novas mensagens." },
       { status: 409 }

@@ -51,7 +51,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-28 | Download da certidão emitida pelo solicitante | backend | adição | média | aberta |
 | #PEND-29 | Pedido de arquivamento pelo solicitante (regra de custo/tempo) | backend | adição | média | bloqueada (#PEND-27) |
 | #PEND-30 | Análise agendada de duplicidade e sobreposição (4 situações) | backend | adição | alta | aberta |
-| #PEND-31 | Solicitação com 13+ polígonos: congelar e liberar pela DDD | backend | adição | alta | aberta |
+| #PEND-31 | Solicitação com 13+ polígonos: congelar e liberar pela DDD | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-32 | Nível de complexidade 1–9 (hoje são 4 classes) | backend | adição | média | aberta |
 | #PEND-33 | SIGEF no portal: CPF/CNPJ do representado, parcelas e geometria | backend | adição | média | aberta |
 | #PEND-34 | Persistir vínculo polígono nomeado ↔ parcela SIGEF | backend | adição | média | aberta |
@@ -328,6 +328,7 @@ Documento (Nova Requisição §7): antes de a requisição subir para a DDD, rod
 Documento (Nova Requisição §4): o máximo visto foi 12 polígonos. Com 13 ou mais, o preenchimento para na Pergunta 4 e remete à DDD; a solicitação fica "congelada pela metade" até a equipe técnica liberar, com o chat aberto para pedir comprovações; após o OK o solicitante continua preenchendo. Falta o rascunho/solicitação parcial e a ação de liberar.
 **Impacto no frontend:** bloqueio com aviso na Pergunta 4 e retomada do preenchimento.
 **Depende de:** #PEND-25, #PEND-27 (rascunho).
+**Resolução:** Fase 5 do plano de atendimento CJT, branch `feat/portal-correcoes-cjt` (2026-10-07). Colunas `Solicitacao.congeladaEm` e `liberadaEm` nos dois schemas (migration `20261007150000_congelamento_poligonos`). `POST /api/portal/solicitacoes/[id]/congelar`: o dono encaminha à DDD um rascunho com 13 ou mais polígonos (a quantidade vem do rascunho guardado) e o status vira `AGUARDANDO_LIBERACAO`, com o chat aberto e mensagem de sistema idempotente. `POST /api/requisicoes/[id]/liberar` (ADMIN e SDTC): volta a `RASCUNHO` com `liberadaEm`, mensagem opcional no chat; ambas as transições são condicionais. Liberado, o pedido passa de 12 até 100 polígonos (`validarFormulario(form, { liberado })`); o atendimento presencial, que já é a DDD, não tem o limite de 12. O rascunho congelado fica visível ao atendimento (`visivelAoAtendimento`, `chatVisivel` ganharam o parâmetro `congeladaEm`), sai da fila de abertura de processo (`STATUS_FORA_DA_FILA`) e conta em "Em análise" para o solicitante. Telas: quadro de encaminhamento no formulário, avisos laranja e verde no acompanhamento, cartão `LiberarRequisicao` no atendimento. Limite: a DDD não recebe notificação própria do pedido congelado (a notificação só liga a processos); ela o encontra na lista de Requisições pelo status "Aguardando liberação".
 
 ### #PEND-32 · Nível de complexidade 1–9 (hoje são 4 classes)
 

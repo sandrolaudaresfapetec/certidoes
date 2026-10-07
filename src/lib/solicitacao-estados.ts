@@ -1,3 +1,5 @@
+import { LIMITE_POLIGONOS_ENVIO } from "./cjt-formulario";
+
 /**
  * Estados da requisição (`Solicitacao.status`) e regras que dependem só deles.
  * O banco guarda texto livre (sem enum): todo código de status novo entra aqui e em
@@ -38,9 +40,43 @@ export const STATUS_EDITAVEIS_PELO_CLIENTE: readonly string[] = [
   STATUS_SOLICITACAO.DEVOLVIDA,
 ];
 
-/** Rascunho é só do solicitante: o atendimento não o vê em lista nem em tela. */
-export function visivelAoAtendimento(status: string): boolean {
-  return status !== STATUS_SOLICITACAO.RASCUNHO;
+/**
+ * Rascunho é só do solicitante: o atendimento não o vê em lista nem em tela. Exceção: o
+ * rascunho que já foi congelado (13+ polígonos) tem conversa com a DDD e fica visível.
+ */
+export function visivelAoAtendimento(
+  status: string,
+  congeladaEm?: Date | string | null
+): boolean {
+  return status !== STATUS_SOLICITACAO.RASCUNHO || Boolean(congeladaEm);
+}
+
+/** Situações em que a requisição não está na fila de abertura de processo da DDD. */
+export const STATUS_FORA_DA_FILA: readonly string[] = [
+  STATUS_SOLICITACAO.RASCUNHO,
+  STATUS_SOLICITACAO.AGUARDANDO_LIBERACAO,
+  STATUS_SOLICITACAO.AGUARDANDO_CLIENTE,
+  STATUS_SOLICITACAO.DEVOLVIDA,
+  STATUS_SOLICITACAO.ARQUIVAMENTO_SOLICITADO,
+  STATUS_SOLICITACAO.ARQUIVADA,
+];
+
+/**
+ * Só um rascunho com mais de 12 polígonos vai para a DDD (#PEND-31). A quantidade vem do
+ * rascunho guardado, não do que a tela mandou.
+ */
+export function podeCongelar(requisicao: {
+  status: string;
+  cjtQtdPoligonos?: number | null;
+}): boolean {
+  return (
+    requisicao.status === STATUS_SOLICITACAO.RASCUNHO &&
+    (requisicao.cjtQtdPoligonos ?? 0) > LIMITE_POLIGONOS_ENVIO
+  );
+}
+
+export function podeLiberar(requisicao: { status: string }): boolean {
+  return requisicao.status === STATUS_SOLICITACAO.AGUARDANDO_LIBERACAO;
 }
 
 /**

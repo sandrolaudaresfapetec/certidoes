@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import { REQUISICAO_STATUS, statusRequisicao } from "./requisicao-status";
 import {
   MOTIVO_DEVOLUCAO_MAX,
+  STATUS_FORA_DA_FILA,
   STATUS_SOLICITACAO,
   bloqueioAcaoAtendimento,
   clientePodeEditar,
+  podeCongelar,
   podeDevolver,
+  podeLiberar,
   validarMotivoDevolucao,
   visivelAoAtendimento,
 } from "./solicitacao-estados";
@@ -88,5 +91,34 @@ describe("rascunho e atendimento", () => {
 
   it.each(["PENDENTE", "EM_ANALISE", "APROVADA", "CONCLUIDA"])("libera em %s", (status) => {
     expect(bloqueioAcaoAtendimento(status)).toBeNull();
+  });
+});
+
+describe("congelamento por 13+ polígonos (#PEND-31)", () => {
+  it("o atendimento vê rascunho só depois de congelado", () => {
+    expect(visivelAoAtendimento("RASCUNHO")).toBe(false);
+    expect(visivelAoAtendimento("RASCUNHO", new Date())).toBe(true);
+    expect(visivelAoAtendimento("AGUARDANDO_LIBERACAO", new Date())).toBe(true);
+  });
+
+  it("só congela rascunho com mais de 12 polígonos", () => {
+    expect(podeCongelar({ status: "RASCUNHO", cjtQtdPoligonos: 13 })).toBe(true);
+    expect(podeCongelar({ status: "RASCUNHO", cjtQtdPoligonos: 12 })).toBe(false);
+    expect(podeCongelar({ status: "RASCUNHO", cjtQtdPoligonos: null })).toBe(false);
+    expect(podeCongelar({ status: "PENDENTE", cjtQtdPoligonos: 20 })).toBe(false);
+    expect(podeCongelar({ status: "AGUARDANDO_LIBERACAO", cjtQtdPoligonos: 20 })).toBe(false);
+  });
+
+  it("só libera pedido aguardando liberação", () => {
+    expect(podeLiberar({ status: "AGUARDANDO_LIBERACAO" })).toBe(true);
+    expect(podeLiberar({ status: "RASCUNHO" })).toBe(false);
+    expect(podeLiberar({ status: "PENDENTE" })).toBe(false);
+  });
+
+  it("o pedido congelado não está na fila de abertura de processo e não é editável", () => {
+    expect(STATUS_FORA_DA_FILA).toContain("AGUARDANDO_LIBERACAO");
+    expect(STATUS_FORA_DA_FILA).toContain("RASCUNHO");
+    expect(STATUS_FORA_DA_FILA).not.toContain("PENDENTE");
+    expect(clientePodeEditar({ status: "AGUARDANDO_LIBERACAO" })).toBe(false);
   });
 });

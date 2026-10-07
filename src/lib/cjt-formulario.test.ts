@@ -218,3 +218,31 @@ describe("representação (#PEND-44)", () => {
     });
   });
 });
+
+describe("limite de polígonos liberado pela DDD (#PEND-31)", () => {
+  const gleba = (qtd: number) =>
+    formulario({
+      qualidade: "1b",
+      resultado: "2b",
+      situacao: "3d",
+      propriedadeDe: "Maria",
+      matricula: "123",
+      qtdPoligonos: String(qtd),
+      nomesPoligonos: Array.from({ length: qtd }, (_, i) => `Gleba ${i + 1}`),
+    });
+
+  it("sem liberação, 13 é recusado", () => {
+    expect(validarFormulario(gleba(13)).qtdPoligonos).toContain("13 ou mais");
+  });
+
+  it("liberado, passa de 12 até o máximo de 100", () => {
+    expect(validarFormulario(gleba(13), { liberado: true })).toEqual({});
+    expect(validarFormulario(gleba(100), { liberado: true })).toEqual({});
+    expect(validarFormulario(gleba(101), { liberado: true }).qtdPoligonos).toContain("máximo");
+  });
+
+  it("liberado ainda exige um nome para cada polígono", () => {
+    const f = { ...gleba(14), nomesPoligonos: Array.from({ length: 12 }, (_, i) => `Gleba ${i + 1}`) };
+    expect(validarFormulario(f, { liberado: true }).nomesPoligonos).toBeDefined();
+  });
+});

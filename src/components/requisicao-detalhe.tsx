@@ -86,7 +86,7 @@ export function RequisicaoDetalhe({
           </span>
         </div>
 
-        {escopo === "CLIENTE" && editavel && (
+        {escopo === "CLIENTE" && editavel && requisicao.status === "DEVOLVIDA" && (
           <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
             <p className="text-xs text-amber-900">
               <strong className="font-semibold">A equipe devolveu sua requisição.</strong>{" "}
@@ -112,6 +112,34 @@ export function RequisicaoDetalhe({
                 Ver conversa
               </a>
             </div>
+          </div>
+        )}
+
+        {escopo === "CLIENTE" && requisicao.status === "AGUARDANDO_LIBERACAO" && (
+          <div className="mt-4 rounded-md border border-orange-200 bg-orange-50 p-3">
+            <p className="text-xs text-orange-900">
+              <strong className="font-semibold">
+                Seu pedido tem {requisicao.cjtQtdPoligonos} polígonos e aguarda a liberação da DDD.
+              </strong>{" "}
+              Enquanto isso o preenchimento fica pausado. Use a conversa abaixo para enviar as
+              informações que a equipe pedir.
+            </p>
+          </div>
+        )}
+
+        {escopo === "CLIENTE" && requisicao.status === "RASCUNHO" && requisicao.congeladaEm && (
+          <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+            <p className="text-xs text-emerald-900">
+              <strong className="font-semibold">A DDD liberou o seu pedido.</strong> Você já pode
+              continuar o preenchimento e enviar a solicitação.
+            </p>
+            <Link
+              href={`/portal/requisicoes/${requisicao.id}/editar`}
+              className="mt-3 inline-flex items-center gap-1 bg-emerald-700 text-white px-4 py-2 rounded-md text-sm hover:bg-emerald-800"
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              Continuar solicitação
+            </Link>
           </div>
         )}
 

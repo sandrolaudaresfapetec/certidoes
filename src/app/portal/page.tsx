@@ -114,7 +114,7 @@ export default async function PortalHomePage({
                 <li key={s.id}>
                   <Link
                     href={
-                      s.status === "RASCUNHO"
+                      s.status === "RASCUNHO" && !s.congeladaEm
                         ? `/portal/requisicoes/${s.id}/editar`
                         : `/portal/requisicoes/${s.id}`
                     }
