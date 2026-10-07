@@ -13,6 +13,7 @@ import {
   Inbox,
   PenLine,
   UserPlus,
+  Map as MapIcon,
 } from "lucide-react";
 import { StaffLogoutButton } from "@/components/staff-logout";
 
@@ -22,6 +23,8 @@ interface ItemNav {
   icon: typeof Users;
   /** Gerenciamento de usuarios aparece somente para o administrador. */
   somenteAdmin?: boolean;
+  /** Restringe o item a alguns papeis (ex.: geometria so para ADMIN e TECNICO). */
+  papeis?: string[];
 }
 
 const navigation: ItemNav[] = [
@@ -31,6 +34,7 @@ const navigation: ItemNav[] = [
   { name: "Cadastro de Cliente", href: "/clientes", icon: UserPlus },
   { name: "Processos", href: "/processos", icon: FileText },
   { name: "Quadro", href: "/quadro", icon: Columns3 },
+  { name: "Geometria (corte de divisas)", href: "/geometria", icon: MapIcon, papeis: ["ADMIN", "TECNICO"] },
   { name: "Novo Processo", href: "/processos/novo", icon: PlusCircle },
   { name: "Notificacoes", href: "/notificacoes", icon: Bell },
   { name: "Usuarios", href: "/usuarios", icon: Users, somenteAdmin: true },
@@ -53,6 +57,7 @@ export function Sidebar({ usuario }: SidebarProps) {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navigation
           .filter((item) => !item.somenteAdmin || usuario.role === "ADMIN")
+          .filter((item) => !item.papeis || item.papeis.includes(usuario.role))
           .map((item) => {
             const isActive =
               item.href === "/"

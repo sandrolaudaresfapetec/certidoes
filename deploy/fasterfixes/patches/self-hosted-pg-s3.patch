@@ -37,6 +37,46 @@ index eb5230a..ca1427f 100644
  AWS_ACCESS_KEY_ID=""
  AWS_BUCKET_NAME=""
  AWS_SECRET_ACCESS_KEY=""
+diff --git a/apps/web/src/app/api/inngest/route.ts b/apps/web/src/app/api/inngest/route.ts
+index 42bb799..af2969c 100644
+--- a/apps/web/src/app/api/inngest/route.ts
++++ b/apps/web/src/app/api/inngest/route.ts
+@@ -1,4 +1,5 @@
+ import { inngest } from "@/server/inngest";
++import { attachScreenshotToGitHubIssue } from "@/server/inngest/attach-screenshot-to-github-issue";
+ import { addContactToSegment } from "@/server/inngest/add-contact-to-segment";
+ import { createGitHubIssue } from "@/server/inngest/create-github-issue";
+ import { createJiraIssue } from "@/server/inngest/create-jira-issue";
+@@ -25,6 +26,7 @@ export const { GET, POST, PUT } = serve({
+   client: inngest,
+   functions: [
+     createGitHubIssue,
++    attachScreenshotToGitHubIssue,
+     syncGitHubIssueStatus,
+     syncFeedbackStatusToGitHub,
+     createLinearIssue,
+diff --git a/apps/web/src/app/api/v1/feedback/[id]/screenshot/route.ts b/apps/web/src/app/api/v1/feedback/[id]/screenshot/route.ts
+index 97e4232..78ed766 100644
+--- a/apps/web/src/app/api/v1/feedback/[id]/screenshot/route.ts
++++ b/apps/web/src/app/api/v1/feedback/[id]/screenshot/route.ts
+@@ -1,4 +1,5 @@
+ import { checkRateLimit } from "@/server/api/check-rate-limit";
++import { inngest } from "@/server/inngest";
+ import { resolveProject } from "@/server/api/resolve-project";
+ import { validateOrigin } from "@/server/api/validate-origin";
+ import { validateReviewer } from "@/server/api/validate-reviewer";
+@@ -121,5 +122,11 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
+     ? await getSignedAssetUrl(updated.screenshot)
+     : null;
+ 
++  // Fire-and-forget like `feedback/created`: the upload response must not
++  // depend on Inngest availability.
++  inngest
++    .send({ name: "feedback/screenshot-attached", data: { feedbackId: id } })
++    .catch(() => {});
++
+   return NextResponse.json({ screenshotUrl });
+ }
 diff --git a/apps/web/src/lib/mailer/console.ts b/apps/web/src/lib/mailer/console.ts
 new file mode 100644
 index 0000000..d74086b
@@ -231,10 +271,10 @@ index d23072f..3d4bc4c 100644
    });
  }
 diff --git a/apps/web/src/server/inngest/create-github-issue.ts b/apps/web/src/server/inngest/create-github-issue.ts
-index 46f4dcf..17fc5b7 100644
+index 46f4dcf..5166f59 100644
 --- a/apps/web/src/server/inngest/create-github-issue.ts
 +++ b/apps/web/src/server/inngest/create-github-issue.ts
-@@ -5,9 +5,14 @@ import {
+@@ -5,9 +5,17 @@ import {
  import { getInstallationOctokit } from "@/server/github/github-app";
  import type { DiagnosticTrail } from "@fasterfixes/core";
  import { getSignedAssetUrl } from "@/server/storage/get-signed-asset-url";
@@ -243,13 +283,16 @@ index 46f4dcf..17fc5b7 100644
  import { inngest } from "./index";
  
 +// The widget attaches the screenshot in a second request after the feedback is
-+// created, so `feedback/created` usually fires before it has landed.
-+const SCREENSHOT_GRACE_PERIOD = "20s";
++// created, so `feedback/created` usually fires before it has landed. Poll for a
++// bounded time (slow browsers can take tens of seconds to render + upload)
++// rather than delaying every issue by the worst case.
++const SCREENSHOT_POLL_INTERVAL = "10s";
++const SCREENSHOT_POLL_ATTEMPTS = 6;
 +
  export const createGitHubIssue = inngest.createFunction(
    {
      id: "create-github-issue",
-@@ -21,9 +26,22 @@ export const createGitHubIssue = inngest.createFunction(
+@@ -21,9 +29,23 @@ export const createGitHubIssue = inngest.createFunction(
        },
      ],
    },
@@ -258,22 +301,23 @@ index 46f4dcf..17fc5b7 100644
      const { feedbackId } = event.data;
  
 +    if (event.name === "feedback/created") {
-+      const hasScreenshot = await step.run("check-screenshot", async () => {
-+        const row = await prisma.feedback.findUnique({
-+          where: { id: feedbackId },
-+          select: { screenshotId: true },
++      for (let attempt = 0; attempt < SCREENSHOT_POLL_ATTEMPTS; attempt++) {
++        const hasScreenshot = await step.run("check-screenshot", async () => {
++          const row = await prisma.feedback.findUnique({
++            where: { id: feedbackId },
++            select: { screenshotId: true },
++          });
++          return row?.screenshotId != null;
 +        });
-+        return row?.screenshotId != null;
-+      });
-+      if (!hasScreenshot) {
-+        await step.sleep("wait-for-screenshot", SCREENSHOT_GRACE_PERIOD);
++        if (hasScreenshot) break;
++        await step.sleep("wait-for-screenshot", SCREENSHOT_POLL_INTERVAL);
 +      }
 +    }
 +
      const feedback = await prisma.feedback.findUnique({
        where: { id: feedbackId },
        include: {
-@@ -63,9 +81,14 @@ export const createGitHubIssue = inngest.createFunction(
+@@ -63,9 +85,14 @@ export const createGitHubIssue = inngest.createFunction(
      const installation = gitHubLink.gitHubInstallation;
      const octokit = getInstallationOctokit(installation.installationId);
  
@@ -364,3 +408,111 @@ index 94d4e14..74eb090 100644
  
  const prisma = new PrismaClient({ adapter });
  
+diff --git a/apps/web/src/server/inngest/attach-screenshot-to-github-issue.ts b/apps/web/src/server/inngest/attach-screenshot-to-github-issue.ts
+new file mode 100644
+index 0000000..047442d
+--- /dev/null
++++ b/apps/web/src/server/inngest/attach-screenshot-to-github-issue.ts
+@@ -0,0 +1,102 @@
++import { getInstallationOctokit } from "@/server/github/github-app";
++import { getSignedAssetUrl } from "@/server/storage/get-signed-asset-url";
++import { resolveS3Url } from "@/server/storage/resolve-s3-url";
++import { prisma } from "@workspace/db";
++import { inngest } from "./index";
++
++// `create-github-issue` waits a bounded time for the screenshot; anything that
++// lands after that window reaches the issue through this handler instead.
++// The wait below covers the race where the screenshot is attached while the
++// issue is still being created (no issue link yet).
++const ISSUE_CREATION_GRACE_PERIOD = "2m";
++
++const SCREENSHOT_MARKER = "![Screenshot](";
++
++async function loadFeedback(feedbackId: string) {
++  return prisma.feedback.findUnique({
++    where: { id: feedbackId },
++    select: {
++      screenshot: { select: { key: true, bucket: true } },
++      issueLink: {
++        select: {
++          id: true,
++          issueNumber: true,
++          projectGitHubLink: {
++            select: {
++              repoOwner: true,
++              repoName: true,
++              gitHubInstallation: { select: { installationId: true } },
++            },
++          },
++        },
++      },
++    },
++  });
++}
++
++export const attachScreenshotToGitHubIssue = inngest.createFunction(
++  {
++    id: "attach-screenshot-to-github-issue",
++    retries: 3,
++    concurrency: { key: "event.data.feedbackId", limit: 1 },
++    triggers: [{ event: "feedback/screenshot-attached" }],
++  },
++  async ({ event, step }) => {
++    const { feedbackId } = event.data;
++
++    let feedback = await step.run("load-feedback", () =>
++      loadFeedback(feedbackId),
++    );
++    if (!feedback) return { skipped: "feedback_not_found" };
++    if (!feedback.screenshot) return { skipped: "no_screenshot" };
++
++    if (!feedback.issueLink) {
++      await step.sleep("wait-for-issue", ISSUE_CREATION_GRACE_PERIOD);
++      feedback = await step.run("reload-feedback", () =>
++        loadFeedback(feedbackId),
++      );
++      if (!feedback?.screenshot) return { skipped: "no_screenshot" };
++      if (!feedback.issueLink) return { skipped: "no_github_issue" };
++    }
++
++    const { issueLink, screenshot } = feedback;
++    const { repoOwner, repoName, gitHubInstallation } =
++      issueLink.projectGitHubLink;
++
++    return step.run("update-issue-body", async () => {
++      const octokit = getInstallationOctokit(gitHubInstallation.installationId);
++      const current = await octokit.request(
++        "GET /repos/{owner}/{repo}/issues/{issue_number}",
++        { owner: repoOwner, repo: repoName, issue_number: issueLink.issueNumber },
++      );
++      const body = (current.data as { body: string | null }).body ?? "";
++
++      // Idempotent: a second delivery (or the create path having already
++      // embedded the image) must not add a second screenshot.
++      if (body.includes(SCREENSHOT_MARKER)) {
++        return { skipped: "screenshot_already_present" };
++      }
++
++      const screenshotUrl = process.env.NEXT_PUBLIC_STORAGE_BASE_URL
++        ? resolveS3Url(screenshot.key)
++        : await getSignedAssetUrl(screenshot, 3600);
++
++      await octokit.request(
++        "PATCH /repos/{owner}/{repo}/issues/{issue_number}",
++        {
++          owner: repoOwner,
++          repo: repoName,
++          issue_number: issueLink.issueNumber,
++          body: `${body}\n\n${SCREENSHOT_MARKER}${screenshotUrl})`,
++        },
++      );
++
++      await prisma.feedbackIssueLink.update({
++        where: { id: issueLink.id },
++        data: { lastSyncSource: "app", lastSyncAt: new Date() },
++      });
++
++      return { issueNumber: issueLink.issueNumber, screenshotUrl };
++    });
++  },
++);
