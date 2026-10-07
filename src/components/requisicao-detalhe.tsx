@@ -54,11 +54,14 @@ export function RequisicaoDetalhe({
   escopo,
   editavel = false,
   geometriaImovel = null,
+  chat = null,
 }: {
   requisicao: RequisicaoDetalhada;
   escopo: "CLIENTE" | "INTERNO";
   editavel?: boolean;
   geometriaImovel?: unknown | null;
+  /** Cartão do chat (montado pela página, que carrega as mensagens). */
+  chat?: React.ReactNode;
 }) {
   const st = statusRequisicao(requisicao.status);
   const poligonos = nomesPoligonos(requisicao.cjtNomesPoligonos);
@@ -117,6 +120,8 @@ export function RequisicaoDetalhe({
           finalizadaEm={requisicao.finalizadaEm}
         />
       )}
+
+      {chat}
 
       <Bloco titulo="Identificação do pedido">
         <Item rotulo="Qualidade do solicitante" valor={rotuloOpcao(requisicao.cjtQualidade)} />

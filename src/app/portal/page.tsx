@@ -11,6 +11,8 @@ import {
 import { RequisicaoFiltros } from "@/components/requisicao-filtros";
 import { CartoesStatusGeral } from "@/components/requisicao/cartoes-status-geral";
 import { FileText, PlusCircle } from "lucide-react";
+import { naoLidasPorSolicitacao } from "@/lib/chat";
+import { SeloMensagensNovas } from "@/components/requisicao/selo-mensagens-novas";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +51,7 @@ export default async function PortalHomePage({
       select: { status: true },
     }),
   ]);
+  const novas = await naoLidasPorSolicitacao(solicitacoes, "SOLICITANTE");
 
   const contagens = Object.fromEntries(
     GRUPOS_STATUS_GERAL.map((g) => [
@@ -135,10 +138,13 @@ export default async function PortalHomePage({
                         </p>
                       </div>
                     </div>
-                    <span
-                      className={`shrink-0 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}
-                    >
-                      {st.label}
+                    <span className="flex shrink-0 items-center gap-2">
+                      {novas.has(s.id) && <SeloMensagensNovas quantidade={novas.get(s.id)!} />}
+                      <span
+                        className={`shrink-0 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}
+                      >
+                        {st.label}
+                      </span>
                     </span>
                   </Link>
                 </li>

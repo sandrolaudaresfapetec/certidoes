@@ -358,7 +358,7 @@ export function RequisicaoForm({
               dias, período de funcionamento do Instituto, de segunda a sexta-feira, das 9h às
               17h, exceto feriados.
             </p>
-            {/* PEND-25: o chat da solicitação ainda não existe; texto do cliente mantido. */}
+            {/* Texto do cliente (documento CJT). O chat existe em Acompanhar Requisição (#PEND-25). */}
             <p>
               Todas as comunicações e solicitações de complementação serão realizadas
               exclusivamente por este sistema, no chat da solicitação.

@@ -6,6 +6,8 @@ import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
 import { geometriaDoAcervo } from "@/components/requisicao/geometria";
 import { clientePodeEditar } from "@/lib/solicitacao-estados";
+import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
+import { ChatSolicitacao } from "@/components/requisicao/chat";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +44,11 @@ export default async function AcompanharRequisicaoPage({
   // O cliente só altera a requisição depois que a equipe a devolve.
   const editavel = clientePodeEditar(requisicao);
 
+  // Chat: abrir a tela conta como leitura (some o selo "novas" da lista).
+  const chatDisponivel = chatVisivel(requisicao.status);
+  const mensagens = chatDisponivel ? await listarMensagens(requisicao.id) : [];
+  if (chatDisponivel) await marcarLido(requisicao.id, "SOLICITANTE");
+
   return (
     <div>
       <Link
@@ -55,6 +62,19 @@ export default async function AcompanharRequisicaoPage({
       <RequisicaoDetalhe requisicao={requisicao} escopo="CLIENTE"
         editavel={editavel}
         geometriaImovel={geometriaImovel}
+        chat={
+          chatDisponivel ? (
+            <ChatSolicitacao
+              endpoint={`/api/portal/solicitacoes/${requisicao.id}/mensagens`}
+              lado="SOLICITANTE"
+              inicial={mensagens}
+              aceitaInicial={chatAceitaMensagens(requisicao.status)}
+              titulo="Conversa com o IGC"
+              subtitulo="Todas as comunicações e pedidos de complementação são feitos aqui."
+              rotuloCampo="Mensagem para o IGC"
+            />
+          ) : null
+        }
       />
     </div>
   );

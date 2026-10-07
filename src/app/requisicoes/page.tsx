@@ -6,6 +6,8 @@ import { statusRequisicao } from "@/lib/requisicao-status";
 import { RequisicaoFiltros } from "@/components/requisicao-filtros";
 import { requireUsuario, podeAtender } from "@/lib/auth";
 import type { Prisma } from "@prisma/client";
+import { naoLidasPorSolicitacao } from "@/lib/chat";
+import { SeloMensagensNovas } from "@/components/requisicao/selo-mensagens-novas";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,10 @@ export default async function RequisicoesPage({
       process: { select: { id: true, ordem: true } },
     },
   });
+  // Selo de mensagens novas só para quem pode abrir o chat (ADMIN e SDTC).
+  const novas = atendimento
+    ? await naoLidasPorSolicitacao(requisicoes, "ATENDIMENTO")
+    : new Map<string, number>();
 
   return (
     <div className="p-8 space-y-6">
@@ -122,8 +128,11 @@ export default async function RequisicoesPage({
                         </p>
                       </div>
                     </div>
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}>
-                      {st.label}
+                    <span className="flex shrink-0 items-center gap-2">
+                      {novas.has(r.id) && <SeloMensagensNovas quantidade={novas.get(r.id)!} />}
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}>
+                        {st.label}
+                      </span>
                     </span>
                   </Link>
                 </li>

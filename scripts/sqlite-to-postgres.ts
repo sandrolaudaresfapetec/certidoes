@@ -21,16 +21,17 @@ const DATE_COLS: Record<string, string[]> = {
   WorkflowAction: ["createdAt"],
   SigefConsulta: ["createdAt"],
   Solicitante: ["createdAt","updatedAt"],
-  Solicitacao: ["createdAt","updatedAt"],
+  Solicitacao: ["pagamentoEm","finalizadaEm","chatLidoSolicitanteEm","chatLidoAtendimentoEm","createdAt","updatedAt"],
+  MensagemSolicitacao: ["respondidaEm","createdAt"],
   Documento: ["createdAt"],
   LinhaDivisa: ["dataValidacao","createdAt"],
   CorteDivisa: ["dataCorte"],
 };
 const BOOL_COLS: Record<string, string[]> = {
   User: ["active"], Notification: ["read"], SigefConsulta: ["sucesso"],
-  Solicitante: ["cadastroCompleto"], Solicitacao: ["tipoViaSigef"],
+  Solicitante: ["cadastroCompleto"], Solicitacao: ["tipoViaSigef","cjtDeclaracaoAceita"],
 };
-const TABLES = ["User","Process","Notification","WorkflowAction","SigefConsulta","Solicitante","Solicitacao","Documento","LinhaDivisa","CorteDivisa"];
+const TABLES = ["User","Process","Notification","WorkflowAction","SigefConsulta","Solicitante","Solicitacao","Documento","MensagemSolicitacao","LinhaDivisa","CorteDivisa"];
 
 function toDate(v: unknown): Date | null {
   if (v === null || v === undefined) return null;

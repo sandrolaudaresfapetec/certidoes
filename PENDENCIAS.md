@@ -45,13 +45,13 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-22 | `eslint` falha em `docker-entrypoint.js` | infra | bugfix | baixa | aberta |
 | #PEND-23 | Restos do Litestream no `package.json` | infra | refatoração | baixa | aberta |
 | #PEND-24 | Sem testes automatizados nas bibliotecas de regra | backend | adição | média | aberta |
-| #PEND-25 | Chat da solicitação (não existe modelo, rota nem tela) | backend | adição | alta | aberta |
+| #PEND-25 | Chat da solicitação (não existe modelo, rota nem tela) | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-26 | Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA` | backend | adição | alta | em andamento |
 | #PEND-27 | Modelo de status da requisição para o solicitante (5 gerais + 6 etapas) | backend | adição | alta | aberta |
 | #PEND-28 | Download da certidão emitida pelo solicitante | backend | adição | média | aberta |
 | #PEND-29 | Pedido de arquivamento pelo solicitante (regra de custo/tempo) | backend | adição | média | bloqueada (#PEND-27) |
-| #PEND-30 | Análise agendada de duplicidade e sobreposição (4 situações) | backend | adição | alta | bloqueada (#PEND-25) |
-| #PEND-31 | Solicitação com 13+ polígonos: congelar e liberar pela DDD | backend | adição | alta | bloqueada (#PEND-25) |
+| #PEND-30 | Análise agendada de duplicidade e sobreposição (4 situações) | backend | adição | alta | aberta |
+| #PEND-31 | Solicitação com 13+ polígonos: congelar e liberar pela DDD | backend | adição | alta | aberta |
 | #PEND-32 | Nível de complexidade 1–9 (hoje são 4 classes) | backend | adição | média | aberta |
 | #PEND-33 | SIGEF no portal: CPF/CNPJ do representado, parcelas e geometria | backend | adição | média | aberta |
 | #PEND-34 | Persistir vínculo polígono nomeado ↔ parcela SIGEF | backend | adição | média | aberta |
@@ -269,6 +269,7 @@ Nenhum framework de teste instalado e nenhum script `test`. São bibliotecas pur
 O documento de correções de 2026-09-16 diz que "todas as comunicações … serão realizadas exclusivamente por este sistema, no chat da solicitação", e o cliente já reclama: "não encontramos o chat". Precisa de mensagens por requisição (autor solicitante/servidor, data, leitura), rotas de listar/enviar com escopo (o solicitante só vê as suas), aviso ao servidor e suporte a mensagem com resposta rápida (Sim/Não), usada por #PEND-30 e #PEND-31.
 **Impacto no frontend:** UI do chat no portal (Acompanhar) e no backoffice (`/requisicoes/[id]`). A mensagem de sucesso do envio (doc §6) cita o chat.
 **Bloqueia:** #PEND-30, #PEND-31.
+**Resolução:** Fase 1 do plano de atendimento CJT, branch `feat/portal-correcoes-cjt` (2026-10-07). Model `MensagemSolicitacao` e marcas de leitura em `Solicitacao` (`chatLidoSolicitanteEm`, `chatLidoAtendimentoEm`) nos dois schemas, mais a migration `20261007120000_chat_solicitacao`. Lib `src/lib/chat.ts` (parte pura em `chat-tipos.ts`), rotas `GET|POST /api/portal/solicitacoes/[id]/mensagens`, `POST …/[mid]/responder` e `GET|POST /api/requisicoes/[id]/mensagens`, componente `src/components/requisicao/chat.tsx` (atualiza a cada 20 s) e selo de mensagens novas nas duas listas. Mensagens de sistema são idempotentes pela `chave` e a resposta a uma pergunta só vale uma vez. Limites: só ADMIN e SDTC (a "DDD") veem o chat no backoffice; sem anexos e sem aviso por e-mail ou SMS (#PEND-37); a leitura é marcada ao abrir a tela ou ao atualizar. A #PEND-30 e a #PEND-31 deixam de estar bloqueadas por esta pendência.
 
 ### #PEND-26 · Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA`
 

@@ -93,6 +93,11 @@ model Solicitacao {
   processId         String?  @unique
   process           Process? @relation(fields: [processId], references: [id])
 
+  // Chat da solicitacao: ate onde cada lado leu (mensagens mais novas = nao lidas)
+  chatLidoSolicitanteEm DateTime?
+  chatLidoAtendimentoEm DateTime?
+  mensagens         MensagemSolicitacao[]
+
   documentos        Documento[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -103,6 +108,29 @@ model Solicitacao {
 //  - PLANTA (planta do imovel)
 //  - DOC_PROPRIEDADE (comprovante de propriedade, nao precisa ser matricula)
 //  - PROCURACAO (quando o solicitante representa terceiro)
+/// Chat entre o solicitante e a DDD (ADMIN e SDTC). Mensagens de sistema (perguntas de
+/// duplicidade, avisos) usam `chave` para nunca serem gravadas duas vezes.
+model MensagemSolicitacao {
+  id            String   @id @default(cuid())
+  autorTipo     String   // SOLICITANTE | ATENDIMENTO | SISTEMA
+  autorUserId   String?  // User.id do atendente quando autorTipo = ATENDIMENTO
+  autorNome     String
+  tipo          String   @default("TEXTO") // TEXTO | PERGUNTA | EVENTO
+  texto         String
+  opcoes        String?  // JSON [{id, rotulo}] quando tipo = PERGUNTA
+  respostaOpcao String?  // id da opcao escolhida
+  respondidaEm  DateTime?
+  chave         String?  // idempotencia das mensagens de sistema (unica por solicitacao)
+
+  solicitacaoId String
+  solicitacao   Solicitacao @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+
+  @@unique([solicitacaoId, chave])
+  @@index([solicitacaoId, createdAt])
+}
+
 model Documento {
   id            String   @id @default(cuid())
   tipo          String   // PLANTA, DOC_PROPRIEDADE, PROCURACAO

@@ -6,6 +6,8 @@ import { requireUsuario, podeAtender } from "@/lib/auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
 import { geometriaDoAcervo } from "@/components/requisicao/geometria";
 import { AberturaProcesso, FinalizacaoPagamento } from "@/components/atendimento-acoes";
+import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
+import { ChatSolicitacao } from "@/components/requisicao/chat";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,11 @@ export default async function VisualizarRequisicaoPage({
 
   const atendimento = podeAtender(usuario);
 
+  // Chat só para o atendimento (ADMIN e SDTC); abrir a tela conta como leitura.
+  const chatDisponivel = atendimento && chatVisivel(requisicao.status);
+  const mensagens = chatDisponivel ? await listarMensagens(requisicao.id) : [];
+  if (chatDisponivel) await marcarLido(requisicao.id, "ATENDIMENTO");
+
   return (
     <div className="p-8 max-w-4xl space-y-6">
       <Link
@@ -51,7 +58,24 @@ export default async function VisualizarRequisicaoPage({
       </Link>
       <h1 className="text-2xl font-bold text-gray-900">Visualizar Requisição</h1>
 
-      <RequisicaoDetalhe requisicao={requisicao} escopo="INTERNO" geometriaImovel={geometriaImovel} />
+      <RequisicaoDetalhe
+        requisicao={requisicao}
+        escopo="INTERNO"
+        geometriaImovel={geometriaImovel}
+        chat={
+          chatDisponivel ? (
+            <ChatSolicitacao
+              endpoint={`/api/requisicoes/${requisicao.id}/mensagens`}
+              lado="ATENDIMENTO"
+              inicial={mensagens}
+              aceitaInicial={chatAceitaMensagens(requisicao.status)}
+              titulo="Conversa com o solicitante"
+              subtitulo={`${requisicao.solicitante.nome} · ${requisicao.protocolo}`}
+              rotuloCampo="Mensagem para o solicitante"
+            />
+          ) : null
+        }
+      />
 
       {atendimento && (
         <div className="space-y-6">
