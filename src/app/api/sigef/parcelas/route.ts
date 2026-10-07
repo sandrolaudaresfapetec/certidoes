@@ -4,10 +4,11 @@ import {
   parcelaNoPonto,
   parcelaPorCodigo,
   parcelasPorBbox,
+  ultimaSincronizacaoAcervo,
 } from "@/lib/sigef-parcelas";
 import { exigirGeometriaApi } from "@/lib/auth";
 
-const FONTE = "SIGEF/Acervo Fundiario (INCRA) — shapefile importado";
+const FONTE = "SIGEF/Acervo Fundiario (INCRA) — sincronizado diariamente";
 
 /**
  * GET /api/sigef/parcelas?bbox=minLon,minLat,maxLon,maxLat — parcelas da janela
@@ -67,7 +68,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ fonte: FONTE, parcelas: [parcela] });
     }
 
-    return NextResponse.json({ fonte: FONTE, uf, total: await contarParcelas(uf) });
+    const [total, sincronizacao] = await Promise.all([contarParcelas(uf), ultimaSincronizacaoAcervo(uf)]);
+    return NextResponse.json({ fonte: FONTE, uf, total, sincronizacao });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
