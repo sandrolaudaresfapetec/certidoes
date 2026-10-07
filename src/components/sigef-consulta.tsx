@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { CampoMascarado } from "@/components/campo-mascarado";
+import { digitosCpfCnpj, mascaraCpfCnpj } from "@/lib/mascaras";
 import { Search, Loader2, MapPin, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface SigefParcela {
@@ -48,7 +50,7 @@ export default function SigefConsulta() {
       const res = await fetch("/api/sigef/consulta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cpfCnpj }),
+        body: JSON.stringify({ cpfCnpj: digitosCpfCnpj(cpfCnpj) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -99,10 +101,13 @@ export default function SigefConsulta() {
       </p>
 
       <div className="flex gap-2">
-        <input
-          type="text"
+        <CampoMascarado
+          mascara={mascaraCpfCnpj}
+          inputMode="numeric"
+          autoComplete="off"
+          aria-label="CPF ou CNPJ do solicitante"
           value={cpfCnpj}
-          onChange={(e) => setCpfCnpj(e.target.value)}
+          onValueChange={setCpfCnpj}
           placeholder="CPF ou CNPJ do solicitante"
           className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
         />

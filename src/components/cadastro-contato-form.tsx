@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, CheckCircle2 } from "lucide-react";
+import { CampoMascarado } from "@/components/campo-mascarado";
+import { mascaraTelefone } from "@/lib/mascaras";
 
 interface CadastroContatoFormProps {
   emailInicial?: string;
@@ -20,7 +22,7 @@ export function CadastroContatoForm({
 }: CadastroContatoFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState(emailInicial);
-  const [telefone, setTelefone] = useState(telefoneInicial);
+  const [telefone, setTelefone] = useState(mascaraTelefone(telefoneInicial));
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvo, setSalvo] = useState(false);
@@ -74,11 +76,13 @@ export function CadastroContatoForm({
         <label htmlFor="cadastro-telefone" className="block text-xs font-medium text-gray-600 mb-1">
           Telefone (com DDD) *
         </label>
-        <input
+        <CampoMascarado
           id="cadastro-telefone"
-          type="tel"
+          mascara={mascaraTelefone}
+          inputMode="tel"
+          autoComplete="tel"
           value={telefone}
-          onChange={(e) => setTelefone(e.target.value)}
+          onValueChange={setTelefone}
           placeholder="(61) 99999-9999"
           required
           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { CampoMascarado } from "@/components/campo-mascarado";
+import { mascaraCpf } from "@/lib/mascaras";
 import { useRouter } from "next/navigation";
 import { Loader2, ShieldCheck } from "lucide-react";
 
@@ -53,13 +55,16 @@ export default function PortalLoginPage() {
             substituído pelo botão oficial "Entrar com gov.br" */}
         <form onSubmit={entrar} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="login-cpf" className="block text-xs font-medium text-gray-600 mb-1">
               CPF
             </label>
-            <input
-              type="text"
+            <CampoMascarado
+              id="login-cpf"
+              mascara={mascaraCpf}
+              inputMode="numeric"
+              autoComplete="off"
               value={cpf}
-              onChange={(e) => setCpf(e.target.value)}
+              onValueChange={setCpf}
               placeholder="000.000.000-00"
               required
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"

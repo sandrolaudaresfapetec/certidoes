@@ -12,6 +12,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Clock, User, FileText, MapPin, FileCheck, Pencil, Scissors } from "lucide-react";
 import { WorkflowActions } from "@/components/workflow-actions";
 import { podeAtender, requireUsuario } from "@/lib/auth";
+import { exibirCpfCnpj } from "@/lib/mascaras";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +131,7 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
               <InfoField label="Tipo" value={processo.tipo} />
               <InfoField label="Email" value={processo.email} />
               <InfoField label="Telefone" value={processo.telefone} />
-              <InfoField label="CPF/CNPJ" value={processo.cpfCnpj} />
+              <InfoField label="CPF/CNPJ" value={exibirCpfCnpj(processo.cpfCnpj)} />
               {processo.dtNascimentoIdoso && (
                 <InfoField
                   label="Data Nascimento (Idoso)"

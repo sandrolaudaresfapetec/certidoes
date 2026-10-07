@@ -61,7 +61,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-38 | Decisão: cartela de cores e logos do IGC | negócio | decisão | média | aberta |
 | #PEND-39 | Decisão: dúvidas do documento de correções de 2026-09-16 | negócio | decisão | média | aberta |
 | #PEND-40 | Texto auxiliar em `gray-400` abaixo do contraste AA (rodapé do portal) | frontend | melhoria | baixa | aberta |
-| #PEND-41 | Máscaras de entrada nos formulários (telefone, CPF, CNPJ etc.) | frontend | adição | média | aberta |
+| #PEND-41 | Máscaras de entrada nos formulários (telefone, CPF, CNPJ etc.) | frontend | adição | média | resolvida (2026-10-07) |
 | #PEND-42 | Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar | backend | adição | média | aberta |
 | #PEND-43 | Salvar rascunho e continuar requisição no formulário e em Minhas Requisições | frontend | adição | média | bloqueada (#PEND-42) |
 | #PEND-44 | Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1 | backend | segurança | média | aberta |
@@ -400,6 +400,7 @@ Achado na varredura de contraste da Fase A: o rodapé "Serviço de emissão de c
 
 Os campos de telefone, CPF, CNPJ e similares aceitam texto livre, sem máscara de digitação. Aplicar máscara em todo formulário que tiver esses tipos de campo. Pedido do time; não mapeado nem priorizado ainda — o levantamento dos formulários afetados fica para quando a pendência for atacada.
 **Já feito:** CPF/CNPJ de quem é representado (Fase 4, `mascaraCpfCnpj` em `src/lib/cjt-formulario.ts`, reaproveitável nos demais campos).
+**Resolução:** `src/lib/mascaras.ts` (máscaras de CPF, telefone e exibição) e `src/components/campo-mascarado.tsx` (campo que preserva o cursor). Aplicadas em: login do portal (CPF), cadastro do portal e completar cadastro (telefone), Cadastro de Cliente (CPF, telefone), consulta SIGEF e Novo Processo (telefone, CPF/CNPJ) e Editar Processo (telefone, CPF/CNPJ). Telas de leitura (Processo, Certidão) mostram CPF/CNPJ formatado. O contrato com a API não mudou: CPF/CNPJ vão só com números e o telefone vai formatado. Commit: ver histórico de `feat(ui): máscaras…`.
 
 ### #PEND-42 · Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar
 

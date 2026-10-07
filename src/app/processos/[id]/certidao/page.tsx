@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "./print-button";
 import { requireUsuario } from "@/lib/auth";
+import { exibirCpfCnpj } from "@/lib/mascaras";
 
 export const dynamic = "force-dynamic";
 
@@ -142,7 +143,7 @@ export default async function CertidaoPage({ params }: PageProps) {
         {/* Interessado */}
         <Section titulo="Interessado">
           <Campo label="Nome" valor={processo.interessado} />
-          <Campo label="CPF/CNPJ" valor={processo.cpfCnpj} />
+          <Campo label="CPF/CNPJ" valor={exibirCpfCnpj(processo.cpfCnpj)} />
           <Campo label="E-mail" valor={processo.email} />
           <Campo label="Telefone" valor={processo.telefone} />
         </Section>

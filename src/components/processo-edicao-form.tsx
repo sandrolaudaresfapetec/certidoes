@@ -5,6 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Save } from "lucide-react";
 import { SERVICE_TYPES, CLIENT_TYPES, BASES, DEPARTMENTS } from "@/lib/workflow";
+import { CampoMascarado } from "@/components/campo-mascarado";
+import {
+  cpfCnpjCompleto,
+  digitosCpfCnpj,
+  mascaraCpfCnpj,
+  mascaraTelefone,
+  telefoneCompleto,
+  type Mascara,
+} from "@/lib/mascaras";
 
 type Tipo = "texto" | "email" | "data" | "ano" | "dinheiro" | "lista" | "area";
 
@@ -17,7 +26,14 @@ interface CampoDef {
   dica?: string;
   /** Campo ocupa a largura toda da seção (áreas de texto). */
   largo?: boolean;
+  /** Máscara de entrada: o campo guarda o texto formatado. */
+  mascara?: "telefone" | "cpfcnpj";
 }
+
+const MASCARAS: Record<"telefone" | "cpfcnpj", Mascara> = {
+  telefone: mascaraTelefone,
+  cpfcnpj: mascaraCpfCnpj,
+};
 
 interface SecaoDef {
   id: string;
@@ -64,8 +80,8 @@ const SECOES: SecaoDef[] = [
       { nome: "interessado", rotulo: "Interessado", tipo: "texto", obrigatorio: true },
       { nome: "tipo", rotulo: "Tipo", tipo: "lista", obrigatorio: true, opcoes: CLIENT_TYPES },
       { nome: "email", rotulo: "Email", tipo: "email" },
-      { nome: "telefone", rotulo: "Telefone", tipo: "texto" },
-      { nome: "cpfCnpj", rotulo: "CPF/CNPJ", tipo: "texto" },
+      { nome: "telefone", rotulo: "Telefone", tipo: "texto", mascara: "telefone" },
+      { nome: "cpfCnpj", rotulo: "CPF/CNPJ", tipo: "texto", mascara: "cpfcnpj" },
       { nome: "dtNascimentoIdoso", rotulo: "Data Nascimento (Idoso)", tipo: "data" },
     ],
   },
@@ -129,6 +145,17 @@ function converter(campo: CampoDef, texto: string): { valor: string | number | n
   const t = texto.trim();
   if (campo.obrigatorio && t === "") return { valor: null, erro: "Campo obrigatório." };
   if (t === "") return { valor: null };
+  if (campo.mascara === "cpfcnpj") {
+    // CPF/CNPJ seguem só com algarismos, como o portal grava.
+    return cpfCnpjCompleto(t)
+      ? { valor: digitosCpfCnpj(t) }
+      : { valor: null, erro: "Informe 11 números (CPF) ou 14 (CNPJ)." };
+  }
+  if (campo.mascara === "telefone") {
+    return telefoneCompleto(t)
+      ? { valor: t }
+      : { valor: null, erro: "Informe o telefone com DDD." };
+  }
   if (campo.tipo === "ano") {
     const n = Number(t);
     if (!Number.isInteger(n) || n < 1900 || n > 2100) {
@@ -157,7 +184,15 @@ export function ProcessoEdicaoForm({
   conferentes,
 }: ProcessoEdicaoFormProps) {
   const router = useRouter();
-  const [valores, setValores] = useState<Record<string, string>>(inicial);
+  // Valores que já vêm do servidor (CPF sem pontos, telefone cru) abrem formatados.
+  const [inicialMascarado] = useState(() => {
+    const m = { ...inicial };
+    for (const c of TODOS_OS_CAMPOS) {
+      if (c.mascara && m[c.nome]) m[c.nome] = MASCARAS[c.mascara](m[c.nome]);
+    }
+    return m;
+  });
+  const [valores, setValores] = useState<Record<string, string>>(inicialMascarado);
   const [errosCampo, setErrosCampo] = useState<Record<string, string>>({});
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -182,17 +217,15 @@ export function ProcessoEdicaoForm({
     const novosErros: Record<string, string> = {};
     const payload: Record<string, string | number | null> = {};
     for (const campo of TODOS_OS_CAMPOS) {
+      // Campo que o usuário não tocou não é validado nem enviado (dado antigo pode estar fora do padrão).
+      if ((valores[campo.nome] ?? "") === (inicialMascarado[campo.nome] ?? "")) continue;
       const atual = converter(campo, valores[campo.nome] ?? "");
-      if (atual.erro) {
-        novosErros[campo.nome] = atual.erro;
-        continue;
-      }
-      const original = converter(campo, inicial[campo.nome] ?? "");
-      if (atual.valor !== original.valor) payload[campo.nome] = atual.valor;
+      if (atual.erro) novosErros[campo.nome] = atual.erro;
+      else payload[campo.nome] = atual.valor;
     }
     for (const nome of NOMES_USUARIO) {
       const atual = valores[nome] || null;
-      if (atual !== (inicial[nome] || null)) payload[nome] = atual;
+      if (atual !== (inicialMascarado[nome] || null)) payload[nome] = atual;
     }
 
     setErrosCampo(novosErros);
@@ -363,6 +396,20 @@ function Campo({
     );
   } else if (def.tipo === "area") {
     controle = <textarea {...comum} rows={3} onChange={(e) => onChange(def.nome, e.target.value)} />;
+  } else if (def.mascara) {
+    controle = (
+      <CampoMascarado
+        id={id}
+        mascara={MASCARAS[def.mascara]}
+        inputMode={def.mascara === "telefone" ? "tel" : "numeric"}
+        autoComplete="off"
+        value={valor}
+        onValueChange={(v) => onChange(def.nome, v)}
+        aria-describedby={descricao}
+        aria-invalid={erro ? true : undefined}
+        className={CLASSE_CAMPO}
+      />
+    );
   } else {
     const tipoInput = def.tipo === "data" ? "date" : def.tipo === "ano" ? "number" : def.tipo === "email" ? "email" : "text";
     controle = (

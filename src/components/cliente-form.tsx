@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { CampoMascarado } from "@/components/campo-mascarado";
+import { mascaraCpf, mascaraTelefone } from "@/lib/mascaras";
 import { useRouter } from "next/navigation";
 import { Loader2, CheckCircle2 } from "lucide-react";
 
@@ -52,10 +54,14 @@ export function ClienteForm() {
           <label htmlFor="cliente-cpf" className="block text-xs text-gray-600 mb-1">
             CPF *
           </label>
-          <input
+          <CampoMascarado
             id="cliente-cpf"
+            mascara={mascaraCpf}
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="000.000.000-00"
             value={cpf}
-            onChange={(e) => setCpf(e.target.value)}
+            onValueChange={setCpf}
             required
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
           />
@@ -89,10 +95,14 @@ export function ClienteForm() {
           <label htmlFor="cliente-telefone" className="block text-xs text-gray-600 mb-1">
             Telefone *
           </label>
-          <input
+          <CampoMascarado
             id="cliente-telefone"
+            mascara={mascaraTelefone}
+            inputMode="tel"
+            autoComplete="off"
+            placeholder="(11) 99999-9999"
             value={telefone}
-            onChange={(e) => setTelefone(e.target.value)}
+            onValueChange={setTelefone}
             required
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
           />

@@ -6,11 +6,15 @@ import { SERVICE_TYPES, CLIENT_TYPES, BASES, DEPARTMENTS } from "@/lib/workflow"
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import SigefConsulta from "@/components/sigef-consulta";
+import { CampoMascarado } from "@/components/campo-mascarado";
+import { digitosCpfCnpj, mascaraCpfCnpj, mascaraTelefone } from "@/lib/mascaras";
 
 export default function NovoProcessoPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [telefone, setTelefone] = useState("");
+  const [cpfCnpj, setCpfCnpj] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -22,6 +26,8 @@ export default function NovoProcessoPage() {
     formData.forEach((value, key) => {
       if (value) data[key] = value.toString();
     });
+    // CPF/CNPJ só com algarismos (como o portal grava); o telefone segue formatado.
+    if (data.cpfCnpj) data.cpfCnpj = digitosCpfCnpj(data.cpfCnpj);
 
     try {
       const res = await fetch("/api/processes", {
@@ -141,17 +147,27 @@ export default function NovoProcessoPage() {
               />
             </FormField>
             <FormField label="Telefone" name="telefone">
-              <input
-                type="text"
+              <CampoMascarado
                 name="telefone"
+                mascara={mascaraTelefone}
+                inputMode="tel"
+                autoComplete="off"
+                aria-label="Telefone"
+                value={telefone}
+                onValueChange={setTelefone}
                 placeholder="(11) 99999-9999"
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
               />
             </FormField>
             <FormField label="CPF/CNPJ" name="cpfCnpj">
-              <input
-                type="text"
+              <CampoMascarado
                 name="cpfCnpj"
+                mascara={mascaraCpfCnpj}
+                inputMode="numeric"
+                autoComplete="off"
+                aria-label="CPF ou CNPJ"
+                value={cpfCnpj}
+                onValueChange={setCpfCnpj}
                 placeholder="000.000.000-00"
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
               />
