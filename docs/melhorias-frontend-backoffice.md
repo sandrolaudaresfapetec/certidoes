@@ -36,7 +36,7 @@ Página própria `/processos/{id}/editar`, no padrão da edição do portal.
 
 - **Página (Server Component):** `requireUsuario()`; quem não é ADMIN/SDTC (`podeAtender`) vê um aviso e o link de volta. Isso é usabilidade; a autorização é da rota. Carrega os usuários elegíveis: técnico = TECNICO ou ADMIN, conferente = CONFERENTE ou ADMIN, e o responsável atual sempre fica na lista.
 - **Formulário (client):** seções Interessado, Processo (expediente SEI e datas), Localização, Trabalho técnico, Financeiro e Observações, com os 32 campos de `CAMPOS_EDITAVEIS`.
-- **Contrato (lido em `PATCH /api/processes/[id]`):** JSON só com os campos alterados; data vazia vai como `null`; datas como meio-dia local (evita deslocar o dia, porque `formatDate` usa o fuso do servidor); números convertidos no cliente, porque a rota não valida tipos (#PEND-48). Erros em texto com `role="alert"`. Ao salvar, volta para `/processos/{id}?salvo=1`, que mostra "Processo atualizado.".
+- **Contrato (lido em `PATCH /api/processes/[id]`):** JSON só com os campos alterados; data vazia vai como `null`; datas como meio-dia local (evita deslocar o dia, porque `formatDate` usa o fuso do servidor); números convertidos no cliente; a rota também valida cada campo pelo tipo e devolve 400 com `campo` (#PEND-48, resolvida). Erros em texto com `role="alert"`. Ao salvar, volta para `/processos/{id}?salvo=1`, que mostra "Processo atualizado.".
 - **Tela do processo:** botão "Editar processo" (só `podeAtender`).
 - **Fim a fim:** o expediente SEI preenchido no backoffice passa a aparecer em `/portal/requisicoes/{id}` no lugar de "Aguardando liberação do número SEI" (fecha o item 12 do plano anterior).
 
@@ -90,13 +90,11 @@ Antes do push, o remoto já tinha 12 commits de `sandro.laudares` na mesma branc
 - Documentação em **dois arquivos** em `docs/`, um por plano.
 - **Máscara só de exibição**: o contrato com a API não muda.
 - No processo, CPF/CNPJ gravado **só com números** e mostrado formatado nas telas de leitura.
-- O campo "Total" não aparece na edição, porque a API nunca o calcula (#PEND-49).
+- O campo "Total" não aparece na edição: a API o recalcula ao salvar qualquer valor financeiro (#PEND-49, resolvida).
 - Só tema claro (seção 3.4).
 
 ## 5. Limites conhecidos
 
-- **Validação no servidor:** `PATCH /api/processes/[id]` devolve 500 para data vazia, número ou ano inválidos (#PEND-48). A tela converte tudo antes de enviar, então não depende disso.
-- **Total do processo:** nenhuma rota grava `Process.total`; o cartão Financeiro mostra R$ 0,00 mesmo com taxas (#PEND-49).
 - **Atribuição pelo GERENTE:** a rota só aceita ADMIN e SDTC (#PEND-6); para os outros papéis a tela mostra apenas o aviso.
 - **Largura no celular:** a correção do layout raiz (`min-w-0` no `main`) é global e ficou na #PEND-47; as telas afetadas têm correção local.
 - **Camada SIGEF no mapa:** marcar "Mostrar parcelas SIGEF (SP)" funcionou sem erro, mas não vimos parcelas aparecerem no teste local; não confirmamos se foi o nível de zoom ou o acervo local vazio na região.
@@ -106,7 +104,7 @@ Antes do push, o remoto já tinha 12 commits de `sandro.laudares` na mesma branc
 ## 6. Pendências do plano
 
 - **Resolvidas:** #PEND-5, #PEND-7, #PEND-8, #PEND-40, #PEND-41 (e, no plano anterior, #PEND-16 e #PEND-17).
-- **Criadas:** #PEND-47 (layout raiz, frontend), #PEND-48 (validação do PATCH, backend), #PEND-49 (`Process.total`, backend).
+- **Criadas:** #PEND-47 (layout raiz, frontend), #PEND-48 (validação do PATCH, backend) e #PEND-49 (`Process.total`, backend) — as duas de backend resolvidas em seguida (ver `PENDENCIAS.md`).
 
 ## 7. Como testar
 

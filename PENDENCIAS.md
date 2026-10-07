@@ -68,8 +68,8 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-45 | Associar cada polígono nomeado ao polígono do mapa (UI) | frontend | adição | média | bloqueada (#PEND-34) |
 | #PEND-46 | Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio | backend | bugfix | baixa | aberta |
 | #PEND-47 | Layout raiz: `main` sem `min-w-0` deixa conteúdo largo esticar a página no celular | frontend | melhoria | baixa | aberta |
-| #PEND-48 | `PATCH /api/processes/[id]` não valida tipos nem data vazia (devolve 500) | backend | bugfix | média | aberta |
-| #PEND-49 | `Process.total` nunca é calculado (a tela mostra R$ 0,00 mesmo com taxas) | backend | bugfix | média | aberta |
+| #PEND-48 | `PATCH /api/processes/[id]` não valida tipos nem data vazia (devolve 500) | backend | bugfix | média | resolvida (2026-10-07) |
+| #PEND-49 | `Process.total` nunca é calculado (a tela mostra R$ 0,00 mesmo com taxas) | backend | bugfix | média | resolvida (2026-10-07) |
 
 ## Detalhes
 
@@ -464,6 +464,7 @@ O `main` é item de um contêiner flex e tem `min-width: auto`: qualquer descend
 
 Testado na rota local: `{"dtVisita2":""}`, `{"taxaVistoria":"abc"}` e `{"anoEntrada":"x"}` devolvem **500** sem mensagem (erro do Prisma), em vez de 400 com o campo. Data vazia deveria virar `null`; número e ano precisam ser validados. A tela de edição (Fase 3) converte tudo antes de enviar (`null` para vazio, números e datas válidos), então não depende disto, mas outro cliente da API ou um formulário futuro depende.
 **Impacto no frontend:** nenhum hoje; ao corrigir, a tela pode mostrar o erro por campo devolvido pela API.
+**Resolução:** a rota normaliza cada campo pelo tipo da coluna antes do Prisma (`normalizarCampo` em `src/app/api/processes/[id]/route.ts`): `""`/`null` limpam o campo (exceto `anoEntrada` e `interessado`, obrigatórios), datas aceitam ISO/`YYYY-MM-DD`, valores em R$ aceitam número ou `"1.350,50"`, ano inteiro entre 1900 e 2100, demais campos só texto. Erro devolve **400** `{ error: "campo: motivo", campo }`; a tela de edição destaca o campo apontado. `servicoTecGabinete` e `servicoTecCampo` passaram a ser editáveis (API e tela).
 
 ### #PEND-49 · `Process.total` nunca é calculado (a tela mostra R$ 0,00 mesmo com taxas)
 
@@ -472,3 +473,4 @@ Testado na rota local: `{"dtVisita2":""}`, `{"taxaVistoria":"abc"}` e `{"anoEntr
 
 Nenhuma rota grava `total`: ao salvar `taxaAbertura` de R$ 1.350,50 pela nova edição, "Taxa Abertura" mostra 1350.50 e "Total" continua R$ 0.00. Precisa definir a regra (soma de taxa de abertura, serviço de gabinete, taxa de vistoria e serviço de campo, como sugere o cartão) e calculá-la ao salvar, ou derivar na leitura. A tela de edição não expõe o campo "Total".
 **Impacto no frontend:** nenhum além de mostrar o valor correto quando existir; se a regra for derivada na leitura, o cartão "Financeiro" pode calculá-la.
+**Resolução:** regra = taxa de abertura + serviço de gabinete + taxa de vistoria + serviço de campo (campos vazios contam zero). `PATCH /api/processes/[id]` recalcula e grava `Process.total` sempre que um desses quatro campos é alterado; o cartão "Financeiro" usa `total` gravado ou, para processos antigos ainda sem ele, a mesma soma (`totalFinanceiro` em `src/app/processos/[id]/page.tsx`).
