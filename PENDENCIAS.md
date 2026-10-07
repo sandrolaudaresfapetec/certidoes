@@ -66,10 +66,12 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-43 | Salvar rascunho e continuar requisição no formulário e em Minhas Requisições | frontend | adição | média | bloqueada (#PEND-42) |
 | #PEND-44 | Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1 | backend | segurança | média | aberta |
 | #PEND-45 | Associar cada polígono nomeado ao polígono do mapa (UI) | frontend | adição | média | bloqueada (#PEND-34) |
-| #PEND-46 | Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio | backend | bugfix | baixa | aberta |
+| #PEND-46 | Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio | backend | bugfix | baixa | descartada (obsoleta: CAR removido em `f34b945`) |
 | #PEND-47 | Layout raiz: `main` sem `min-w-0` deixa conteúdo largo esticar a página no celular | frontend | melhoria | baixa | aberta |
 | #PEND-48 | `PATCH /api/processes/[id]` não valida tipos nem data vazia (devolve 500) | backend | bugfix | média | aberta |
 | #PEND-49 | `Process.total` nunca é calculado (a tela mostra R$ 0,00 mesmo com taxas) | backend | bugfix | média | aberta |
+| #PEND-50 | Decisão: acesso à API b-Cadastro (Portal Integrador): processo SEI de acordo bilateral e credencial | negócio | decisão | média | aberta |
+| #PEND-51 | Integração com o SEI como última etapa do fluxo da certidão | backend | adição | média | aberta |
 
 ## Detalhes
 
@@ -270,11 +272,12 @@ O documento de correções de 2026-09-16 diz que "todas as comunicações … se
 ### #PEND-26 · Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA`
 
 **Responsável:** backend · **Tipo:** adição · **Registrada em:** 2026-10-06
-**Onde:** `src/app/api/portal/solicitacoes/[id]/route.ts` (`STATUS_EDITAVEIS = ["PENDENTE", "DEVOLVIDA"]`); nenhum código grava `DEVOLVIDA` nem `APROVADA`
+**Onde:** `src/app/api/portal/solicitacoes/[id]/route.ts` (`STATUS_EDITAVEIS = ["DEVOLVIDA"]` desde `5fa78a6`); nenhum código grava `DEVOLVIDA` nem `APROVADA`
 
 O documento pede que o cliente "não possa editar enquanto não tiver sido devolvido" e só edite "após o retorno da DDD". Hoje (a) o `PATCH` aceita `PENDENTE`, ou seja, o cliente edita logo depois de enviar; (b) não existe ação no backoffice para devolver a requisição, então não há como liberar a edição. Precisa tirar `PENDENTE` da lista e criar a ação "devolver" (com motivo registrado no chat, #PEND-25).
 **Impacto no frontend:** esconder "Alterar requisição" fora de `DEVOLVIDA` (feito na tela, mas não é segurança); botão "Devolver" no backoffice.
 **Andamento (2026-10-07):** (a) feito — o `PATCH` só aceita `DEVOLVIDA`. Falta (b), a ação "devolver" no backoffice.
+**Verificado (2026-10-07):** busca em `src/app/api` e `src/lib`: `DEVOLVIDA` só aparece em `STATUS_EDITAVEIS`, no rótulo e no filtro "Devolvidas" (`requisicao-status.ts`); nenhuma rota ou ação grava esse status. **Efeito atual:** como ninguém consegue devolver, o solicitante não consegue mais editar uma requisição enviada (antes editava em `PENDENTE`). A tela já reflete isso (aviso "não pode ser alterada" e botão "Alterar requisição" só em `DEVOLVIDA`), então não há erro visível, mas o fluxo de correção fica parado até a ação "devolver" existir. Bloqueia o item 11 do documento do cliente de ponta a ponta.
 
 ### #PEND-27 · Modelo de status da requisição para o solicitante (5 gerais + 6 etapas)
 
@@ -449,6 +452,7 @@ Item 16 do documento: "mostrar de alguma maneira um indicativo de quem é cada G
 
 Em desenvolvimento a mesma consulta devolve ora parcelas com dados completos (11,72 ha, Ribeirão Branco/SP), ora parcelas enriquecidas com o CAR em que `areaHectares` é 0 e `municipio` é vazio (lista mostra "0 ha · /SP"). A resposta varia entre chamadas. Afeta só o ambiente simulado, mas atrapalha testes e demonstrações.
 **Impacto no frontend:** nenhum; o texto do mapa para leitores de tela ignora área e município ausentes.
+**Descarte (2026-10-07):** o enriquecimento com o CAR era a causa da variação. A função `gerarParcelasMockComCar` e `src/lib/car.ts` saíram no commit `f34b945` ("remover CAR/SICAR e manter apenas as parcelas do SIGEF"), e a consulta simulada voltou a usar só `gerarParcelasMock`, que é determinística (conferido em `src/lib/sigef.ts`). Os registros de teste locais com "(CAR SP-…)" no nome da área são só dados antigos do banco.
 
 ### #PEND-47 · Layout raiz: `main` sem `min-w-0` deixa conteúdo largo esticar a página no celular
 
@@ -472,3 +476,23 @@ Testado na rota local: `{"dtVisita2":""}`, `{"taxaVistoria":"abc"}` e `{"anoEntr
 
 Nenhuma rota grava `total`: ao salvar `taxaAbertura` de R$ 1.350,50 pela nova edição, "Taxa Abertura" mostra 1350.50 e "Total" continua R$ 0.00. Precisa definir a regra (soma de taxa de abertura, serviço de gabinete, taxa de vistoria e serviço de campo, como sugere o cartão) e calculá-la ao salvar, ou derivar na leitura. A tela de edição não expõe o campo "Total".
 **Impacto no frontend:** nenhum além de mostrar o valor correto quando existir; se a regra for derivada na leitura, o cartão "Financeiro" pode calculá-la.
+
+### #PEND-50 · Decisão: acesso à API b-Cadastro (Portal Integrador): processo SEI de acordo bilateral e credencial
+
+**Responsável:** negócio · **Tipo:** decisão · **Registrada em:** 2026-10-07
+**Onde:** nenhum arquivo; procedimento administrativo descrito no e-mail do Suporte Integrador de 10/08/2026 (assunto "Informações adicionais e api B-cadastro", destinatário do órgão: Thiago Carmuega Rabacal)
+
+Para usar a API b-Cadastro, o Suporte Integrador exige: (1) credencial igual à da aplicação (`clientid` do IDP, pedido pelo Portal Integrador, se ainda não houver); (2) abertura de processo SEI-SP de acordo bilateral, com as informações do projeto e o documento "Solicitação de acesso à API – Governança de Dados_01_2025"; (3) assinatura do órgão Cedente, aviso ao Suporte e encaminhamento à Unidade Integrador, que só então libera o acesso. Nada disso é código: quem abre o processo e obtém a credencial é o IGC/CJT. Não sabemos, pelo e-mail, quais dados a API devolve nem em que tela do sistema entrariam.
+**Depende de:** definir qual necessidade do sistema a b-Cadastro atende (possível ligação com #PEND-1, login real do portal, ainda não confirmada) e quem responde pelo processo SEI.
+**Bloqueia:** qualquer integração com a b-Cadastro (backend); sem contrato da API e sem credencial não há o que implementar no frontend.
+**Andamento (2026-10-07):** adiada por decisão do time; perguntas enviadas ao Sandro (para que serve a b-Cadastro, `clientid` do IDP, situação do processo SEI, documentação da API).
+
+### #PEND-51 · Integração com o SEI como última etapa do fluxo da certidão
+
+**Responsável:** backend · **Tipo:** adição · **Registrada em:** 2026-10-07
+**Onde:** hoje o expediente SEI é digitado à mão em `/processos/{id}/editar` (campo `Process.expediente`, rota `PATCH /api/processes/[id]`); não há rota nem biblioteca que fale com o SEI
+
+Pedido do Sandro (07/10/2026), junto com o e-mail da #PEND-50: no fluxo do sistema de certidões a integração com o SEI é a última coisa a fazer. O e-mail em si não trata de API do SEI (o SEI ali é só onde se abre o processo de acesso à b-Cadastro). Falta definir o que a integração faz (criar o processo e devolver o número, anexar a minuta, coletar assinatura, consultar andamento), por qual API (catálogo do Portal Integrador, que passa pela #PEND-50, ou outra) e com que credencial. Sem o contrato, o frontend não tem o que implementar.
+**Impacto no frontend:** quando existir, o campo "Expediente (SEI)" da edição do processo e o box "Número SEI" do portal (item 12 do documento do cliente) deixam de ser preenchimento manual e passam a refletir o que a integração gravar; a tela de edição pode mostrá-lo somente leitura.
+**Depende de:** contrato da API do SEI e credencial (possivelmente #PEND-50).
+**Andamento (2026-10-07):** adiada por decisão do time; retomar quando o Sandro responder o que a integração deve fazer, por qual interface e quando dispara.

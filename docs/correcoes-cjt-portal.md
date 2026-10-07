@@ -81,14 +81,14 @@ Fora da lista dos 16, a pedido do time, antes das fases (`f371f7a`): **padrão g
 
 ## 6. Limites conhecidos
 
-- **Edição:** o servidor ainda aceita alteração com a requisição em `PENDENTE` e nada devolve a requisição; só a tela bloqueia (#PEND-26).
+- **Edição:** o servidor só aceita alteração em `DEVOLVIDA` (desde `5fa78a6`), mas nenhuma ação do backoffice devolve a requisição; enquanto isso o solicitante não consegue editar uma requisição enviada (#PEND-26).
 - **Status:** a etapa do acompanhamento é derivada; o modelo oficial (5 gerais + 6 etapas) é do backend (#PEND-27).
 - **Download da certidão:** a etapa 6 mostra "o download ainda não está disponível" (#PEND-28).
 - **Chat:** o texto de envio cita "o chat da solicitação", que não existe (#PEND-25).
 - **Nome × polígono do mapa:** a lista de nomes aparece ao lado do mapa, mas a ligação de cada nome a um polígono depende do backend gravar o vínculo (#PEND-34 → #PEND-45).
 - **SIGEF:** a consulta continua pelo CPF logado, não pelo do representado (#PEND-33). A validação do CPF/CNPJ do representado no servidor é a #PEND-44. A nomenclatura dos polígonos só é imposta pela tela (#PEND-36).
 - **Mapa no acompanhamento:** o contorno vem do acervo `SigefParcela`, vazio no banco local.
-- **Dados simulados:** a consulta SIGEF simulada com CAR devolve, às vezes, parcelas com área 0 e município vazio (#PEND-46).
+- **Dados simulados:** a variação da consulta SIGEF simulada (parcelas com área 0) vinha do enriquecimento com o CAR, removido em `f34b945`; a #PEND-46 foi descartada.
 - **Pendências do plano:** #PEND-16 e #PEND-17 resolvidas; #PEND-41 a #PEND-46 criadas; #PEND-29, #PEND-33, #PEND-34 e #PEND-36 detalhadas.
 
 ## 7. Como testar
