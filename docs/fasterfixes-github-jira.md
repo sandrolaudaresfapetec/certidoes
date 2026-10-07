@@ -177,6 +177,12 @@ link de volta ao dashboard, screenshot, seletor CSS, componente React,
 coordenadas do clique, navegador/SO/viewport e console/network logs. O status é
 sincronizado nos dois sentidos (feedback resolvido fecha a issue; reaberto reabre).
 
+Screenshot: o widget envia a imagem em uma segunda requisição, depois do
+feedback. O patch em `deploy/fasterfixes/patches/` faz a criação da issue
+aguardar a imagem por até 60 s (6 verificações de 10 s) e, se ela chegar depois
+disso, o evento `feedback/screenshot-attached` anexa a imagem à issue já criada
+(sem duplicar se já estiver no corpo).
+
 ## 3. Integração 2 — GitHub → Jira (GitHub for Jira)
 
 Doc: https://support.atlassian.com/jira-cloud-administration/docs/link-github-workflows-and-deployments-to-jira-issues/
