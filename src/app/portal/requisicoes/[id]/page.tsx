@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
 import { geometriaDoAcervo } from "@/components/requisicao/geometria";
+import { clientePodeEditar } from "@/lib/solicitacao-estados";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +40,7 @@ export default async function AcompanharRequisicaoPage({
   const geometriaImovel = geometriaDoAcervo(parcela?.geometria);
 
   // O cliente só altera a requisição depois que a equipe a devolve.
-  const editavel =
-    !requisicao.processId && !requisicao.finalizadaEm && requisicao.status === "DEVOLVIDA";
+  const editavel = clientePodeEditar(requisicao);
 
   return (
     <div>

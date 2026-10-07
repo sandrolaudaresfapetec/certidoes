@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirAtendimentoApi } from "@/lib/auth";
+import { criarComProtocolo } from "@/lib/protocolo";
 import {
   formularioDoPayload,
   normalizarParaPersistencia,
   primeiroErro,
   validarFormulario,
 } from "@/lib/cjt-formulario";
-
-function gerarProtocolo(sequencial: number): string {
-  const ano = new Date().getFullYear();
-  return `CERT-${ano}-${String(sequencial).padStart(6, "0")}`;
-}
 
 /**
  * POST /api/requisicoes — abertura de requisição pelo Atendimento, em nome de
@@ -44,11 +40,10 @@ export async function POST(request: NextRequest) {
   }
   const cjt = normalizarParaPersistencia(formulario);
 
-  const total = await prisma.solicitacao.count();
-
-  const solicitacao = await prisma.solicitacao.create({
+  const solicitacao = await criarComProtocolo((protocolo) =>
+    prisma.solicitacao.create({
     data: {
-      protocolo: gerarProtocolo(total + 1),
+      protocolo,
       tipoViaSigef,
       sigefCodigoImovel: tipoViaSigef ? body.sigefCodigoImovel : null,
       sigefParcelaCodigo: tipoViaSigef ? body.sigefParcelaCodigo : null,
@@ -69,7 +64,8 @@ export async function POST(request: NextRequest) {
       abertaPorUserId: sessao.usuario.id,
       ...cjt,
     },
-  });
+    })
+  );
 
   return NextResponse.json(solicitacao, { status: 201 });
 }

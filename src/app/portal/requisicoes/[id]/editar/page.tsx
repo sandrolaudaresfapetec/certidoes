@@ -5,11 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoForm } from "@/components/requisicao-form";
 import { formularioDoPayload } from "@/lib/cjt-formulario";
+import { clientePodeEditar } from "@/lib/solicitacao-estados";
 
 export const dynamic = "force-dynamic";
-
-/** Situações em que a requisição ainda aceita alteração pelo cliente. */
-const STATUS_EDITAVEIS = ["DEVOLVIDA"];
 
 export default async function EditarRequisicaoPage({
   params,
@@ -26,10 +24,7 @@ export default async function EditarRequisicaoPage({
   });
   if (!requisicao) notFound();
 
-  const editavel =
-    !requisicao.processId &&
-    !requisicao.finalizadaEm &&
-    STATUS_EDITAVEIS.includes(requisicao.status);
+  const editavel = clientePodeEditar(requisicao);
 
   const voltar = (
     <Link

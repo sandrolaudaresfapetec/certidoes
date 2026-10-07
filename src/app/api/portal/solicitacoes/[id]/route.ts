@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSolicitanteLogado } from "@/lib/portal-auth";
+import { exigirSolicitanteApi } from "@/lib/portal-auth";
+import { clientePodeEditar } from "@/lib/solicitacao-estados";
 import {
   formularioDoPayload,
   normalizarParaPersistencia,
   primeiroErro,
   validarFormulario,
 } from "@/lib/cjt-formulario";
-
-/**
- * Situações em que o solicitante ainda pode alterar a própria requisição.
- * Depois da abertura do processo os dados alimentam a análise técnica e só o
- * backoffice altera; a devolução existe justamente para o cliente corrigir.
- */
-const STATUS_EDITAVEIS = ["DEVOLVIDA"];
 
 /**
  * PATCH /api/portal/solicitacoes/[id]
@@ -28,10 +22,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const solicitante = await getSolicitanteLogado();
-  if (!solicitante) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  }
+  const sessao = await exigirSolicitanteApi();
+  if ("erro" in sessao) return sessao.erro;
+  const { solicitante } = sessao;
 
   const atual = await prisma.solicitacao.findFirst({
     where: { id, solicitanteId: solicitante.id },
@@ -39,7 +32,7 @@ export async function PATCH(
   if (!atual) {
     return NextResponse.json({ error: "Requisição não encontrada." }, { status: 404 });
   }
-  if (atual.processId || atual.finalizadaEm || !STATUS_EDITAVEIS.includes(atual.status)) {
+  if (!clientePodeEditar(atual)) {
     return NextResponse.json(
       { error: "Esta requisição já está em andamento e não pode mais ser alterada." },
       { status: 409 }

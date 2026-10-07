@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 import { createHmac } from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { Solicitante } from "@prisma/client";
@@ -47,6 +48,22 @@ export async function getSolicitanteLogado(): Promise<Solicitante | null> {
   const id = verificarSessao(store.get(PORTAL_COOKIE)?.value);
   if (!id) return null;
   return prisma.solicitante.findUnique({ where: { id } });
+}
+
+export type ChecagemPortalApi = { solicitante: Solicitante } | { erro: NextResponse };
+
+/**
+ * Para rotas de API do portal: devolve o solicitante logado ou a resposta 401.
+ * Uso: `const sessao = await exigirSolicitanteApi(); if ("erro" in sessao) return sessao.erro;`.
+ * Rota que lê ou altera uma requisição ainda precisa filtrar por dono
+ * (`where: { id, solicitanteId: sessao.solicitante.id }`).
+ */
+export async function exigirSolicitanteApi(): Promise<ChecagemPortalApi> {
+  const solicitante = await getSolicitanteLogado();
+  if (!solicitante) {
+    return { erro: NextResponse.json({ error: "Não autenticado." }, { status: 401 }) };
+  }
+  return { solicitante };
 }
 
 /** Exige solicitante logado; redireciona para /portal/login caso contrario. */

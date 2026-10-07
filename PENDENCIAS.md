@@ -259,6 +259,7 @@ O Dockerfile e o `fly.toml` já não usam Litestream (ver `docs/MIGRACAO-POSTGIS
 **Onde:** `src/lib/cjt-formulario.ts`, `src/lib/workflow.ts`, `src/lib/geometria.ts`
 
 Nenhum framework de teste instalado e nenhum script `test`. São bibliotecas puras, sem I/O — as 12 combinações da matriz do CJT viram 12 casos de teste quase por transcrição. É o que permite corrigir #PEND-9 e #PEND-36 sem regressão.
+**Andamento (2026-10-07):** Vitest instalado (`npm test`, `vitest.config.ts`, testes ao lado do código em `src/**/*.test.ts`). Cobertos até agora: `protocolo.ts`, `solicitacao-estados.ts` e uma linha de base da matriz de `cjt-formulario.ts` (7 casos). Faltam as 12 combinações completas, `workflow.ts` e `geometria.ts`; a pendência segue aberta.
 
 ### #PEND-25 · Chat da solicitação (não existe modelo, rota nem tela)
 

@@ -5,6 +5,12 @@ export const REQUISICAO_STATUS: Record<string, { label: string; classe: string }
   APROVADA: { label: "Aprovada", classe: "bg-emerald-100 text-emerald-800" },
   DEVOLVIDA: { label: "Devolvida", classe: "bg-red-100 text-red-800" },
   CONCLUIDA: { label: "Concluída", classe: "bg-gray-200 text-gray-700" },
+  // Estados novos (ver solicitacao-estados.ts); só passam a ser gravados nas fases seguintes.
+  RASCUNHO: { label: "Não enviada", classe: "bg-gray-100 text-gray-700" },
+  AGUARDANDO_LIBERACAO: { label: "Aguardando liberação", classe: "bg-orange-100 text-orange-800" },
+  AGUARDANDO_CLIENTE: { label: "Aguardando sua resposta", classe: "bg-violet-100 text-violet-800" },
+  ARQUIVAMENTO_SOLICITADO: { label: "Arquivamento solicitado", classe: "bg-gray-200 text-gray-700" },
+  ARQUIVADA: { label: "Arquivada", classe: "bg-gray-200 text-gray-700" },
 };
 
 export function statusRequisicao(status: string): { label: string; classe: string } {

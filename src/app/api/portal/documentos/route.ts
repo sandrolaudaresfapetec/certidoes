@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSolicitanteLogado } from "@/lib/portal-auth";
+import { exigirSolicitanteApi } from "@/lib/portal-auth";
 
 const TIPOS_VALIDOS = ["PLANTA", "DOC_PROPRIEDADE", "PROCURACAO"];
 const MIME_VALIDOS = ["application/pdf", "image/jpeg", "image/png"];
@@ -13,10 +13,9 @@ const TAMANHO_MAX = 10 * 1024 * 1024; // 10 MB
  * comprovante de propriedade) ou quando o solicitante é procurador (procuração).
  */
 export async function POST(request: NextRequest) {
-  const solicitante = await getSolicitanteLogado();
-  if (!solicitante) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  }
+  const sessao = await exigirSolicitanteApi();
+  if ("erro" in sessao) return sessao.erro;
+  const { solicitante } = sessao;
 
   const form = await request.formData().catch(() => null);
   if (!form) {

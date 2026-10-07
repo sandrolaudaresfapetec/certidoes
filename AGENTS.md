@@ -93,6 +93,8 @@ curl -X POST http://localhost:3000/api/seed    # dados de demonstração (só en
 - **Campos e botões seguem a regra global de `src/app/globals.css` (camada `base`) — não a redefina por componente:** placeholder `#6B7280`, texto digitado `#111827` em peso 400 (nunca negrito), cursor de mão em todo botão, checkbox e radio (e no rótulo que os envolve) e `not-allowed` nos desabilitados. Para uma exceção intencional, use um utilitário (ex.: `cursor-default`). Rótulo que envolve checkbox/radio deve ser filho direto (`<label><input …/>texto</label>`) para a regra alcançá-lo.
 - **A plataforma só tem tema claro** (`color-scheme: light` em `globals.css`). Não há modo escuro: as telas usam fundos claros fixos, e o tema escuro do sistema do usuário não muda nada. Não reintroduza `prefers-color-scheme` sem desenhar todas as telas para ele.
 - **CPF, CNPJ e telefone têm máscara de digitação.** Use `CampoMascarado` (`src/components/campo-mascarado.tsx`) com as funções de `src/lib/mascaras.ts` (`mascaraCpf`, `mascaraCpfCnpj`, `mascaraTelefone`); em telas de leitura, `exibirCpfCnpj`. A máscara é só de exibição: ao enviar, CPF/CNPJ vão só com números (`digitosCpfCnpj`) e o telefone vai formatado, como a API e o banco já esperam.
+- **Estados da requisição:** o texto de `Solicitacao.status` e a regra "o solicitante pode editar" (`clientePodeEditar`) ficam em `src/lib/solicitacao-estados.ts`; todo status novo entra também em `REQUISICAO_STATUS` (`requisicao-status.ts`), senão a tela o mostra como "Pendente". **A "DDD" do documento do cliente são os papéis ADMIN e SDTC** (`podeAtender`), decisão do time em 2026-10-07: quem devolve, libera, decide arquivamento e vê a fila de requisições.
+- **Rotas do portal** abrem com `exigirSolicitanteApi()` (`portal-auth.ts`) e filtram a requisição pelo dono (`where: { id, solicitanteId }`). Protocolo novo só por `criarComProtocolo()` (`src/lib/protocolo.ts`), nunca por `count()+1`.
 - **Não duplique constantes:** use `REQUISICAO_STATUS`, `WORKFLOW_STAGES`, `PAPEIS` etc. em vez de reescrever rótulos.
 - **`src/components/requisicao-form.tsx` é compartilhado** pelo portal (`/portal/nova-solicitacao`) e pelo atendimento (`/requisicoes/nova`): teste os dois ao alterá-lo. A prop `variante` (`"SOLICITANTE"` ou `"ATENDIMENTO"`) escolhe caixas progressivas e tela de envio.
 - **Histórico do que já foi implementado** (pedido do cliente → arquivo → URL → decisões → limites) fica em [`docs/`](docs/): comece por [`docs/correcoes-cjt-portal.md`](docs/correcoes-cjt-portal.md) (portal do solicitante) e [`docs/melhorias-frontend-backoffice.md`](docs/melhorias-frontend-backoffice.md) (edição do processo, corte de divisas, máscaras, contraste). Ao concluir um trabalho relevante, registre-o lá ou em um arquivo novo da mesma pasta.
@@ -101,10 +103,11 @@ curl -X POST http://localhost:3000/api/seed    # dados de demonstração (só en
 
 1. `npx tsc --noEmit` — o baseline está limpo.
 2. `npx eslint src` — o baseline está limpo. (`npx eslint` na raiz acusa 1 erro conhecido em `docker-entrypoint.js`: #PEND-22. Não pode surgir erro novo.)
-3. `npm run build`, quando mexer em rotas, layouts ou configuração.
-4. **Mudança visível: suba o servidor e use a funcionalidade no navegador** — caminho feliz, erros e os papéis relevantes. Testes de tipo e lint não provam que a tela funciona. Se não for possível testar, diga isso explicitamente em vez de afirmar que está pronto.
-5. `git status`: nada de `.env`, `*.db` ou segredos no que será commitado.
-6. Informe as pendências criadas ou alteradas (3.5).
+3. `npm test` (Vitest, testes em `src/**/*.test.ts`) quando mexer em `src/lib`; lib de regra nova leva teste.
+4. `npm run build`, quando mexer em rotas, layouts ou configuração.
+5. **Mudança visível: suba o servidor e use a funcionalidade no navegador** — caminho feliz, erros e os papéis relevantes. Testes de tipo e lint não provam que a tela funciona. Se não for possível testar, diga isso explicitamente em vez de afirmar que está pronto.
+6. `git status`: nada de `.env`, `*.db` ou segredos no que será commitado.
+7. Informe as pendências criadas ou alteradas (3.5).
 
 ## 7. Git
 

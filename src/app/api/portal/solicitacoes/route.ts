@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSolicitanteLogado } from "@/lib/portal-auth";
+import { exigirSolicitanteApi } from "@/lib/portal-auth";
+import { criarComProtocolo } from "@/lib/protocolo";
 import {
   formularioDoPayload,
   normalizarParaPersistencia,
@@ -8,17 +9,11 @@ import {
   validarFormulario,
 } from "@/lib/cjt-formulario";
 
-function gerarProtocolo(sequencial: number): string {
-  const ano = new Date().getFullYear();
-  return `CERT-${ano}-${String(sequencial).padStart(6, "0")}`;
-}
-
 /** GET /api/portal/solicitacoes — lista as solicitações do solicitante logado. */
 export async function GET() {
-  const solicitante = await getSolicitanteLogado();
-  if (!solicitante) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  }
+  const sessao = await exigirSolicitanteApi();
+  if ("erro" in sessao) return sessao.erro;
+  const { solicitante } = sessao;
 
   const solicitacoes = await prisma.solicitacao.findMany({
     where: { solicitanteId: solicitante.id },
@@ -37,10 +32,9 @@ export async function GET() {
  *                      dados do imóvel serão preenchidos internamente pelo funcionário)
  */
 export async function POST(request: NextRequest) {
-  const solicitante = await getSolicitanteLogado();
-  if (!solicitante) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  }
+  const sessao = await exigirSolicitanteApi();
+  if ("erro" in sessao) return sessao.erro;
+  const { solicitante } = sessao;
   if (!solicitante.cadastroCompleto) {
     return NextResponse.json(
       { error: "Complete seu cadastro (e-mail e telefone) antes de solicitar." },
@@ -76,11 +70,10 @@ export async function POST(request: NextRequest) {
   }
   const cjt = normalizarParaPersistencia(formulario);
 
-  const total = await prisma.solicitacao.count();
-
-  const solicitacao = await prisma.solicitacao.create({
+  const solicitacao = await criarComProtocolo((protocolo) =>
+    prisma.solicitacao.create({
     data: {
-      protocolo: gerarProtocolo(total + 1),
+      protocolo,
       tipoViaSigef,
       sigefCodigoImovel: tipoViaSigef ? body.sigefCodigoImovel : null,
       sigefParcelaCodigo: tipoViaSigef ? body.sigefParcelaCodigo : null,
@@ -99,7 +92,8 @@ export async function POST(request: NextRequest) {
       solicitanteId: solicitante.id,
       ...cjt,
     },
-  });
+    })
+  );
 
   return NextResponse.json(solicitacao, { status: 201 });
 }
