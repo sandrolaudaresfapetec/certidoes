@@ -141,6 +141,37 @@ export async function exigirAtendimentoApi(): Promise<ChecagemApi> {
   return sessao;
 }
 
+/**
+ * Modulo de geometria (corte de divisas, SIGEF, camadas do IGC): ADMIN ou o
+ * tecnico responsavel por uma analise; os demais papeis nao acessam.
+ */
+export async function podeUsarGeometria(user: User | null): Promise<boolean> {
+  if (!user) return false;
+  if (user.role === "ADMIN") return true;
+  if (user.role !== "TECNICO") return false;
+  return (await prisma.process.count({ where: { tecnicoRespId: user.id } })) > 0;
+}
+
+export async function requireGeometria(): Promise<User> {
+  const usuario = await requireUsuario();
+  if (!(await podeUsarGeometria(usuario))) redirect("/");
+  return usuario;
+}
+
+export async function exigirGeometriaApi(): Promise<ChecagemApi> {
+  const sessao = await exigirUsuarioApi();
+  if ("erro" in sessao) return sessao;
+  if (!(await podeUsarGeometria(sessao.usuario))) {
+    return {
+      erro: NextResponse.json(
+        { error: "Acesso restrito ao ADMIN e ao técnico responsável pela análise." },
+        { status: 403 }
+      ),
+    };
+  }
+  return sessao;
+}
+
 export function podeAtender(user: User | null): boolean {
   return Boolean(user && PAPEIS_ATENDIMENTO.includes(user.role));
 }
