@@ -13,7 +13,7 @@ import {
  * Depois da abertura do processo os dados alimentam a análise técnica e só o
  * backoffice altera; a devolução existe justamente para o cliente corrigir.
  */
-const STATUS_EDITAVEIS = ["PENDENTE", "DEVOLVIDA"];
+const STATUS_EDITAVEIS = ["DEVOLVIDA"];
 
 /**
  * PATCH /api/portal/solicitacoes/[id]

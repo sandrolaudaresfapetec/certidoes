@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
+import { geometriaDoAcervo } from "@/components/requisicao/geometria";
 
 export const dynamic = "force-dynamic";
 
@@ -21,16 +22,25 @@ export default async function AcompanharRequisicaoPage({
     include: {
       solicitante: true,
       documentos: { select: { id: true, tipo: true, nomeArquivo: true } },
-      process: { select: { id: true, ordem: true, situacao: true, tipoServico: true } },
+      process: {
+        select: { id: true, ordem: true, situacao: true, tipoServico: true, expediente: true },
+      },
     },
   });
   if (!requisicao) notFound();
 
-  // Alteração pelo cliente só antes da abertura do processo (ou após devolução).
+  // Contorno do imóvel no acervo SIGEF importado (vazio até a importação; #PEND-33).
+  const parcela = requisicao.sigefParcelaCodigo
+    ? await prisma.sigefParcela.findUnique({
+        where: { codigoParcela: requisicao.sigefParcelaCodigo },
+        select: { geometria: true },
+      })
+    : null;
+  const geometriaImovel = geometriaDoAcervo(parcela?.geometria);
+
+  // O cliente só altera a requisição depois que a equipe a devolve.
   const editavel =
-    !requisicao.processId &&
-    !requisicao.finalizadaEm &&
-    ["PENDENTE", "DEVOLVIDA"].includes(requisicao.status);
+    !requisicao.processId && !requisicao.finalizadaEm && requisicao.status === "DEVOLVIDA";
 
   return (
     <div>
@@ -41,19 +51,11 @@ export default async function AcompanharRequisicaoPage({
         <ArrowLeft className="h-4 w-4" />
         Minhas Requisições
       </Link>
-      <div className="flex items-center justify-between mb-4 gap-4">
-        <h1 className="text-xl font-semibold text-gray-900">Acompanhar Requisição</h1>
-        {editavel && (
-          <Link
-            href={`/portal/requisicoes/${requisicao.id}/editar`}
-            className="inline-flex items-center gap-1 bg-emerald-700 text-white px-4 py-2 rounded-md text-sm hover:bg-emerald-800"
-          >
-            <Pencil className="h-4 w-4" />
-            Alterar requisição
-          </Link>
-        )}
-      </div>
-      <RequisicaoDetalhe requisicao={requisicao} escopo="CLIENTE" />
+      <h1 className="text-xl font-semibold text-gray-900 mb-4">Acompanhar Requisição</h1>
+      <RequisicaoDetalhe requisicao={requisicao} escopo="CLIENTE"
+        editavel={editavel}
+        geometriaImovel={geometriaImovel}
+      />
     </div>
   );
 }

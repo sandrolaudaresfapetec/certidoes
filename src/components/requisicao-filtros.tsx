@@ -6,6 +6,8 @@ interface RequisicaoFiltrosProps {
   action: string;
   q?: string;
   status?: string;
+  /** Grupo do Status Geral ativo (portal); mantido ao filtrar. */
+  grupo?: string;
   /** Campo de busca adicional exibido apenas no atendimento. */
   placeholder?: string;
 }
@@ -15,6 +17,7 @@ export function RequisicaoFiltros({
   action,
   q = "",
   status = "",
+  grupo = "",
   placeholder = "Buscar por protocolo, imóvel ou município",
 }: RequisicaoFiltrosProps) {
   return (
@@ -23,6 +26,7 @@ export function RequisicaoFiltros({
       method="get"
       className="flex flex-wrap items-end gap-3 bg-white border border-gray-200 rounded-lg p-4"
     >
+      {grupo && <input type="hidden" name="grupo" value={grupo} />}
       <div className="flex-1 min-w-56">
         <label htmlFor="filtro-q" className="block text-xs font-medium text-gray-600 mb-1">
           Buscar

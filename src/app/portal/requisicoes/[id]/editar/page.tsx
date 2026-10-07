@@ -9,7 +9,7 @@ import { formularioDoPayload } from "@/lib/cjt-formulario";
 export const dynamic = "force-dynamic";
 
 /** Situações em que a requisição ainda aceita alteração pelo cliente. */
-const STATUS_EDITAVEIS = ["PENDENTE", "DEVOLVIDA"];
+const STATUS_EDITAVEIS = ["DEVOLVIDA"];
 
 export default async function EditarRequisicaoPage({
   params,
@@ -75,6 +75,7 @@ export default async function EditarRequisicaoPage({
         cpf={solicitante.cpf}
         criarEndpoint="/api/portal/solicitacoes"
         documentosEndpoint="/api/portal/documentos"
+        variante="SOLICITANTE"
         painelHref={`/portal/requisicoes/${requisicao.id}`}
         painelLabel="Ver requisição"
         edicao={{

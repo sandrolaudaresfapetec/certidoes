@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoForm } from "@/components/requisicao-form";
+import { IntroducaoCjt } from "@/components/requisicao/introducao-cjt";
 
 export default async function NovaSolicitacaoPage() {
   const solicitante = await requireSolicitante();
@@ -15,19 +16,18 @@ export default async function NovaSolicitacaoPage() {
         <ArrowLeft className="h-4 w-4" />
         Minhas Requisições
       </Link>
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">Nova Requisição</h1>
-      <p className="text-sm text-gray-600 mb-6">
-        Responda às perguntas abaixo: os campos exibidos mudam conforme o
-        resultado pretendido e a situação atual do imóvel.
-      </p>
+      <h1 className="text-xl font-semibold text-gray-900 mb-4">Nova Requisição</h1>
 
-      <RequisicaoForm
-        cpf={solicitante.cpf}
-        criarEndpoint="/api/portal/solicitacoes"
-        documentosEndpoint="/api/portal/documentos"
-        painelHref="/portal"
-        painelLabel="Ver minhas requisições"
-      />
+      <IntroducaoCjt>
+        <RequisicaoForm
+          cpf={solicitante.cpf}
+          criarEndpoint="/api/portal/solicitacoes"
+          documentosEndpoint="/api/portal/documentos"
+          variante="SOLICITANTE"
+          painelHref="/portal"
+          painelLabel="Ver minhas requisições"
+        />
+      </IntroducaoCjt>
     </div>
   );
 }
