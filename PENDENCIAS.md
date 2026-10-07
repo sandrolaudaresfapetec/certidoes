@@ -25,7 +25,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-2 | Sessão do portal: segredo padrão em produção, sem expiração e sem `secure` | backend | segurança | alta | aberta |
 | #PEND-3 | Documentos anexados não podem ser lidos (sem rota de download) | backend | adição | alta | aberta |
 | #PEND-4 | Listar/baixar documentos anexados na tela da requisição | frontend | adição | alta | bloqueada (#PEND-3) |
-| #PEND-5 | Tela de edição do processo e atribuição de técnico/conferente | frontend | adição | alta | aberta |
+| #PEND-5 | Tela de edição do processo e atribuição de técnico/conferente | frontend | adição | alta | resolvida (2026-10-07) |
 | #PEND-6 | GERENTE (quem distribui) não consegue atribuir técnico/conferente | backend | bugfix | alta | aberta |
 | #PEND-7 | `/geometria` fora da navegação e sem vínculo com o processo | frontend | melhoria | média | aberta |
 | #PEND-8 | Leaflet carregado do unpkg em runtime, sem `integrity` | frontend | melhoria | baixa | aberta |
@@ -68,6 +68,8 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-45 | Associar cada polígono nomeado ao polígono do mapa (UI) | frontend | adição | média | bloqueada (#PEND-34) |
 | #PEND-46 | Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio | backend | bugfix | baixa | aberta |
 | #PEND-47 | Layout raiz: `main` sem `min-w-0` deixa conteúdo largo esticar a página no celular | frontend | melhoria | baixa | aberta |
+| #PEND-48 | `PATCH /api/processes/[id]` não valida tipos nem data vazia (devolve 500) | backend | bugfix | média | aberta |
+| #PEND-49 | `Process.total` nunca é calculado (a tela mostra R$ 0,00 mesmo com taxas) | backend | bugfix | média | aberta |
 
 ## Detalhes
 
@@ -110,6 +112,7 @@ Hoje a seção "Documentos" só lista tipo e nome do arquivo. Transformar cada i
 **Onde:** `src/app/processos/[id]/page.tsx`
 
 A página é somente leitura (nenhum `<input>`/`<form>`; só os botões de transição). `PATCH /api/processes/[id]` já existe — 27 campos editáveis, valida o papel de quem é atribuído — e nenhum componente o chama. Falta a UI para expediente SEI, datas de visita, taxas, observações e técnico/conferente. Hoje a rota só aceita ADMIN/SDTC; atribuição pelo GERENTE depende de #PEND-6.
+**Resolução:** Fase 3 do plano de melhorias, branch `feat/portal-correcoes-cjt` (2026-10-07). Nova rota `/processos/[id]/editar` (`src/app/processos/[id]/editar/page.tsx`) com `src/components/processo-edicao-form.tsx`: os 32 campos de `CAMPOS_EDITAVEIS`, envio só do que mudou, botão "Editar processo" e aviso "Processo atualizado." na tela do processo. O preenchimento do expediente SEI aparece no portal do solicitante. Fica de fora o GERENTE (#PEND-6).
 
 ### #PEND-6 · GERENTE (quem distribui) não consegue atribuir técnico/conferente
 
@@ -448,3 +451,19 @@ Em desenvolvimento a mesma consulta devolve ora parcelas com dados completos (11
 **Onde:** `src/app/layout.tsx` (`<main className="flex-1 bg-gray-50 min-h-screen …">` dentro de `body` com `flex`)
 
 O `main` é item de um contêiner flex e tem `min-width: auto`: qualquer descendente com largura mínima maior que a tela (texto sem espaço, `input` com largura intrínseca) alarga o `main` e a página ganha rolagem horizontal. Apareceu em 375 px na lista de Minhas Requisições (nome de área com código do CAR sem espaços) e no campo "Propriedade de" ao lado do rótulo "Espólio de". Foi corrigido caso a caso (`min-w-0` e `[overflow-wrap:anywhere]` nos itens da lista e nos botões de imóvel; `w-full min-w-0` no campo). A correção na raiz (`min-w-0` no `main`) não foi aplicada porque muda o comportamento de todo o backoffice (tabelas largas passariam a vazar do `main` em vez de esticá-lo); precisa de uma passada nas telas do backoffice antes.
+
+### #PEND-48 · `PATCH /api/processes/[id]` não valida tipos nem data vazia (devolve 500)
+
+**Responsável:** backend · **Tipo:** bugfix · **Registrada em:** 2026-10-07
+**Onde:** `src/app/api/processes/[id]/route.ts` (laço que monta `data`: só converte data preenchida e repassa o resto ao Prisma)
+
+Testado na rota local: `{"dtVisita2":""}`, `{"taxaVistoria":"abc"}` e `{"anoEntrada":"x"}` devolvem **500** sem mensagem (erro do Prisma), em vez de 400 com o campo. Data vazia deveria virar `null`; número e ano precisam ser validados. A tela de edição (Fase 3) converte tudo antes de enviar (`null` para vazio, números e datas válidos), então não depende disto, mas outro cliente da API ou um formulário futuro depende.
+**Impacto no frontend:** nenhum hoje; ao corrigir, a tela pode mostrar o erro por campo devolvido pela API.
+
+### #PEND-49 · `Process.total` nunca é calculado (a tela mostra R$ 0,00 mesmo com taxas)
+
+**Responsável:** backend · **Tipo:** bugfix · **Registrada em:** 2026-10-07
+**Onde:** `prisma/schema.prisma` (`Process.total`), `src/app/processos/[id]/page.tsx` (cartão "Financeiro" só lê o campo), `src/app/api/processes/**`
+
+Nenhuma rota grava `total`: ao salvar `taxaAbertura` de R$ 1.350,50 pela nova edição, "Taxa Abertura" mostra 1350.50 e "Total" continua R$ 0.00. Precisa definir a regra (soma de taxa de abertura, serviço de gabinete, taxa de vistoria e serviço de campo, como sugere o cartão) e calculá-la ao salvar, ou derivar na leitura. A tela de edição não expõe o campo "Total".
+**Impacto no frontend:** nenhum além de mostrar o valor correto quando existir; se a regra for derivada na leitura, o cartão "Financeiro" pode calculá-la.
