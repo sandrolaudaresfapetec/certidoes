@@ -86,7 +86,7 @@ export default async function NotificacoesPage() {
                 </div>
                 <p className="text-sm text-gray-600 mt-0.5">{notif.message}</p>
                 <div className="flex items-center gap-4 mt-2">
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-500">
                     {formatDateTime(notif.createdAt)}
                   </span>
                   {notif.process && (

@@ -100,7 +100,7 @@ export default function PortalLoginPage() {
           </button>
         </form>
 
-        <p className="text-xs text-gray-400 text-center mt-4">
+        <p className="text-xs text-gray-500 text-center mt-4">
           Ambiente de homologação — login gov.br em modo simulado.
         </p>
       </div>

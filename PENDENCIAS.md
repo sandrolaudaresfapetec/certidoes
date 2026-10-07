@@ -28,7 +28,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-5 | Tela de edição do processo e atribuição de técnico/conferente | frontend | adição | alta | resolvida (2026-10-07) |
 | #PEND-6 | GERENTE (quem distribui) não consegue atribuir técnico/conferente | backend | bugfix | alta | aberta |
 | #PEND-7 | `/geometria` fora da navegação e sem vínculo com o processo | frontend | melhoria | média | resolvida (2026-10-07) |
-| #PEND-8 | Leaflet carregado do unpkg em runtime, sem `integrity` | frontend | melhoria | baixa | aberta |
+| #PEND-8 | Leaflet carregado do unpkg em runtime, sem `integrity` | frontend | melhoria | baixa | resolvida (2026-10-07) |
 | #PEND-9 | Múltiplos proprietários: regra do "e outros" não implementada | backend | adição | média | aberta |
 | #PEND-10 | Nomes de gleba/polígono: não rejeita matrícula nem município | backend | adição | média | descartada (substituída por #PEND-36) |
 | #PEND-11 | Decisão: usucapião — matrícula numérica ou literal "USUCAPIÃO"? | negócio | decisão | média | resolvida (2026-10-06) |
@@ -60,7 +60,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-37 | Decisão: o que é "incluir e-mail para finalizar o cadastro (ou SMS)" | negócio | decisão | média | aberta |
 | #PEND-38 | Decisão: cartela de cores e logos do IGC | negócio | decisão | média | aberta |
 | #PEND-39 | Decisão: dúvidas do documento de correções de 2026-09-16 | negócio | decisão | média | aberta |
-| #PEND-40 | Texto auxiliar em `gray-400` abaixo do contraste AA (rodapé do portal) | frontend | melhoria | baixa | aberta |
+| #PEND-40 | Texto auxiliar em `gray-400` abaixo do contraste AA (rodapé do portal) | frontend | melhoria | baixa | resolvida (2026-10-07) |
 | #PEND-41 | Máscaras de entrada nos formulários (telefone, CPF, CNPJ etc.) | frontend | adição | média | resolvida (2026-10-07) |
 | #PEND-42 | Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar | backend | adição | média | aberta |
 | #PEND-43 | Salvar rascunho e continuar requisição no formulário e em Minhas Requisições | frontend | adição | média | bloqueada (#PEND-42) |
@@ -136,6 +136,7 @@ Nenhum link aponta para `/geometria`; lá dentro o vínculo com o processo é um
 **Onde:** `src/app/geometria/page.tsx` (injeção de `<script>` e `<link>`)
 
 Dependência externa sem hash fixo; o mapa deixa de funcionar se o unpkg estiver inacessível (ambiente de governo com saída restrita). Preferir o pacote `leaflet` via npm ou, no mínimo, SRI.
+**Resolução:** `src/app/geometria/page.tsx` agora usa o pacote `leaflet` (já em `package.json`): `import("leaflet")` dinâmico no efeito de inicialização e `import "leaflet/dist/leaflet.css"`. Sem requisição ao unpkg; o mapa também é removido ao sair da tela.
 
 ### #PEND-9 · Múltiplos proprietários: regra do "e outros" não implementada
 
@@ -393,6 +394,7 @@ O documento pede "mudar todas as cores, seguindo a cartela e padrão do IGC". A 
 **Onde:** `src/app/portal/layout.tsx` (rodapé, `text-gray-400`); a classe aparece em outros textos auxiliares
 
 Achado na varredura de contraste da Fase A: o rodapé "Serviço de emissão de certidões…" tem 2,49:1 sobre `gray-50` (mínimo AA: 4,5:1), tanto em modo claro quanto escuro. Só foram varridas algumas páginas; vale uma passada nos demais usos de `text-gray-400`.
+**Resolução:** os 9 textos auxiliares em `gray-400` (rodapé e login do portal, dica dos anexos, número/município/coluna vazia do Quadro, data das Notificações, "Pendente" da Certidão, nota da tabela em `/geometria`) passaram para `gray-500` (4,6 a 4,8:1). Ícones e a seta do histórico, decorativos, ficaram como estavam.
 
 ### #PEND-41 · Máscaras de entrada nos formulários (telefone, CPF, CNPJ etc.)
 

@@ -816,7 +816,7 @@ export function RequisicaoForm({
                   onChange={setProcuracao}
                 />
               )}
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-500">
                 Formatos aceitos: PDF, JPG ou PNG — até 10 MB cada.
               </p>
             </div>

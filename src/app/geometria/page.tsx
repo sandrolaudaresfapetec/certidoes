@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Scissors, Loader2, Map as MapIcon, MousePointerClick, Tractor } from "lucide-react";
+import "leaflet/dist/leaflet.css";
 import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
 
 /** Poligono de demonstracao: cobre a triplice Brotas / Torrinha / Sao Pedro (SP). */
@@ -20,6 +21,9 @@ const IMOVEL_EXEMPLO = {
 };
 
 const ROTULO_EXEMPLO = "Imovel de exemplo — Brotas / Torrinha / Sao Pedro (SP) · 11.436 ha";
+
+/** Geometria vinda da API embrulhada como Feature GeoJSON (o tipo do Leaflet não aceita o literal). */
+const feicao = (geometria: any): any => ({ type: "Feature", properties: {}, geometry: geometria });
 
 const CORES = ["#10b981", "#f59e0b", "#3b82f6", "#ef4444", "#8b5cf6"];
 
@@ -84,6 +88,7 @@ type Vinculo =
     };
 
 export default function GeometriaPage() {
+  const leafletRef = useRef<typeof import("leaflet") | null>(null);
   const mapRef = useRef<any>(null);
   const layersRef = useRef<any[]>([]);
   const [pronto, setPronto] = useState(false);
@@ -183,18 +188,13 @@ export default function GeometriaPage() {
     window.history.replaceState(null, "", "/geometria");
   }
 
+  // Leaflet vem do pacote npm (import dinâmico: a biblioteca usa `window` e não roda no servidor).
   useEffect(() => {
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-    script.onload = async () => {
-      const L = (window as any).L;
+    let cancelado = false;
+    (async () => {
+      const L = await import("leaflet");
+      if (cancelado) return;
+      leafletRef.current = L;
       const map = L.map("mapa-divisas").setView([-22.2, -48.6], 6);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap",
@@ -207,6 +207,7 @@ export default function GeometriaPage() {
       map.on("click", (e: any) => selecionarPorClique(e.latlng.lat, e.latlng.lng));
       // O mapa abre so com o limite estadual: a cobertura e todo o estado de SP.
       const limite = await (await fetch("/api/geometria/limite-uf?uf=SP")).json();
+      if (cancelado) return;
       if (limite.geojson) {
         const layer = L.geoJSON(limite.geojson, {
           style: { color: "#047857", weight: 2, fill: false },
@@ -215,8 +216,12 @@ export default function GeometriaPage() {
         map.fitBounds(layer.getBounds());
       }
       setPronto(true);
+    })();
+    return () => {
+      cancelado = true;
+      mapRef.current?.remove();
+      mapRef.current = null;
     };
-    document.body.appendChild(script);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -226,7 +231,7 @@ export default function GeometriaPage() {
    * WFS e sao desenhadas no cliente; o WMS fica como base translucida.
    */
   async function atualizarCamadaCar() {
-    const L = (window as any).L;
+    const L = leafletRef.current!;
     const map = mapRef.current;
     const pedido = ++pedidoBboxRef.current;
     if (!map || !mostrarCarRef.current) return;
@@ -247,7 +252,7 @@ export default function GeometriaPage() {
       const grupo = carLayerRef.current;
       grupo.clearLayers();
       (data.imoveis ?? []).forEach((imovel: any) => {
-        L.geoJSON({ type: "Feature", properties: {}, geometry: imovel.geometria }, {
+        L.geoJSON(feicao(imovel.geometria), {
           style: { color: "#f97316", weight: 1.5, fillColor: "#f97316", fillOpacity: 0.05 },
         })
           .bindPopup(popupImovel(imovel))
@@ -267,7 +272,7 @@ export default function GeometriaPage() {
   }
 
   function alternarCamadaCar(ativo: boolean) {
-    const L = (window as any).L;
+    const L = leafletRef.current!;
     const map = mapRef.current;
     setMostrarCar(ativo);
     mostrarCarRef.current = ativo;
@@ -301,7 +306,7 @@ export default function GeometriaPage() {
    * acervo do INCRA importado), porque o acervo nao responde fora do Brasil.
    */
   async function atualizarCamadaSigef() {
-    const L = (window as any).L;
+    const L = leafletRef.current!;
     const map = mapRef.current;
     const pedido = ++pedidoSigefRef.current;
     if (!map || !mostrarSigefRef.current) return;
@@ -322,7 +327,7 @@ export default function GeometriaPage() {
       const grupo = sigefLayerRef.current;
       grupo.clearLayers();
       (data.parcelas ?? []).forEach((parcela: any) => {
-        L.geoJSON({ type: "Feature", properties: {}, geometry: parcela.geometria }, {
+        L.geoJSON(feicao(parcela.geometria), {
           style: { color: "#7c3aed", weight: 1.5, fillColor: "#7c3aed", fillOpacity: 0.05 },
         })
           .bindPopup(popupParcela(parcela))
@@ -343,7 +348,7 @@ export default function GeometriaPage() {
   }
 
   async function alternarCamadaSigef(ativo: boolean) {
-    const L = (window as any).L;
+    const L = leafletRef.current!;
     const map = mapRef.current;
     setMostrarSigef(ativo);
     mostrarSigefRef.current = ativo;
@@ -390,7 +395,7 @@ export default function GeometriaPage() {
 
   /** Vira o poligono de analise: preenche o GeoJSON, destaca no mapa e abre o popup. */
   function usarImovel(imovel: any, voar: boolean) {
-    const L = (window as any).L;
+    const L = leafletRef.current!;
     const map = mapRef.current;
     setGeojson(JSON.stringify({
       type: "Feature",
@@ -408,7 +413,7 @@ export default function GeometriaPage() {
       `${Number(imovel.areaHa).toLocaleString("pt-BR")} ha · ${imovel.modulosFiscais} MF · ${imovel.statusImovel}`
     );
     if (selecaoRef.current) map.removeLayer(selecaoRef.current);
-    const layer = L.geoJSON({ type: "Feature", properties: {}, geometry: imovel.geometria }, {
+    const layer = L.geoJSON(feicao(imovel.geometria), {
       style: { color: "#6366f1", weight: 3, fillColor: "#6366f1", fillOpacity: 0.2 },
     })
       .bindPopup(popupImovel(imovel))
@@ -422,7 +427,7 @@ export default function GeometriaPage() {
 
   /** Mesma funcao de usarImovel, para os atributos da parcela do SIGEF. */
   function usarParcela(parcela: any) {
-    const L = (window as any).L;
+    const L = leafletRef.current!;
     const map = mapRef.current;
     setGeojson(JSON.stringify({
       type: "Feature",
@@ -443,7 +448,7 @@ export default function GeometriaPage() {
       (parcela.status ? ` · ${parcela.status}` : "")
     );
     if (selecaoRef.current) map.removeLayer(selecaoRef.current);
-    const layer = L.geoJSON({ type: "Feature", properties: {}, geometry: parcela.geometria }, {
+    const layer = L.geoJSON(feicao(parcela.geometria), {
       style: { color: "#6366f1", weight: 3, fillColor: "#6366f1", fillOpacity: 0.2 },
     })
       .bindPopup(popupParcela(parcela))
@@ -455,7 +460,7 @@ export default function GeometriaPage() {
   }
 
   function desenharImovel(feature: any, cor: string) {
-    const L = (window as any).L;
+    const L = leafletRef.current!;
     const layer = L.geoJSON(feature, { style: { color: cor, weight: 2, fillOpacity: 0.25 } }).addTo(mapRef.current);
     layersRef.current.push(layer);
     mapRef.current.fitBounds(layer.getBounds().pad(0.2));
@@ -722,7 +727,7 @@ export default function GeometriaPage() {
                   ))}
                 </tbody>
               </table>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 O tecnico confere os municipios/percentuais antes de seguir para conferencia.
               </p>
             </div>

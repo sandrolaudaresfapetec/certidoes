@@ -251,7 +251,7 @@ export default async function CertidaoPage({ params }: PageProps) {
                     <p className="text-xs text-gray-600">{formatDateTime(a.data)}</p>
                   </>
                 ) : (
-                  <p className="text-xs text-gray-400 mt-1">Pendente</p>
+                  <p className="text-xs text-gray-500 mt-1">Pendente</p>
                 )}
               </div>
             ))}
