@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { exigirAdminApi, exigirUsuarioApi } from "@/lib/auth";
+import { exigirAdminApi, exigirGeometriaApi } from "@/lib/auth";
 import { garantirLinhasDemo } from "@/lib/linhas-demo";
 
 /** GET /api/geometria/linhas — lista as linhas de divisa validadas. */
 export async function GET() {
-  const sessao = await exigirUsuarioApi();
+  const sessao = await exigirGeometriaApi();
   if ("erro" in sessao) return sessao.erro;
 
   // Instalacao nova comeca sem linhas: qualquer usuario ve as de demonstracao,

@@ -96,7 +96,7 @@ jobs:
               ...context.repo,
               issue_number: issue.number,
               body: [
-                `Card do Jira: ${key} — ${process.env.JIRA_BASE_URL}/browse/${key}`,
+                `Card do Jira: ${key} — ${baseUrl}/browse/${key}`,
                 '',
                 `Use a chave \`${key}\` no nome da branch, nas mensagens de commit e no titulo do PR`,
                 'para que o GitHub for Jira vincule tudo ao card.',

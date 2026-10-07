@@ -3,8 +3,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Scissors, Loader2, Map as MapIcon, MousePointerClick, Tractor } from "lucide-react";
-import "leaflet/dist/leaflet.css";
+import {
+  Scissors, Loader2, Map as MapIcon, MousePointerClick, Search, Layers, Upload, PenTool, Download, Trash2,
+} from "lucide-react";
 import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
 
 /** Poligono de demonstracao: cobre a triplice Brotas / Torrinha / Sao Pedro (SP). */
@@ -22,34 +23,116 @@ const IMOVEL_EXEMPLO = {
 
 const ROTULO_EXEMPLO = "Imovel de exemplo — Brotas / Torrinha / Sao Pedro (SP) · 11.436 ha";
 
-/** Geometria vinda da API embrulhada como Feature GeoJSON (o tipo do Leaflet não aceita o literal). */
-const feicao = (geometria: any): any => ({ type: "Feature", properties: {}, geometry: geometria });
-
 const CORES = ["#10b981", "#f59e0b", "#3b82f6", "#ef4444", "#8b5cf6"];
 
-const CAR_WMS = "https://geoserver.car.gov.br/geoserver/sicar/wms";
-/** Zoom minimo para pedir as feicoes do WFS (abaixo disso a janela e grande demais). */
-const ZOOM_MIN_CAR = 12;
+/** Zoom minimo para pedir as parcelas da janela (abaixo disso a janela e grande demais). */
+const ZOOM_MIN_SIGEF = 12;
 
-/** Atributos vem de fontes externas (WFS do CAR, DBF do acervo): sempre escapar. */
+/** Limites municipais oficiais do IGC publicados no GeoServer da IDESP (base do IGC, nao de outros orgaos). */
+const IDESP_WMS = "https://www.idesp.sp.gov.br/geoserver/idesp/wms";
+const IDESP_LIMITES_MUNICIPAIS = "idesp:dradt_mvw_lml_municipio_a_2021";
+
+const CDN = {
+  leafletCss: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+  leafletJs: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+  geomanCss: "https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css",
+  geomanJs: "https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js",
+  shpJs: "https://unpkg.com/shpjs@6.1.0/dist/shp.js",
+};
+
+function carregarCss(id: string, href: string) {
+  if (document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = href;
+  document.head.appendChild(link);
+}
+
+function carregarScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const existente = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
+    if (existente?.dataset.carregado) return resolve();
+    const script = existente ?? document.createElement("script");
+    script.addEventListener("load", () => {
+      script.dataset.carregado = "1";
+      resolve();
+    });
+    script.addEventListener("error", () => reject(new Error(`Falha ao carregar ${src}`)));
+    if (!existente) {
+      script.src = src;
+      document.body.appendChild(script);
+    }
+  });
+}
+
+type Camada = { nome: string; total: number; poligonos: number };
+
+/** KML (Google Earth) -> GeoJSON: Placemarks com Polygon, LineString e Point, inclusive em MultiGeometry. */
+function kmlParaGeoJSON(texto: string): any {
+  const doc = new DOMParser().parseFromString(texto, "application/xml");
+  if (doc.querySelector("parsererror")) throw new Error("KML invalido");
+  const coords = (el: Element | null) =>
+    (el?.textContent ?? "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((par) => par.split(",").slice(0, 2).map(Number))
+      .filter((c) => c.length === 2 && c.every(Number.isFinite));
+  const features: any[] = [];
+  doc.querySelectorAll("Placemark").forEach((pm) => {
+    const nome = pm.querySelector("name")?.textContent?.trim() ?? "";
+    const props = { nome };
+    pm.querySelectorAll("Polygon").forEach((pol) => {
+      const anel = (sel: string) =>
+        Array.from(pol.querySelectorAll(`${sel} LinearRing coordinates`)).map(coords);
+      const externo = anel("outerBoundaryIs")[0];
+      if (externo?.length >= 4) {
+        features.push({ type: "Feature", properties: props, geometry: { type: "Polygon", coordinates: [externo, ...anel("innerBoundaryIs")] } });
+      }
+    });
+    pm.querySelectorAll("LineString").forEach((ls) => {
+      const c = coords(ls.querySelector("coordinates"));
+      if (c.length >= 2) features.push({ type: "Feature", properties: props, geometry: { type: "LineString", coordinates: c } });
+    });
+    pm.querySelectorAll("Point").forEach((pt) => {
+      const c = coords(pt.querySelector("coordinates"));
+      if (c.length === 1) features.push({ type: "Feature", properties: props, geometry: { type: "Point", coordinates: c[0] } });
+    });
+  });
+  return { type: "FeatureCollection", features };
+}
+
+function normalizarGeoJSON(dado: any): any {
+  if (Array.isArray(dado)) {
+    return { type: "FeatureCollection", features: dado.flatMap((d) => normalizarGeoJSON(d).features) };
+  }
+  if (dado?.type === "FeatureCollection") return dado;
+  if (dado?.type === "Feature") return { type: "FeatureCollection", features: [dado] };
+  if (dado?.type && dado?.coordinates) {
+    return { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: dado }] };
+  }
+  throw new Error("Arquivo sem feicoes geograficas reconheciveis");
+}
+
+/** Reune os poligonos de uma colecao em uma unica geometria (Polygon ou MultiPolygon). */
+function poligonosDe(fc: any): { type: "Polygon" | "MultiPolygon"; coordinates: any } | null {
+  const aneis: any[] = [];
+  for (const f of fc.features ?? []) {
+    const g = f?.geometry;
+    if (g?.type === "Polygon") aneis.push(g.coordinates);
+    else if (g?.type === "MultiPolygon") aneis.push(...g.coordinates);
+  }
+  if (!aneis.length) return null;
+  return aneis.length === 1
+    ? { type: "Polygon", coordinates: aneis[0] }
+    : { type: "MultiPolygon", coordinates: aneis };
+}
+
+/** Atributos vem de fonte externa (DBF do acervo do INCRA): sempre escapar. */
 function esc(valor: unknown): string {
   return String(valor ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
-  );
-}
-
-function popupImovel(imovel: any) {
-  const linha = (rotulo: string, valor: string) =>
-    `<div style="display:flex;gap:6px"><span style="color:#6b7280">${rotulo}</span><b>${esc(valor)}</b></div>`;
-  return (
-    `<div style="font-size:12px;line-height:1.5;min-width:230px">` +
-    `<div style="font-family:monospace;font-weight:700;margin-bottom:4px">${esc(imovel.codImovel)}</div>` +
-    linha("Municipio:", `${imovel.municipio}/${imovel.uf}`) +
-    linha("Area:", `${Number(imovel.areaHa).toLocaleString("pt-BR", { maximumFractionDigits: 4 })} ha`) +
-    linha("Modulos fiscais:", Number(imovel.modulosFiscais).toLocaleString("pt-BR", { maximumFractionDigits: 4 })) +
-    linha("Situacao:", `${imovel.statusImovel}${imovel.tipoImovel ? ` (${imovel.tipoImovel})` : ""}`) +
-    linha("Condicao:", imovel.condicao || "—") +
-    `<div style="color:#9ca3af;margin-top:4px">Fonte: CAR/SICAR</div></div>`
   );
 }
 
@@ -88,7 +171,6 @@ type Vinculo =
     };
 
 export default function GeometriaPage() {
-  const leafletRef = useRef<typeof import("leaflet") | null>(null);
   const mapRef = useRef<any>(null);
   const layersRef = useRef<any[]>([]);
   const [pronto, setPronto] = useState(false);
@@ -101,28 +183,31 @@ export default function GeometriaPage() {
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [resultado, setResultado] = useState<any>(null);
-  const [carregandoCar, setCarregandoCar] = useState(false);
-  const [carregandoCamada, setCarregandoCamada] = useState(false);
-  const [carInfo, setCarInfo] = useState<string | null>(null);
-  const [codigoCar, setCodigoCar] = useState("");
-  const [mostrarCar, setMostrarCar] = useState(false);
+  const [carregandoParcela, setCarregandoParcela] = useState(false);
+  const [parcelaInfo, setParcelaInfo] = useState<string | null>(null);
+  const [codigoParcela, setCodigoParcela] = useState("");
   const [modoClique, setModoClique] = useState(false);
   const [carregandoPonto, setCarregandoPonto] = useState(false);
-  const [totalCarVisivel, setTotalCarVisivel] = useState<number | null>(null);
   const [mostrarSigef, setMostrarSigef] = useState(false);
   const [carregandoSigef, setCarregandoSigef] = useState(false);
   const [totalSigefVisivel, setTotalSigefVisivel] = useState<number | null>(null);
   const [totalSigefImportado, setTotalSigefImportado] = useState<number | null>(null);
-  const wmsRef = useRef<any>(null);
-  const carLayerRef = useRef<any>(null);
   const sigefLayerRef = useRef<any>(null);
   const selecaoRef = useRef<any>(null);
-  const mostrarCarRef = useRef(false);
   const mostrarSigefRef = useRef(false);
   const modoCliqueRef = useRef(false);
-  const pedidoBboxRef = useRef(0);
   const pedidoPontoRef = useRef(0);
   const pedidoSigefRef = useRef(0);
+  const [mostrarLimitesIgc, setMostrarLimitesIgc] = useState(false);
+  const limitesIgcRef = useRef<any>(null);
+  const [camadaProprietario, setCamadaProprietario] = useState<Camada | null>(null);
+  const [carregandoArquivo, setCarregandoArquivo] = useState(false);
+  const proprietarioLayerRef = useRef<any>(null);
+  const proprietarioFcRef = useRef<any>(null);
+  const arquivoRef = useRef<HTMLInputElement>(null);
+  const [modoRascunho, setModoRascunho] = useState(false);
+  const [rascunhoTotal, setRascunhoTotal] = useState(0);
+  const desenhandoRef = useRef(false);
 
   // Lê `?processo=` ao abrir e carrega o processo (rota GET /api/processes/[id]).
   useEffect(() => {
@@ -163,7 +248,7 @@ export default function GeometriaPage() {
     (async () => {
       if (!codigo) {
         setAvisoParcela(
-          "Este processo não tem parcela do SIGEF registrada. Escolha o imóvel no mapa (CAR ou SIGEF) ou cole o GeoJSON."
+          "Este processo não tem parcela do SIGEF registrada. Escolha a parcela no mapa ou pelo código, ou cole o GeoJSON."
         );
         return;
       }
@@ -174,7 +259,7 @@ export default function GeometriaPage() {
         usarParcela(data.parcelas[0]);
       } catch {
         setAvisoParcela(
-          `A parcela ${codigo} deste processo não está no acervo SIGEF importado. Escolha o imóvel no mapa (CAR ou SIGEF) ou cole o GeoJSON.`
+          `A parcela ${codigo} deste processo não está no acervo SIGEF importado. Escolha a parcela no mapa ou pelo código, ou cole o GeoJSON.`
         );
       }
     })();
@@ -188,26 +273,36 @@ export default function GeometriaPage() {
     window.history.replaceState(null, "", "/geometria");
   }
 
-  // Leaflet vem do pacote npm (import dinâmico: a biblioteca usa `window` e não roda no servidor).
   useEffect(() => {
-    let cancelado = false;
-    (async () => {
-      const L = await import("leaflet");
-      if (cancelado) return;
-      leafletRef.current = L;
+    carregarCss("leaflet-css", CDN.leafletCss);
+    carregarCss("geoman-css", CDN.geomanCss);
+    carregarScript(CDN.leafletJs).then(async () => {
+      await carregarScript(CDN.geomanJs).catch(() => undefined);
+      const L = (window as any).L;
       const map = L.map("mapa-divisas").setView([-22.2, -48.6], 6);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap",
       }).addTo(map);
       mapRef.current = map;
-      map.on("moveend", () => {
-        atualizarCamadaCar();
-        atualizarCamadaSigef();
+      map.on("moveend", () => atualizarCamadaSigef());
+      map.on("click", (e: any) => {
+        if (desenhandoRef.current) return;
+        selecionarPorClique(e.latlng.lat, e.latlng.lng);
       });
-      map.on("click", (e: any) => selecionarPorClique(e.latlng.lat, e.latlng.lng));
+      if (map.pm) {
+        map.pm.setLang("pt_br");
+        map.pm.setGlobalOptions({ pathOptions: { color: "#dc2626", weight: 3, fillOpacity: 0.15 } });
+        const contar = () => setRascunhoTotal(map.pm.getGeomanDrawLayers().length);
+        map.on("pm:drawstart", () => { desenhandoRef.current = true; });
+        map.on("pm:drawend", () => { desenhandoRef.current = false; });
+        map.on("pm:create", (e: any) => {
+          e.layer.bindPopup("Rascunho do tecnico");
+          contar();
+        });
+        map.on("pm:remove", contar);
+      }
       // O mapa abre so com o limite estadual: a cobertura e todo o estado de SP.
       const limite = await (await fetch("/api/geometria/limite-uf?uf=SP")).json();
-      if (cancelado) return;
       if (limite.geojson) {
         const layer = L.geoJSON(limite.geojson, {
           style: { color: "#047857", weight: 2, fill: false },
@@ -216,89 +311,184 @@ export default function GeometriaPage() {
         map.fitBounds(layer.getBounds());
       }
       setPronto(true);
-    })();
-    return () => {
-      cancelado = true;
-      mapRef.current?.remove();
-      mapRef.current = null;
-    };
+    }).catch((e) => setErro((e as Error).message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * Contorno laranja dos imoveis da janela atual. O GeoServer do CAR ignora
-   * SLD_BODY (estilo unico com preenchimento opaco), por isso as feicoes vem do
-   * WFS e sao desenhadas no cliente; o WMS fica como base translucida.
-   */
-  async function atualizarCamadaCar() {
-    const L = leafletRef.current!;
+  /** Limites municipais oficiais do IGC (WMS da IDESP) sobre o mapa base. */
+  function alternarLimitesIgc(ativo: boolean) {
+    const L = (window as any).L;
     const map = mapRef.current;
-    const pedido = ++pedidoBboxRef.current;
-    if (!map || !mostrarCarRef.current) return;
-    if (map.getZoom() < ZOOM_MIN_CAR) {
-      carLayerRef.current?.clearLayers();
-      setTotalCarVisivel(null);
-      setCarregandoCamada(false);
-      return;
-    }
-    const b = map.getBounds();
-    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n: number) => n.toFixed(6)).join(",");
-    setCarregandoCamada(true);
-    try {
-      const res = await fetch(`/api/car/imoveis?bbox=${bbox}&limite=300`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Falha ao consultar o CAR");
-      if (pedido !== pedidoBboxRef.current || !mostrarCarRef.current) return;
-      const grupo = carLayerRef.current;
-      grupo.clearLayers();
-      (data.imoveis ?? []).forEach((imovel: any) => {
-        L.geoJSON(feicao(imovel.geometria), {
-          style: { color: "#f97316", weight: 1.5, fillColor: "#f97316", fillOpacity: 0.05 },
-        })
-          .bindPopup(popupImovel(imovel))
-          .on("click", (ev: any) => {
-            if (!modoCliqueRef.current) return;
-            L.DomEvent.stopPropagation(ev);
-            usarImovel(imovel, false);
-          })
-          .addTo(grupo);
-      });
-      setTotalCarVisivel((data.imoveis ?? []).length);
-    } catch (e) {
-      if (pedido === pedidoBboxRef.current) setErro((e as Error).message);
-    } finally {
-      if (pedido === pedidoBboxRef.current) setCarregandoCamada(false);
+    setMostrarLimitesIgc(ativo);
+    if (!map) return;
+    if (ativo) {
+      if (!limitesIgcRef.current) {
+        limitesIgcRef.current = L.tileLayer.wms(IDESP_WMS, {
+          layers: IDESP_LIMITES_MUNICIPAIS,
+          format: "image/png",
+          transparent: true,
+          version: "1.1.1",
+          opacity: 0.9,
+          attribution: "Limites municipais 2021 — IGC/IDESP",
+        });
+      }
+      limitesIgcRef.current.addTo(map);
+    } else if (limitesIgcRef.current) {
+      map.removeLayer(limitesIgcRef.current);
     }
   }
 
-  function alternarCamadaCar(ativo: boolean) {
-    const L = leafletRef.current!;
+  /** Camada enviada pelo proprietario (GeoJSON, KML ou shapefile zipado) desenhada sobre o mapa. */
+  async function abrirCamadaProprietario(arquivo: File) {
+    const L = (window as any).L;
     const map = mapRef.current;
-    setMostrarCar(ativo);
-    mostrarCarRef.current = ativo;
     if (!map) return;
-    if (ativo) {
-      wmsRef.current ??= L.tileLayer.wms(CAR_WMS, {
-        layers: "sicar:sicar_imoveis_sp",
-        format: "image/png",
-        transparent: true,
-        opacity: 0.25,
-        attribution: "CAR/SICAR",
-      });
-      carLayerRef.current ??= L.layerGroup();
-      wmsRef.current.addTo(map);
-      carLayerRef.current.addTo(map);
-      atualizarCamadaCar();
-    } else {
-      pedidoBboxRef.current++;
-      setCarregandoCamada(false);
-      if (wmsRef.current) map.removeLayer(wmsRef.current);
-      if (carLayerRef.current) {
-        carLayerRef.current.clearLayers();
-        map.removeLayer(carLayerRef.current);
+    setCarregandoArquivo(true);
+    setErro(null);
+    try {
+      const nome = arquivo.name;
+      const ext = nome.toLowerCase().split(".").pop() ?? "";
+      let fc: any;
+      if (ext === "zip") {
+        await carregarScript(CDN.shpJs);
+        fc = normalizarGeoJSON(await (window as any).shp(await arrayBufferDe(arquivo)));
+      } else if (ext === "kml") {
+        fc = kmlParaGeoJSON(await arquivo.text());
+      } else if (ext === "geojson" || ext === "json") {
+        fc = normalizarGeoJSON(JSON.parse(await arquivo.text()));
+      } else {
+        throw new Error("Formato nao suportado: envie .geojson, .json, .kml ou .zip (shapefile)");
       }
-      setTotalCarVisivel(null);
+      if (!fc.features.length) throw new Error("O arquivo nao contem feicoes geograficas");
+      removerCamadaProprietario();
+      const layer = L.geoJSON(fc, {
+        style: { color: "#ea580c", weight: 3, fillColor: "#fb923c", fillOpacity: 0.2 },
+        onEachFeature: (f: any, l: any) => {
+          const props = f.properties ?? {};
+          const linhas = Object.entries(props)
+            .filter(([, v]) => v !== null && v !== "" && typeof v !== "object")
+            .slice(0, 12)
+            .map(([k, v]) => `<b>${esc(k)}</b>: ${esc(v)}`);
+          l.bindPopup(`<div style="font-size:12px"><b>Camada do proprietario — ${esc(nome)}</b><br/>${linhas.join("<br/>")}</div>`);
+        },
+      }).addTo(map);
+      proprietarioLayerRef.current = layer;
+      proprietarioFcRef.current = fc;
+      const poligonos = fc.features.filter((f: any) => /Polygon$/.test(f.geometry?.type ?? "")).length;
+      setCamadaProprietario({ nome, total: fc.features.length, poligonos });
+      const bounds = layer.getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds.pad(0.2));
+    } catch (e) {
+      setErro((e as Error).message || "Falha ao abrir a camada enviada pelo proprietario");
+    } finally {
+      setCarregandoArquivo(false);
+      if (arquivoRef.current) arquivoRef.current.value = "";
     }
+  }
+
+  function arrayBufferDe(arquivo: File): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      const leitor = new FileReader();
+      leitor.onload = () => resolve(leitor.result as ArrayBuffer);
+      leitor.onerror = () => reject(leitor.error);
+      leitor.readAsArrayBuffer(arquivo);
+    });
+  }
+
+  function removerCamadaProprietario() {
+    if (proprietarioLayerRef.current) mapRef.current?.removeLayer(proprietarioLayerRef.current);
+    proprietarioLayerRef.current = null;
+    proprietarioFcRef.current = null;
+    setCamadaProprietario(null);
+  }
+
+  /** Troca o poligono de analise por uma geometria desenhada/enviada (em vez da parcela do SIGEF). */
+  function usarGeometria(geometria: any, origem: string, rotulo: string) {
+    const L = (window as any).L;
+    const map = mapRef.current;
+    setGeojson(JSON.stringify({
+      type: "Feature",
+      properties: { nome: rotulo, origem },
+      geometry: geometria,
+    }, null, 2));
+    setParcelaInfo(rotulo);
+    if (selecaoRef.current) map.removeLayer(selecaoRef.current);
+    const layer = L.geoJSON({ type: "Feature", properties: {}, geometry: geometria }, {
+      style: { color: "#6366f1", weight: 3, fillColor: "#6366f1", fillOpacity: 0.2 },
+      interactive: false,
+    }).addTo(map);
+    selecaoRef.current = layer;
+    map.fitBounds(layer.getBounds().pad(0.3));
+  }
+
+  function usarCamadaProprietario() {
+    const geometria = poligonosDe(proprietarioFcRef.current ?? {});
+    if (!geometria || !camadaProprietario) {
+      setErro("A camada enviada nao contem poligonos");
+      return;
+    }
+    usarGeometria(geometria, "PROPRIETARIO", `Camada do proprietario — ${camadaProprietario.nome}`);
+  }
+
+  /** Camada de rascunho: barra de desenho (poligono, retangulo, linha, marcador, editar, arrastar, apagar). */
+  function alternarRascunho(ativo: boolean) {
+    const map = mapRef.current;
+    setModoRascunho(ativo);
+    if (!map?.pm) return;
+    if (ativo) {
+      map.pm.addControls({
+        position: "topleft",
+        drawMarker: true,
+        drawPolyline: true,
+        drawRectangle: true,
+        drawPolygon: true,
+        drawCircle: false,
+        drawCircleMarker: false,
+        drawText: false,
+        editMode: true,
+        dragMode: true,
+        cutPolygon: false,
+        removalMode: true,
+        rotateMode: false,
+      });
+    } else {
+      map.pm.disableDraw();
+      map.pm.disableGlobalEditMode();
+      map.pm.disableGlobalRemovalMode();
+      map.pm.disableGlobalDragMode();
+      map.pm.removeControls();
+      desenhandoRef.current = false;
+    }
+  }
+
+  function rascunhoGeoJSON(): any {
+    const camadas = mapRef.current?.pm?.getGeomanDrawLayers() ?? [];
+    return { type: "FeatureCollection", features: camadas.map((l: any) => l.toGeoJSON()) };
+  }
+
+  function usarRascunho() {
+    const geometria = poligonosDe(rascunhoGeoJSON());
+    if (!geometria) {
+      setErro("Desenhe ao menos um poligono ou retangulo no rascunho");
+      return;
+    }
+    usarGeometria(geometria, "RASCUNHO", "Rascunho desenhado pelo tecnico");
+  }
+
+  function exportarRascunho() {
+    const blob = new Blob([JSON.stringify(rascunhoGeoJSON(), null, 2)], { type: "application/geo+json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rascunho-${new Date().toISOString().slice(0, 10)}.geojson`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function limparRascunho() {
+    const map = mapRef.current;
+    for (const l of map?.pm?.getGeomanDrawLayers() ?? []) map.removeLayer(l);
+    setRascunhoTotal(0);
   }
 
   /**
@@ -306,11 +496,11 @@ export default function GeometriaPage() {
    * acervo do INCRA importado), porque o acervo nao responde fora do Brasil.
    */
   async function atualizarCamadaSigef() {
-    const L = leafletRef.current!;
+    const L = (window as any).L;
     const map = mapRef.current;
     const pedido = ++pedidoSigefRef.current;
     if (!map || !mostrarSigefRef.current) return;
-    if (map.getZoom() < ZOOM_MIN_CAR) {
+    if (map.getZoom() < ZOOM_MIN_SIGEF) {
       sigefLayerRef.current?.clearLayers();
       setTotalSigefVisivel(null);
       setCarregandoSigef(false);
@@ -327,13 +517,13 @@ export default function GeometriaPage() {
       const grupo = sigefLayerRef.current;
       grupo.clearLayers();
       (data.parcelas ?? []).forEach((parcela: any) => {
-        L.geoJSON(feicao(parcela.geometria), {
+        L.geoJSON({ type: "Feature", properties: {}, geometry: parcela.geometria }, {
           style: { color: "#7c3aed", weight: 1.5, fillColor: "#7c3aed", fillOpacity: 0.05 },
         })
           .bindPopup(popupParcela(parcela))
           .on("click", (ev: any) => {
             if (!modoCliqueRef.current) return;
-            // Sem isso o clique tambem chega ao mapa e a consulta do CAR sobrescreve a parcela.
+            // Sem isso o clique tambem chega ao mapa e dispara a consulta por ponto.
             L.DomEvent.stopPropagation(ev);
             usarParcela(parcela);
           })
@@ -348,7 +538,7 @@ export default function GeometriaPage() {
   }
 
   async function alternarCamadaSigef(ativo: boolean) {
-    const L = leafletRef.current!;
+    const L = (window as any).L;
     const map = mapRef.current;
     setMostrarSigef(ativo);
     mostrarSigefRef.current = ativo;
@@ -374,18 +564,18 @@ export default function GeometriaPage() {
     }
   }
 
-  /** Clique no mapa: o WFS devolve a feicao que contem o ponto. */
+  /** Clique no mapa: a parcela do SIGEF que contem o ponto vira o poligono de analise. */
   async function selecionarPorClique(lat: number, lon: number) {
     if (!modoCliqueRef.current) return;
     const pedido = ++pedidoPontoRef.current;
     setCarregandoPonto(true);
     setErro(null);
     try {
-      const res = await fetch(`/api/car/imoveis?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}`);
+      const res = await fetch(`/api/sigef/parcelas?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}`);
       const data = await res.json();
       if (pedido !== pedidoPontoRef.current || !modoCliqueRef.current) return;
-      if (!res.ok) throw new Error(data.error || "Falha ao consultar o CAR");
-      usarImovel(data.imoveis[0], false);
+      if (!res.ok) throw new Error(data.error || "Falha ao consultar as parcelas do SIGEF");
+      usarParcela(data.parcelas[0]);
     } catch (e) {
       if (pedido === pedidoPontoRef.current) setErro((e as Error).message);
     } finally {
@@ -394,40 +584,8 @@ export default function GeometriaPage() {
   }
 
   /** Vira o poligono de analise: preenche o GeoJSON, destaca no mapa e abre o popup. */
-  function usarImovel(imovel: any, voar: boolean) {
-    const L = leafletRef.current!;
-    const map = mapRef.current;
-    setGeojson(JSON.stringify({
-      type: "Feature",
-      properties: {
-        nome: imovel.codImovel,
-        municipio: imovel.municipio,
-        uf: imovel.uf,
-        areaHa: imovel.areaHa,
-        modulosFiscais: imovel.modulosFiscais,
-      },
-      geometry: imovel.geometria,
-    }, null, 2));
-    setCarInfo(
-      `CAR/SICAR (SP) · ${imovel.codImovel} — ${imovel.municipio}/${imovel.uf} · ` +
-      `${Number(imovel.areaHa).toLocaleString("pt-BR")} ha · ${imovel.modulosFiscais} MF · ${imovel.statusImovel}`
-    );
-    if (selecaoRef.current) map.removeLayer(selecaoRef.current);
-    const layer = L.geoJSON(feicao(imovel.geometria), {
-      style: { color: "#6366f1", weight: 3, fillColor: "#6366f1", fillOpacity: 0.2 },
-    })
-      .bindPopup(popupImovel(imovel))
-      .addTo(map);
-    selecaoRef.current = layer;
-    const bounds = layer.getBounds();
-    if (voar) map.flyToBounds(bounds.pad(0.3), { duration: 1 });
-    else map.fitBounds(bounds.pad(0.3));
-    layer.openPopup(bounds.getCenter());
-  }
-
-  /** Mesma funcao de usarImovel, para os atributos da parcela do SIGEF. */
   function usarParcela(parcela: any) {
-    const L = leafletRef.current!;
+    const L = (window as any).L;
     const map = mapRef.current;
     setGeojson(JSON.stringify({
       type: "Feature",
@@ -442,13 +600,13 @@ export default function GeometriaPage() {
       },
       geometry: parcela.geometria,
     }, null, 2));
-    setCarInfo(
+    setParcelaInfo(
       `SIGEF ${parcela.codigoParcela} — ${parcela.municipio || parcela.municipioIbge || "—"}/${parcela.uf}` +
       (parcela.areaHa === null ? "" : ` · ${Number(parcela.areaHa).toLocaleString("pt-BR")} ha`) +
       (parcela.status ? ` · ${parcela.status}` : "")
     );
     if (selecaoRef.current) map.removeLayer(selecaoRef.current);
-    const layer = L.geoJSON(feicao(parcela.geometria), {
+    const layer = L.geoJSON({ type: "Feature", properties: {}, geometry: parcela.geometria }, {
       style: { color: "#6366f1", weight: 3, fillColor: "#6366f1", fillOpacity: 0.2 },
     })
       .bindPopup(popupParcela(parcela))
@@ -460,27 +618,26 @@ export default function GeometriaPage() {
   }
 
   function desenharImovel(feature: any, cor: string) {
-    const L = leafletRef.current!;
+    const L = (window as any).L;
     const layer = L.geoJSON(feature, { style: { color: cor, weight: 2, fillOpacity: 0.25 } }).addTo(mapRef.current);
     layersRef.current.push(layer);
     mapRef.current.fitBounds(layer.getBounds().pad(0.2));
   }
 
-  async function carregarCar(codigo?: string) {
-    setCarregandoCar(true);
+  async function carregarParcela() {
+    const codigo = codigoParcela.trim();
+    if (!codigo) return;
+    setCarregandoParcela(true);
     setErro(null);
     try {
-      const url = codigo && codigo.trim()
-        ? `/api/car/imoveis?codigo=${encodeURIComponent(codigo.trim())}`
-        : "/api/car/imoveis?uf=SP&quantidade=1";
-      const res = await fetch(url);
+      const res = await fetch(`/api/sigef/parcelas?codigo=${encodeURIComponent(codigo)}`);
       const data = await res.json();
-      if (!res.ok || !data.imoveis?.length) throw new Error(data.error || "Nenhum imovel retornado pelo CAR");
-      usarImovel(data.imoveis[0], Boolean(codigo && codigo.trim()));
+      if (!res.ok || !data.parcelas?.length) throw new Error(data.error || "Parcela nao encontrada no SIGEF");
+      usarParcela(data.parcelas[0]);
     } catch (e) {
-      setErro((e as Error).message || "Falha ao consultar o CAR");
+      setErro((e as Error).message || "Falha ao consultar as parcelas do SIGEF");
     } finally {
-      setCarregandoCar(false);
+      setCarregandoParcela(false);
     }
   }
 
@@ -545,44 +702,7 @@ export default function GeometriaPage() {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
-          <div className="bg-orange-50 border border-orange-200 rounded-md p-3 space-y-2">
-            <label className="flex items-center gap-2 text-xs font-medium text-orange-900 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={mostrarCar}
-                disabled={!pronto}
-                onChange={(e) => alternarCamadaCar(e.target.checked)}
-                className="accent-orange-600"
-              />
-              Mostrar imoveis CAR (SP)
-              {carregandoCamada && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            </label>
-            <label className="flex items-center gap-2 text-xs font-medium text-orange-900 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={modoClique}
-                disabled={!pronto}
-                onChange={(e) => {
-                  setModoClique(e.target.checked);
-                  modoCliqueRef.current = e.target.checked;
-                  if (!e.target.checked) {
-                    pedidoPontoRef.current++;
-                    setCarregandoPonto(false);
-                  }
-                }}
-                className="accent-orange-600"
-              />
-              <MousePointerClick className="h-3.5 w-3.5" />
-              Selecionar imovel por clique
-              {carregandoPonto && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            </label>
-            {mostrarCar && (
-              <p className="text-[11px] text-orange-700">
-                {totalCarVisivel === null
-                  ? `Aproxime o mapa (zoom ${ZOOM_MIN_CAR}+) para carregar os contornos do CAR.`
-                  : `${totalCarVisivel} imoveis nesta janela — contorno laranja, direto do geoserver.car.gov.br.`}
-              </p>
-            )}
+          <div className="bg-violet-50 border border-violet-200 rounded-md p-3 space-y-2">
             <label className="flex items-center gap-2 text-xs font-medium text-violet-900 cursor-pointer">
               <input
                 type="checkbox"
@@ -599,43 +719,174 @@ export default function GeometriaPage() {
                 {totalSigefImportado === 0
                   ? "Nenhuma parcela importada — rode scripts/import-sigef-shp.ts com o shapefile do acervo do INCRA."
                   : totalSigefVisivel === null
-                    ? `Aproxime o mapa (zoom ${ZOOM_MIN_CAR}+) para carregar as parcelas do SIGEF.`
+                    ? `Aproxime o mapa (zoom ${ZOOM_MIN_SIGEF}+) para carregar as parcelas do SIGEF.`
                     : `${totalSigefVisivel} parcelas nesta janela — contorno violeta` +
                       (totalSigefImportado === null ? "." : `, de ${totalSigefImportado.toLocaleString("pt-BR")} importadas de SP.`)}
               </p>
             )}
+            <label className="flex items-center gap-2 text-xs font-medium text-violet-900 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={modoClique}
+                disabled={!pronto}
+                onChange={(e) => {
+                  setModoClique(e.target.checked);
+                  modoCliqueRef.current = e.target.checked;
+                  if (!e.target.checked) {
+                    pedidoPontoRef.current++;
+                    setCarregandoPonto(false);
+                  }
+                }}
+                className="accent-violet-600"
+              />
+              <MousePointerClick className="h-3.5 w-3.5" />
+              Selecionar parcela por clique
+              {carregandoPonto && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            </label>
             {modoClique && (
-              <p className="text-[11px] text-orange-700">
-                Clique sobre uma propriedade: a feicao que contem o ponto (CAR pelo WFS, ou parcela do SIGEF) vira o poligono de analise.
+              <p className="text-[11px] text-violet-700">
+                Clique sobre uma propriedade: a parcela do SIGEF que contem o ponto vira o poligono de analise.
               </p>
+            )}
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 space-y-2">
+            <label className="flex items-center gap-2 text-xs font-medium text-amber-900 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={mostrarLimitesIgc}
+                disabled={!pronto}
+                onChange={(e) => alternarLimitesIgc(e.target.checked)}
+                className="accent-amber-600"
+              />
+              <Layers className="h-3.5 w-3.5" />
+              Limites municipais do IGC (IDESP 2021)
+            </label>
+            {mostrarLimitesIgc && (
+              <p className="text-[11px] text-amber-700">
+                Base oficial de limites municipais do IGC, servida pelo GeoServer da IDESP (WMS), sobre o mapa base.
+              </p>
+            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                ref={arquivoRef}
+                type="file"
+                accept=".geojson,.json,.kml,.zip"
+                className="hidden"
+                onChange={(e) => {
+                  const arquivo = e.target.files?.[0];
+                  if (arquivo) abrirCamadaProprietario(arquivo);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => arquivoRef.current?.click()}
+                disabled={!pronto || carregandoArquivo}
+                title="Abrir a camada enviada pelo proprietario (GeoJSON, KML ou shapefile .zip) quando nao for usar a parcela do SIGEF"
+                className="flex items-center gap-1.5 text-xs bg-orange-600 text-white px-3 py-1.5 rounded-md font-medium hover:bg-orange-700 disabled:opacity-50"
+              >
+                {carregandoArquivo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                Abrir camada do proprietario
+              </button>
+              {camadaProprietario && (
+                <>
+                  <button
+                    type="button"
+                    onClick={usarCamadaProprietario}
+                    disabled={!camadaProprietario.poligonos}
+                    className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-md font-medium hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    Usar como poligono de analise
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removerCamadaProprietario}
+                    className="flex items-center gap-1 text-xs text-amber-900 px-2 py-1.5 rounded-md hover:bg-amber-100"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Remover
+                  </button>
+                </>
+              )}
+            </div>
+            {camadaProprietario && (
+              <p className="text-[11px] text-amber-700">
+                {camadaProprietario.nome}: {camadaProprietario.total} feicoes ({camadaProprietario.poligonos} poligonos) — contorno laranja.
+              </p>
+            )}
+            <label className="flex items-center gap-2 text-xs font-medium text-amber-900 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={modoRascunho}
+                disabled={!pronto}
+                onChange={(e) => alternarRascunho(e.target.checked)}
+                className="accent-amber-600"
+              />
+              <PenTool className="h-3.5 w-3.5" />
+              Rascunho: desenhar sobre o mapa
+            </label>
+            {modoRascunho && (
+              <div className="space-y-1.5">
+                <p className="text-[11px] text-amber-700">
+                  Use a barra de desenho no canto do mapa: poligono, retangulo, linha, marcador, editar, arrastar e apagar.
+                  {rascunhoTotal > 0 ? ` ${rascunhoTotal} elemento(s) desenhado(s) — contorno vermelho.` : ""}
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={usarRascunho}
+                    disabled={!rascunhoTotal}
+                    className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-md font-medium hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    Usar rascunho como poligono de analise
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exportarRascunho}
+                    disabled={!rascunhoTotal}
+                    className="flex items-center gap-1 text-xs text-amber-900 px-2 py-1.5 rounded-md hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Exportar GeoJSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={limparRascunho}
+                    disabled={!rascunhoTotal}
+                    className="flex items-center gap-1 text-xs text-amber-900 px-2 py-1.5 rounded-md hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Limpar
+                  </button>
+                </div>
+              </div>
             )}
           </div>
           <div className="flex items-center justify-between">
             <label className="block text-xs font-medium text-gray-600">
-              Imovel (SIGEF ou CAR)
+              Parcela SIGEF
             </label>
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                value={codigoCar}
-                onChange={(e) => setCodigoCar(e.target.value)}
-                placeholder="SP-3500402-0023CF65..."
+                value={codigoParcela}
+                onChange={(e) => setCodigoParcela(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") carregarParcela();
+                }}
+                placeholder="Codigo da parcela SIGEF"
                 className="w-56 border border-gray-300 rounded-md px-2 py-1.5 text-xs font-mono"
-                title="Codigo do imovel no CAR (SP-XXXXXXX-XXXX...)"
+                title="Codigo da parcela certificada no SIGEF (acervo do INCRA)"
               />
               <button
                 type="button"
-                onClick={() => carregarCar(codigoCar || undefined)}
-                disabled={carregandoCar || !pronto}
+                onClick={carregarParcela}
+                disabled={carregandoParcela || !pronto || !codigoParcela.trim()}
                 className="flex items-center gap-1.5 text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-md font-medium hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
               >
-                {carregandoCar ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Tractor className="h-3.5 w-3.5" />}
-                {codigoCar.trim() ? "Buscar pelo codigo" : "Carregar imovel real do CAR"}
+                {carregandoParcela ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                Buscar pelo codigo
               </button>
             </div>
           </div>
           <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded p-2">
-            Poligono em analise: {carInfo ?? ROTULO_EXEMPLO}
+            Poligono em analise: {parcelaInfo ?? ROTULO_EXEMPLO}
           </p>
           {vinculo.estado === "ok" ? (
             <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">

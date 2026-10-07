@@ -46,9 +46,11 @@ const SUBETAPA_TECNICA: Record<string, string> = {
 export function acompanhamentoRequisicao(dados: {
   situacaoProcesso: string | null;
   pagamentoStatus: string | null;
+  finalizadaEm?: Date | string | null;
 }): AcompanhamentoRequisicao {
-  const { situacaoProcesso: s, pagamentoStatus } = dados;
-  if (!s) return { tipo: "ETAPA", atual: 0 };
+  const { situacaoProcesso: s, pagamentoStatus, finalizadaEm } = dados;
+  const pago = pagamentoStatus === "PAGO" || pagamentoStatus === "ISENTO";
+  if (!s) return { tipo: "ETAPA", atual: finalizadaEm ? (pago ? 5 : 4) : 0 };
   if (s === "sobrestado") return { tipo: "SOBRESTADO" };
   if (s === "cancelado") return { tipo: "CANCELADO" };
   if (s === "entrada_sdtc") return { tipo: "ETAPA", atual: 1 };
@@ -57,7 +59,6 @@ export function acompanhamentoRequisicao(dados: {
     return { tipo: "ETAPA", atual: 3 };
   }
   if (s === "finalizado") {
-    const pago = pagamentoStatus === "PAGO" || pagamentoStatus === "ISENTO";
     return { tipo: "ETAPA", atual: pago ? 5 : 4 };
   }
   return { tipo: "ETAPA", atual: 1 };

@@ -28,7 +28,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-5 | Tela de edição do processo e atribuição de técnico/conferente | frontend | adição | alta | resolvida (2026-10-07) |
 | #PEND-6 | GERENTE (quem distribui) não consegue atribuir técnico/conferente | backend | bugfix | alta | aberta |
 | #PEND-7 | `/geometria` fora da navegação e sem vínculo com o processo | frontend | melhoria | média | resolvida (2026-10-07) |
-| #PEND-8 | Leaflet carregado do unpkg em runtime, sem `integrity` | frontend | melhoria | baixa | resolvida (2026-10-07) |
+| #PEND-8 | Leaflet carregado do unpkg em runtime, sem `integrity` | frontend | melhoria | baixa | aberta |
 | #PEND-9 | Múltiplos proprietários: regra do "e outros" não implementada | backend | adição | média | aberta |
 | #PEND-10 | Nomes de gleba/polígono: não rejeita matrícula nem município | backend | adição | média | descartada (substituída por #PEND-36) |
 | #PEND-11 | Decisão: usucapião — matrícula numérica ou literal "USUCAPIÃO"? | negócio | decisão | média | resolvida (2026-10-06) |
@@ -46,7 +46,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-23 | Restos do Litestream no `package.json` | infra | refatoração | baixa | aberta |
 | #PEND-24 | Sem testes automatizados nas bibliotecas de regra | backend | adição | média | aberta |
 | #PEND-25 | Chat da solicitação (não existe modelo, rota nem tela) | backend | adição | alta | aberta |
-| #PEND-26 | Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA` | backend | adição | alta | aberta |
+| #PEND-26 | Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA` | backend | adição | alta | em andamento |
 | #PEND-27 | Modelo de status da requisição para o solicitante (5 gerais + 6 etapas) | backend | adição | alta | aberta |
 | #PEND-28 | Download da certidão emitida pelo solicitante | backend | adição | média | aberta |
 | #PEND-29 | Pedido de arquivamento pelo solicitante (regra de custo/tempo) | backend | adição | média | bloqueada (#PEND-27) |
@@ -136,7 +136,7 @@ Nenhum link aponta para `/geometria`; lá dentro o vínculo com o processo é um
 **Onde:** `src/app/geometria/page.tsx` (injeção de `<script>` e `<link>`)
 
 Dependência externa sem hash fixo; o mapa deixa de funcionar se o unpkg estiver inacessível (ambiente de governo com saída restrita). Preferir o pacote `leaflet` via npm ou, no mínimo, SRI.
-**Resolução:** `src/app/geometria/page.tsx` agora usa o pacote `leaflet` (já em `package.json`): `import("leaflet")` dinâmico no efeito de inicialização e `import "leaflet/dist/leaflet.css"`. Sem requisição ao unpkg; o mapa também é removido ao sair da tela.
+**Histórico:** resolvida em `9a40c15` (2026-10-07) com `import("leaflet")` dinâmico e `leaflet/dist/leaflet.css`; **reaberta no merge com `origin/feat/portal-correcoes-cjt`**, cuja versão de `/geometria` (camadas do IGC, rascunho de desenho, upload de KML/SHP) carrega do unpkg, em versões fixas e sem `integrity`, o Leaflet, o `@geoman-io/leaflet-geoman-free` e o `shpjs` (constante `CDN`). Os plugins esperam o `L` global, então a troca precisa levar os três para o npm (dependências novas em `package.json`) e retestar o desenho e o upload. O mapa do portal (`mapa-imovel-leaflet.tsx`) já usa o pacote npm.
 
 ### #PEND-9 · Múltiplos proprietários: regra do "e outros" não implementada
 
@@ -274,6 +274,7 @@ O documento de correções de 2026-09-16 diz que "todas as comunicações … se
 
 O documento pede que o cliente "não possa editar enquanto não tiver sido devolvido" e só edite "após o retorno da DDD". Hoje (a) o `PATCH` aceita `PENDENTE`, ou seja, o cliente edita logo depois de enviar; (b) não existe ação no backoffice para devolver a requisição, então não há como liberar a edição. Precisa tirar `PENDENTE` da lista e criar a ação "devolver" (com motivo registrado no chat, #PEND-25).
 **Impacto no frontend:** esconder "Alterar requisição" fora de `DEVOLVIDA` (feito na tela, mas não é segurança); botão "Devolver" no backoffice.
+**Andamento (2026-10-07):** (a) feito — o `PATCH` só aceita `DEVOLVIDA`. Falta (b), a ação "devolver" no backoffice.
 
 ### #PEND-27 · Modelo de status da requisição para o solicitante (5 gerais + 6 etapas)
 

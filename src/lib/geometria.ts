@@ -107,7 +107,7 @@ export function classificarCaso(imovel: any, linhas: LinhaDivisaGeo[]): Resultad
   return "DIFICIL";
 }
 
-/** Municipio declarado no proprio imovel (CAR/SICAR e SIGEF trazem o municipio
+/** Municipio declarado no proprio imovel (o SIGEF traz o municipio
  *  do cadastro). Serve de referencia quando nenhuma linha de divisa corta o
  *  poligono e, portanto, nao ha municipios vindos da divisa. */
 function municipioDeclarado(imovel: any): string | null {

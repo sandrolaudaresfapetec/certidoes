@@ -1,6 +1,6 @@
 # Melhorias de frontend: backoffice e plataforma
 
-Status: **implementado** na branch `feat/portal-correcoes-cjt` (6 commits depois de `b38faab`: `100cb68` a `9a40c15`, mais o commit desta documentação). Nada foi publicado (sem push nem PR).
+Status: **implementado** na branch `feat/portal-correcoes-cjt` (commits `100cb68` a `ab492b0` sobre `b38faab`, mais o merge de `origin/feat/portal-correcoes-cjt`, seção 3.8).
 
 Este documento é o segundo registro da branch. O primeiro, [`correcoes-cjt-portal.md`](correcoes-cjt-portal.md), cobre os 16 itens do documento de correções do cliente. Este cobre o que sobrou de pendências **só de frontend**, que não dependiam de backend, de infraestrutura nem de decisão do cliente. Quem altera estas telas deve ler também [`AGENTS.md`](../AGENTS.md) e [`PENDENCIAS.md`](../PENDENCIAS.md).
 
@@ -22,7 +22,7 @@ Este documento é o segundo registro da branch. O primeiro, [`correcoes-cjt-port
 | Pedido do time (fora do plano) | Remoção do modo escuro | `src/app/globals.css`, `AGENTS.md` | todas as telas | `5a6b861` |
 | #PEND-41 | Máscaras de CPF, CNPJ e telefone | `src/lib/mascaras.ts`, `src/components/campo-mascarado.tsx` e os formulários da seção 3.5 | seção 3.5 | `f5cd66e` |
 | #PEND-40 | Contraste AA dos textos auxiliares | 7 arquivos, seção 3.6 | seção 3.6 | `9a40c15` |
-| #PEND-8 | Leaflet do npm em `/geometria` | `src/app/geometria/page.tsx` | `/geometria` | `9a40c15` |
+| #PEND-8 | Leaflet do npm em `/geometria` (reaberta no merge, ver 3.7) | `src/app/geometria/page.tsx` | `/geometria` | `9a40c15` |
 
 ## 3. O que cada fase entregou
 
@@ -67,11 +67,22 @@ A tabela "Município / Área / Percentual" da certidão aparecia ilegível. A ca
 
 ### 3.6 Contraste AA (#PEND-40, `9a40c15`)
 
-Nove textos auxiliares em `gray-400` (2,5:1) passaram para `gray-500` (4,6 a 4,8:1; mínimo AA é 4,5:1): rodapé e aviso de login do portal, dica de formatos dos anexos, número, município e coluna vazia do Quadro, data das Notificações, "Pendente" da Certidão e a nota da tabela em `/geometria`. Arquivos: `src/app/portal/layout.tsx`, `src/app/portal/login/page.tsx`, `src/components/requisicao-form.tsx`, `src/app/quadro/page.tsx`, `src/app/notificacoes/page.tsx`, `src/app/processos/[id]/certidao/page.tsx`, `src/app/geometria/page.tsx`. Ícones decorativos e a seta do histórico do processo ficaram em `gray-400`, porque o texto ao lado já diz o que é.
+Nove textos auxiliares em `gray-400` (2,5:1) passaram para `gray-500` (4,6 a 4,8:1; mínimo AA é 4,5:1): rodapé e aviso de login do portal, dica de formatos dos anexos, número, município e coluna vazia do Quadro, data das Notificações, "Pendente" da Certidão e a nota da tabela em `/geometria`. Arquivos: `src/app/portal/layout.tsx`, `src/app/portal/login/page.tsx`, `src/components/requisicao-form.tsx`, `src/app/quadro/page.tsx`, `src/app/notificacoes/page.tsx`, `src/app/processos/[id]/certidao/page.tsx`, `src/app/geometria/page.tsx`. A frase "Nenhum processo" das colunas vazias do Quadro usa `gray-600`, porque fica sobre o fundo colorido da coluna e `gray-500` dava 4,39:1. Ícones decorativos e a seta do histórico do processo ficaram em `gray-400`, porque o texto ao lado já diz o que é.
 
-### 3.7 Leaflet do npm em `/geometria` (#PEND-8, `9a40c15`)
+### 3.7 Leaflet do npm em `/geometria` (#PEND-8, `9a40c15`, reaberta no merge)
 
-O mapa deixou de carregar `leaflet.js` e `leaflet.css` do unpkg. Agora `import("leaflet")` dinâmico no efeito de inicialização (a biblioteca usa `window`) e `import "leaflet/dist/leaflet.css"`. O objeto fica em `leafletRef` e substitui os 8 usos de `(window as any).L`. O efeito agora tem limpeza (cancela se a tela fechar antes do carregamento e remove o mapa). O ajudante `feicao()` embrulha a geometria da API em Feature GeoJSON para o TypeScript aceitar. O pacote já era dependência desde o plano anterior; nenhuma dependência nova.
+Em `9a40c15` o mapa deixou de carregar `leaflet.js` e `leaflet.css` do unpkg: `import("leaflet")` dinâmico no efeito de inicialização, `leafletRef` no lugar dos 8 usos de `(window as any).L`, limpeza do efeito e o ajudante `feicao()`.
+
+**Essa troca não está mais no código.** Ao integrar `origin/feat/portal-correcoes-cjt` (merge de 07/10, seção 3.8), a página `/geometria` foi reescrita pelo outro lado (camadas do IGC, rascunho de desenho com `leaflet-geoman`, upload de KML/SHP com `shpjs`) e carrega as três bibliotecas do unpkg. Os plugins precisam do `L` global; levar os três para o npm exige dependências novas e novo teste de desenho e upload. A #PEND-8 voltou a `aberta`.
+
+### 3.8 Merge com `origin/feat/portal-correcoes-cjt`
+
+Antes do push, o remoto já tinha 12 commits de `sandro.laudares` na mesma branch (merge da `main`, #PEND-26 no backend, restrição de geometria e corte ao ADMIN e ao técnico responsável, remoção do CAR/SICAR, limites municipais do IGC, camada do proprietário, rascunho de desenho, fixes do fasterfixes e do acompanhamento). Integramos por merge, sem force-push. Conflitos e decisões:
+
+- **`src/components/sidebar.tsx`:** ficou o item "Corte de Divisas" com `papeis: ["ADMIN", "TECNICO"]` (restrição do outro lado) e o import duplicado de `MapIcon` saiu.
+- **`src/app/globals.css`:** só o comentário diferia; ficou o nosso, porque a plataforma não tem modo escuro. A regra de campos (`color-scheme: light`, fundo branco) coincidia.
+- **`src/app/geometria/page.tsx`:** partimos da versão do outro lado e reaplicamos o vínculo com o processo (faixa "Processo vinculado", parcela do processo, `Desvincular`, link da minuta, `aria-label` e dica no campo do ID) e o contraste da nota. O texto do aviso de parcela ausente deixou de citar o CAR. **A troca do Leaflet para o npm (#PEND-8) não foi reaplicada**: a página nova carrega Leaflet, Geoman e shpjs do unpkg e os plugins precisam do `L` global.
+- **`src/app/processos/[id]/page.tsx`:** o botão "Corte de divisas" só aparece para quem passa em `podeUsarGeometria` (ADMIN ou técnico responsável); para os demais o módulo redireciona para `/`.
 
 ## 4. Decisões aplicadas
 
@@ -89,7 +100,7 @@ O mapa deixou de carregar `leaflet.js` e `leaflet.css` do unpkg. Agora `import("
 - **Atribuição pelo GERENTE:** a rota só aceita ADMIN e SDTC (#PEND-6); para os outros papéis a tela mostra apenas o aviso.
 - **Largura no celular:** a correção do layout raiz (`min-w-0` no `main`) é global e ficou na #PEND-47; as telas afetadas têm correção local.
 - **Camada SIGEF no mapa:** marcar "Mostrar parcelas SIGEF (SP)" funcionou sem erro, mas não vimos parcelas aparecerem no teste local; não confirmamos se foi o nível de zoom ou o acervo local vazio na região.
-- **Camada CAR:** depende do GeoServer externo; não foi exercitada na verificação.
+- **Corte de divisas depois do merge:** o outro lado removeu o CAR/SICAR de `/geometria`, restringiu o módulo ao ADMIN e ao técnico responsável por uma análise e reescreveu a página. Reaplicamos o vínculo com o processo sobre essa versão, mas o teste fim a fim de `/geometria` ficou para depois do merge (ver seção 3.8).
 - **Console em desenvolvimento:** o erro de WebSocket do `webpack-hmr` é do servidor de desenvolvimento e não afeta a aplicação.
 
 ## 6. Pendências do plano
@@ -112,7 +123,6 @@ npm run dev          # http://localhost:3000
 - **Corte de divisas:** menu "Corte de Divisas", ou "Corte de divisas" na tela do processo. Com um processo que tenha parcela no acervo, a parcela abre como polígono em análise. Em "Calcular corte" o resultado grava no processo vinculado e mostra o link da minuta.
 - **Máscaras:** digitar com letras, colar com e sem pontuação, apagar no meio (o cursor deve ficar no lugar) nas telas da seção 3.5.
 - **Contraste:** abrir o Quadro, as Notificações, o rodapé do portal e a certidão; os textos auxiliares devem estar em cinza escuro legível.
-- **Leaflet:** abrir `/geometria` com a aba de rede aberta; não deve haver requisição para o unpkg.
 
 ## 8. Arquivos alterados
 

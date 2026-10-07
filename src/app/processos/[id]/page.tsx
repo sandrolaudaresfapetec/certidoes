@@ -11,7 +11,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Clock, User, FileText, MapPin, FileCheck, Pencil, Scissors } from "lucide-react";
 import { WorkflowActions } from "@/components/workflow-actions";
-import { podeAtender, requireUsuario } from "@/lib/auth";
+import { podeAtender, podeUsarGeometria, requireUsuario } from "@/lib/auth";
 import { exibirCpfCnpj } from "@/lib/mascaras";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +47,7 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
   const stageConfig = WORKFLOW_STAGES[processo.situacao as WorkflowStage];
   const etapaAtual = processo.situacao as WorkflowStage;
   const bloqueio = bloqueioDeSaida(etapaAtual, usuario, processo);
+  const mostrarCorte = await podeUsarGeometria(usuario);
   const allowedNext = bloqueio
     ? []
     : (ALLOWED_TRANSITIONS[etapaAtual] || []).filter(
@@ -88,13 +89,15 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
                 Editar processo
               </Link>
             )}
-            <Link
-              href={`/geometria?processo=${processo.id}`}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
-            >
-              <Scissors className="h-4 w-4" />
-              Corte de divisas
-            </Link>
+            {mostrarCorte && (
+              <Link
+                href={`/geometria?processo=${processo.id}`}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+              >
+                <Scissors className="h-4 w-4" />
+                Corte de divisas
+              </Link>
+            )}
             {/certid/i.test(processo.tipoServico) && (
               <Link
                 href={`/processos/${processo.id}/certidao`}

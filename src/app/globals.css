@@ -28,6 +28,8 @@ body {
   textarea,
   select {
     color: #111827;
+    background-color: #ffffff;
+    color-scheme: light;
     font-weight: 400;
   }
 
