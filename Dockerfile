@@ -45,7 +45,7 @@ FROM base
 
 # Install packages needed for deployment
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y ca-certificates openssl && \
+    apt-get install --no-install-recommends -y ca-certificates openssl unzip && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Copy built application

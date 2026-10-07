@@ -119,6 +119,13 @@ trap - EXIT
 # -----------------------------------------------------------------------------
 log "5/6 Deploy (release_command roda migrate deploy na VM de release)"
 $FLY deploy -a "$APP_NAME" --remote-only --ha=false
+# O processo sigef_sync precisa estar em gru (o INCRA so responde a IPs do Brasil);
+# o deploy cria maquinas novas na primary_region (iad), entao reposiciona.
+$FLY scale count sigef_sync=1 --region gru -a "$APP_NAME" -y
+if [ "$($FLY machine list -a "$APP_NAME" --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).filter(m=>m.config?.metadata?.fly_process_group==="sigef_sync"&&m.region!=="gru").length))')" != "0" ]; then
+  $FLY scale count sigef_sync=0 --region iad -a "$APP_NAME" -y
+fi
+ok "sigef_sync em gru (sincronizacao diaria do acervo SIGEF as 02:00)"
 ok "Deploy concluído"
 
 # -----------------------------------------------------------------------------
