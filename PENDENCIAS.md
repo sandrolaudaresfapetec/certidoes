@@ -46,7 +46,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-23 | Restos do Litestream no `package.json` | infra | refatoração | baixa | aberta |
 | #PEND-24 | Sem testes automatizados nas bibliotecas de regra | backend | adição | média | aberta |
 | #PEND-25 | Chat da solicitação (não existe modelo, rota nem tela) | backend | adição | alta | aberta |
-| #PEND-26 | Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA` | backend | adição | alta | aberta |
+| #PEND-26 | Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA` | backend | adição | alta | em andamento |
 | #PEND-27 | Modelo de status da requisição para o solicitante (5 gerais + 6 etapas) | backend | adição | alta | aberta |
 | #PEND-28 | Download da certidão emitida pelo solicitante | backend | adição | média | aberta |
 | #PEND-29 | Pedido de arquivamento pelo solicitante (regra de custo/tempo) | backend | adição | média | bloqueada (#PEND-27) |
@@ -268,6 +268,7 @@ O documento de correções de 2026-09-16 diz que "todas as comunicações … se
 
 O documento pede que o cliente "não possa editar enquanto não tiver sido devolvido" e só edite "após o retorno da DDD". Hoje (a) o `PATCH` aceita `PENDENTE`, ou seja, o cliente edita logo depois de enviar; (b) não existe ação no backoffice para devolver a requisição, então não há como liberar a edição. Precisa tirar `PENDENTE` da lista e criar a ação "devolver" (com motivo registrado no chat, #PEND-25).
 **Impacto no frontend:** esconder "Alterar requisição" fora de `DEVOLVIDA` (feito na tela, mas não é segurança); botão "Devolver" no backoffice.
+**Andamento (2026-10-07):** (a) feito — o `PATCH` só aceita `DEVOLVIDA`. Falta (b), a ação "devolver" no backoffice.
 
 ### #PEND-27 · Modelo de status da requisição para o solicitante (5 gerais + 6 etapas)
 
