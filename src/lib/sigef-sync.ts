@@ -135,6 +135,8 @@ export async function municipiosIbge(log: (m: string) => void = console.warn): P
   return mapa;
 }
 
+const pausa = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export function assinaturaParcela(p: Omit<ParcelaAcervo, "assinatura">): string {
   const partes = [
     p.codigoParcela,
@@ -150,7 +152,40 @@ export function assinaturaParcela(p: Omit<ParcelaAcervo, "assinatura">): string 
     p.dataAprovacao?.toISOString(),
     p.geometria,
   ];
-  return createHash("sha1").update(partes.map((x) => x ?? "").join("|")).digest("hex");
+  return createHash("md5").update(partes.map((x) => x ?? "").join("|")).digest("hex");
+}
+
+const ehPostgres = () => (process.env.DATABASE_URL ?? "").startsWith("postgres");
+
+/**
+ * Parcelas importadas antes da coluna `assinatura` recebem o hash calculado no
+ * proprio Postgres (mesma string canonica de assinaturaParcela), em lotes, para
+ * nao reescrever o acervo inteiro a partir do cliente na primeira sincronizacao.
+ */
+async function preencherAssinaturasNoBanco(uf: string, pausaMs: number, log: (m: string) => void) {
+  if (!ehPostgres()) return;
+  let total = 0;
+  for (;;) {
+    const n = await prisma.$executeRaw`
+      UPDATE "SigefParcela" SET "assinatura" = md5(concat_ws('|',
+        "codigoParcela",
+        coalesce("nomeArea", ''),
+        coalesce("codigoImovel", ''),
+        coalesce("municipioIbge"::text, ''),
+        coalesce("situacaoImovel", ''),
+        coalesce("status", ''),
+        coalesce("rt", ''),
+        coalesce("art", ''),
+        coalesce("matricula", ''),
+        coalesce(to_char("dataSubmissao", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), ''),
+        coalesce(to_char("dataAprovacao", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), ''),
+        "geometria"))
+      WHERE "id" IN (SELECT "id" FROM "SigefParcela" WHERE "uf" = ${uf} AND "assinatura" IS NULL LIMIT 1000)`;
+    if (n === 0) break;
+    total += n;
+    await pausa(pausaMs);
+  }
+  if (total > 0) log(`${total} assinaturas preenchidas no banco`);
 }
 
 /** Converte uma feicao do shapefile numa linha de SigefParcela (null = sem codigo/geometria). */
@@ -244,8 +279,6 @@ export type ResultadoSincronizacao = {
   mensagem: string | null;
 };
 
-const pausa = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 /** Protecao contra download truncado: nao apaga o acervo se o arquivo veio pequeno demais. */
 const FRACAO_MINIMA_PARA_REMOVER = 0.5;
 
@@ -268,17 +301,25 @@ export async function sincronizarAcervo(opcoes: OpcoesSincronizacao = {}): Promi
     mensagem: string | null,
     fonteInfo?: DownloadAcervo | null,
   ): Promise<ResultadoSincronizacao> => {
-    await prisma.sigefSincronizacao.update({
-      where: { id: execucao.id },
-      data: {
-        status,
-        mensagem,
-        terminadoEm: new Date(),
-        fonteEtag: fonteInfo?.etag ?? undefined,
-        fonteModificadoEm: fonteInfo?.modificadoEm ?? undefined,
-        ...contadores,
-      },
-    });
+    const data = {
+      status,
+      mensagem,
+      terminadoEm: new Date(),
+      fonteEtag: fonteInfo?.etag ?? undefined,
+      fonteModificadoEm: fonteInfo?.modificadoEm ?? undefined,
+      ...contadores,
+    };
+    // O banco pode estar reiniciando (foi o que derrubou a execucao); insiste um pouco.
+    for (let tentativa = 1; ; tentativa++) {
+      try {
+        await prisma.sigefSincronizacao.update({ where: { id: execucao.id }, data });
+        break;
+      } catch (e) {
+        if (tentativa >= 5) throw e;
+        log(`Registro da execucao falhou (${(e as Error).message}); nova tentativa em 30s`);
+        await pausa(30_000);
+      }
+    }
     for (const t of temporarios) fs.rmSync(t, { recursive: true, force: true });
     log(`${status}: ${mensagem ?? ""} ${JSON.stringify(contadores)}`.trim());
     return { id: execucao.id, status, mensagem, ...contadores };
@@ -317,6 +358,8 @@ export async function sincronizarAcervo(opcoes: OpcoesSincronizacao = {}): Promi
     const shp = resolverShp(arquivo);
     if (shp !== arquivo) temporarios.push(path.dirname(shp));
     const municipios = await municipiosIbge(log);
+
+    await preencherAssinaturasNoBanco(uf, pausaMs, log);
 
     // Assinaturas atuais, paginadas por id para nao carregar as geometrias.
     const existentes = new Map<string, string | null>();
