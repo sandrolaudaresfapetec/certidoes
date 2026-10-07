@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirSolicitanteApi } from "@/lib/portal-auth";
 import { criarComProtocolo } from "@/lib/protocolo";
+import { dadosDoRascunho } from "@/lib/solicitacao-rascunho";
+import { STATUS_SOLICITACAO } from "@/lib/solicitacao-estados";
 import {
   formularioDoPayload,
   normalizarParaPersistencia,
@@ -45,6 +47,21 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const tipoViaSigef = body.tipoViaSigef !== false;
+
+  // Rascunho (#PEND-42): guarda o que já foi respondido, sem validar nem enviar.
+  if (body.rascunho === true) {
+    const rascunho = await criarComProtocolo((protocolo) =>
+      prisma.solicitacao.create({
+        data: {
+          protocolo,
+          status: STATUS_SOLICITACAO.RASCUNHO,
+          solicitanteId: solicitante.id,
+          ...dadosDoRascunho(body, tipoViaSigef),
+        },
+      })
+    );
+    return NextResponse.json(rascunho, { status: 201 });
+  }
 
   if (tipoViaSigef && !body.sigefCodigoImovel) {
     return NextResponse.json(

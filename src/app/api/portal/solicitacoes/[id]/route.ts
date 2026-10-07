@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { exigirSolicitanteApi } from "@/lib/portal-auth";
 import { clientePodeEditar } from "@/lib/solicitacao-estados";
 import { mensagemDeSistema } from "@/lib/chat";
+import { dadosDoRascunho } from "@/lib/solicitacao-rascunho";
+import { STATUS_SOLICITACAO } from "@/lib/solicitacao-estados";
 import {
   formularioDoPayload,
   normalizarParaPersistencia,
@@ -43,6 +45,21 @@ export async function PATCH(
 
   const body = await request.json().catch(() => ({}));
   const tipoViaSigef = body.tipoViaSigef !== undefined ? body.tipoViaSigef !== false : atual.tipoViaSigef;
+
+  // Salvar rascunho (#PEND-42): só rascunho, sem validar e sem enviar.
+  if (body.rascunho === true) {
+    if (atual.status !== STATUS_SOLICITACAO.RASCUNHO) {
+      return NextResponse.json(
+        { error: "Só uma requisição ainda não enviada pode ser salva como rascunho." },
+        { status: 409 }
+      );
+    }
+    const salvo = await prisma.solicitacao.update({
+      where: { id },
+      data: dadosDoRascunho(body, tipoViaSigef),
+    });
+    return NextResponse.json(salvo);
+  }
 
   if (tipoViaSigef && !body.sigefCodigoImovel) {
     return NextResponse.json(
@@ -94,13 +111,15 @@ export async function PATCH(
     },
   });
 
-  // Aviso no chat para o atendimento saber que a correção chegou (chave única por reenvio).
-  await mensagemDeSistema({
-    solicitacaoId: solicitacao.id,
-    texto: "O solicitante reenviou a requisição corrigida.",
-    chave: `REENVIO:${Date.now()}`,
-    tipo: "EVENTO",
-  });
+  // Aviso no chat só quando é uma devolvida corrigida (rascunho enviado não tem conversa ainda).
+  if (atual.status === STATUS_SOLICITACAO.DEVOLVIDA) {
+    await mensagemDeSistema({
+      solicitacaoId: solicitacao.id,
+      texto: "O solicitante reenviou a requisição corrigida.",
+      chave: `REENVIO:${Date.now()}`,
+      tipo: "EVENTO",
+    });
+  }
 
   return NextResponse.json(solicitacao);
 }

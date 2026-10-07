@@ -62,8 +62,8 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-39 | Decisão: dúvidas do documento de correções de 2026-09-16 | negócio | decisão | média | aberta |
 | #PEND-40 | Texto auxiliar em `gray-400` abaixo do contraste AA (rodapé do portal) | frontend | melhoria | baixa | resolvida (2026-10-07) |
 | #PEND-41 | Máscaras de entrada nos formulários (telefone, CPF, CNPJ etc.) | frontend | adição | média | resolvida (2026-10-07) |
-| #PEND-42 | Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar | backend | adição | média | aberta |
-| #PEND-43 | Salvar rascunho e continuar requisição no formulário e em Minhas Requisições | frontend | adição | média | bloqueada (#PEND-42) |
+| #PEND-42 | Rascunho de requisição ("Não enviadas"): status e rotas de salvar/enviar | backend | adição | média | resolvida (2026-10-07) |
+| #PEND-43 | Salvar rascunho e continuar requisição no formulário e em Minhas Requisições | frontend | adição | média | resolvida (2026-10-07) |
 | #PEND-44 | Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1 | backend | segurança | média | resolvida (2026-10-07) |
 | #PEND-45 | Associar cada polígono nomeado ao polígono do mapa (UI) | frontend | adição | média | bloqueada (#PEND-34) |
 | #PEND-46 | Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio | backend | bugfix | baixa | descartada (obsoleta: CAR removido em `f34b945`) |
@@ -427,6 +427,7 @@ O Status Geral do documento tem "Requisições não enviadas": o solicitante com
 5. Rascunhos não podem aparecer no backoffice (`/requisicoes`, dashboard, contagens): filtrar por status nas consultas de lá.
 **Impacto no frontend:** hoje o cartão aparece desabilitado "em breve". Quando existir, incluir `"RASCUNHO"` em `GRUPOS_STATUS_GERAL` (marcado com `// PEND-42`) e fazer #PEND-43.
 **Depende de:** #PEND-27 (modelo de status). **Bloqueia:** #PEND-43; relaciona-se com #PEND-31 (requisição congelada com 13+ polígonos).
+**Resolução:** Fase 4 do plano de atendimento CJT, branch `feat/portal-correcoes-cjt` (2026-10-07). Status `RASCUNHO` (sem coluna nova): `POST /api/portal/solicitacoes` com `rascunho: true` cria o rascunho sem validar, e `PATCH` com `rascunho: true` o atualiza; `PATCH` sem a marca valida tudo e envia (vira `PENDENTE`). Regras em `src/lib/cjt-formulario.ts` (`normalizarRascunho`) e `src/lib/solicitacao-rascunho.ts`. O protocolo nasce no primeiro salvamento (rascunho abandonado deixa um número sem uso). O atendimento não vê rascunho em lista, tela, filtro nem pelo link direto (`visivelAoAtendimento`), e abrir processo ou pagamento em requisição fora da fila é recusado (`bloqueioAcaoAtendimento`). Limite: anexos não ficam no rascunho; o solicitante anexa de novo ao continuar. Sem ação de apagar rascunho.
 
 ### #PEND-43 · Salvar rascunho e continuar requisição no formulário e em Minhas Requisições
 
@@ -434,6 +435,7 @@ O Status Geral do documento tem "Requisições não enviadas": o solicitante com
 
 Botão "Salvar rascunho" em `RequisicaoForm` (portal) e, em Minhas Requisições, abrir o rascunho no formulário preenchido ("Continuar") com opção de excluir. O formulário de edição já aceita dados iniciais (`edicao`), o que facilita. Só dá para fazer depois das rotas da #PEND-42.
 **Depende de:** #PEND-42.
+**Resolução:** Fase 4 do plano de atendimento CJT (2026-10-07). Botão "Salvar rascunho" no `RequisicaoForm` (só portal), cartão "Não enviadas" ativo em Minhas Requisições (`GRUPOS_STATUS_GERAL`), linha com selo "Não enviada" e botão "Continuar" que abre `/portal/requisicoes/{id}/editar` com o formulário preenchido ate onde o solicitante parou; o detalhe de um rascunho redireciona para essa tela.
 
 ### #PEND-44 · Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1
 

@@ -113,7 +113,11 @@ export default async function PortalHomePage({
               return (
                 <li key={s.id}>
                   <Link
-                    href={`/portal/requisicoes/${s.id}`}
+                    href={
+                      s.status === "RASCUNHO"
+                        ? `/portal/requisicoes/${s.id}/editar`
+                        : `/portal/requisicoes/${s.id}`
+                    }
                     className="px-6 py-4 flex items-center justify-between gap-3 hover:bg-gray-50"
                   >
                     <div className="flex min-w-0 items-center gap-3">
@@ -131,7 +135,9 @@ export default async function PortalHomePage({
                           )}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {new Date(s.createdAt).toLocaleDateString("pt-BR")}
+                          {s.status === "RASCUNHO"
+                            ? `Rascunho salvo em ${new Date(s.updatedAt).toLocaleDateString("pt-BR")}`
+                            : new Date(s.createdAt).toLocaleDateString("pt-BR")}
                           {s.sigefMunicipio && ` · ${s.sigefMunicipio}/${s.sigefUf}`}
                           {s.documentos.length > 0 &&
                             ` · ${s.documentos.length} documento(s) anexado(s)`}
@@ -145,6 +151,11 @@ export default async function PortalHomePage({
                       >
                         {st.label}
                       </span>
+                      {s.status === "RASCUNHO" && (
+                        <span className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white">
+                          Continuar
+                        </span>
+                      )}
                     </span>
                   </Link>
                 </li>

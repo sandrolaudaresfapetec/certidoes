@@ -10,6 +10,8 @@ interface RequisicaoFiltrosProps {
   grupo?: string;
   /** Campo de busca adicional exibido apenas no atendimento. */
   placeholder?: string;
+  /** Status que não aparecem no seletor (ex.: rascunho, que o atendimento não vê). */
+  ocultarStatus?: string[];
 }
 
 /** Filtros de requisições (busca textual + status), sem JavaScript no cliente. */
@@ -19,6 +21,7 @@ export function RequisicaoFiltros({
   status = "",
   grupo = "",
   placeholder = "Buscar por protocolo, imóvel ou município",
+  ocultarStatus = [],
 }: RequisicaoFiltrosProps) {
   return (
     <form
@@ -51,7 +54,9 @@ export function RequisicaoFiltros({
           className="border border-gray-300 rounded-md px-3 py-2 text-sm"
         >
           <option value="">Todas</option>
-          {Object.entries(REQUISICAO_STATUS).map(([codigo, info]) => (
+          {Object.entries(REQUISICAO_STATUS)
+            .filter(([codigo]) => !ocultarStatus.includes(codigo))
+            .map(([codigo, info]) => (
             <option key={codigo} value={codigo}>
               {info.label}
             </option>

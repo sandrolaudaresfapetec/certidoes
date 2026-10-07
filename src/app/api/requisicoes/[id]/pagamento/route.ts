@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirAtendimentoApi } from "@/lib/auth";
-import { STATUS_SOLICITACAO } from "@/lib/solicitacao-estados";
+import { bloqueioAcaoAtendimento } from "@/lib/solicitacao-estados";
 
 const STATUS_VALIDOS = ["PENDENTE", "PAGO", "ISENTO"];
 
@@ -23,12 +23,8 @@ export async function POST(
     return NextResponse.json({ error: "Requisição não encontrada." }, { status: 404 });
   }
 
-  if (requisicao.status === STATUS_SOLICITACAO.DEVOLVIDA) {
-    return NextResponse.json(
-      { error: "Requisição devolvida: aguarde o reenvio do solicitante para registrar pagamento." },
-      { status: 409 }
-    );
-  }
+  const bloqueio = bloqueioAcaoAtendimento(requisicao.status);
+  if (bloqueio) return NextResponse.json({ error: bloqueio }, { status: 409 });
 
   const body = await request.json().catch(() => ({}));
   const pagamentoStatus = (body.pagamentoStatus ?? "").toString();

@@ -10,7 +10,7 @@ import {
   DevolverRequisicao,
   FinalizacaoPagamento,
 } from "@/components/atendimento-acoes";
-import { STATUS_SOLICITACAO, podeDevolver } from "@/lib/solicitacao-estados";
+import { STATUS_SOLICITACAO, podeDevolver, visivelAoAtendimento } from "@/lib/solicitacao-estados";
 import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
 import { ChatSolicitacao } from "@/components/requisicao/chat";
 
@@ -34,7 +34,8 @@ export default async function VisualizarRequisicaoPage({
       },
     },
   });
-  if (!requisicao) notFound();
+  // Rascunho é só do solicitante: o atendimento não o enxerga, nem pelo link direto.
+  if (!requisicao || !visivelAoAtendimento(requisicao.status)) notFound();
 
   // Contorno do imóvel no acervo SIGEF importado (vazio até a importação; #PEND-33).
   const parcela = requisicao.sigefParcelaCodigo

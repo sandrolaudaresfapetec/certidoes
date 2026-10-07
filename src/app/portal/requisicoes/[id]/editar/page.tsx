@@ -26,13 +26,15 @@ export default async function EditarRequisicaoPage({
 
   const editavel = clientePodeEditar(requisicao);
 
+  const rascunho = requisicao.status === "RASCUNHO";
+
   const voltar = (
     <Link
-      href={`/portal/requisicoes/${requisicao.id}`}
+      href={rascunho ? "/portal?grupo=nao-enviadas" : `/portal/requisicoes/${requisicao.id}`}
       className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
     >
       <ArrowLeft className="h-4 w-4" />
-      Acompanhar Requisição
+      {rascunho ? "Minhas Requisições" : "Acompanhar Requisição"}
     </Link>
   );
 
@@ -59,11 +61,16 @@ export default async function EditarRequisicaoPage({
     <div>
       {voltar}
       <h1 className="text-xl font-semibold text-gray-900 mb-1">
-        Alterar Requisição {requisicao.protocolo}
+        {rascunho ? "Continuar solicitação" : "Alterar Requisição"} {requisicao.protocolo}
       </h1>
       <p className="text-sm text-gray-600 mb-6">
-        Revise as respostas e os dados do imóvel. As alterações substituem os
-        dados enviados anteriormente.
+        {rascunho
+          ? `Este é um rascunho salvo em ${new Date(requisicao.updatedAt).toLocaleString("pt-BR", {
+              timeZone: "America/Sao_Paulo",
+              dateStyle: "short",
+              timeStyle: "short",
+            })}. Complete as respostas e envie quando estiver pronto. Nada é analisado pelo IGC antes do envio.`
+          : "Revise as respostas e os dados do imóvel. As alterações substituem os dados enviados anteriormente."}
       </p>
 
       <RequisicaoForm
@@ -93,6 +100,7 @@ export default async function EditarRequisicaoPage({
           emNomeDeNome: requisicao.emNomeDeNome,
           observacao: requisicao.observacao,
           documentosEnviados: requisicao.documentos.map((d) => d.tipo),
+          rascunho,
         }}
       />
     </div>

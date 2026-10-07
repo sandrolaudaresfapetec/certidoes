@@ -21,12 +21,15 @@ export default async function RequisicoesPage({
   const atendimento = podeAtender(usuario);
 
   const where: Prisma.SolicitacaoWhereInput = {};
-  if (status) where.status = status;
+  // Rascunho é só do solicitante: nunca aparece para o atendimento, nem filtrando por ele.
+  const ocultos = ["RASCUNHO"];
   if (semProcesso === "1") {
     where.processId = null;
-    // Devolvida, rascunho e arquivada não aguardam abertura de processo.
-    if (!status) where.status = { notIn: ["DEVOLVIDA", "RASCUNHO", "ARQUIVADA"] };
+    // Devolvida e arquivada não aguardam abertura de processo.
+    if (!status) ocultos.push("DEVOLVIDA", "ARQUIVADA");
   }
+  if (status && !ocultos.includes(status)) where.status = status;
+  else where.status = { notIn: ocultos };
   if (q) {
     where.OR = [
       { protocolo: { contains: q } },
@@ -76,6 +79,7 @@ export default async function RequisicoesPage({
         q={q}
         status={status}
         placeholder="Buscar por protocolo, cliente, CPF ou município"
+        ocultarStatus={["RASCUNHO"]}
       />
 
       <div className="flex gap-3 text-sm">

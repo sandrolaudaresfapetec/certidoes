@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
@@ -31,6 +31,8 @@ export default async function AcompanharRequisicaoPage({
     },
   });
   if (!requisicao) notFound();
+  // Rascunho não tem acompanhamento: o solicitante volta para continuar o formulário.
+  if (requisicao.status === "RASCUNHO") redirect(`/portal/requisicoes/${id}/editar`);
 
   // Contorno do imóvel no acervo SIGEF importado (vazio até a importação; #PEND-33).
   const parcela = requisicao.sigefParcelaCodigo

@@ -3,14 +3,18 @@ import { REQUISICAO_STATUS, statusRequisicao } from "./requisicao-status";
 import {
   MOTIVO_DEVOLUCAO_MAX,
   STATUS_SOLICITACAO,
+  bloqueioAcaoAtendimento,
   clientePodeEditar,
   podeDevolver,
   validarMotivoDevolucao,
+  visivelAoAtendimento,
 } from "./solicitacao-estados";
 
 describe("clientePodeEditar", () => {
-  it("só deixa editar requisição devolvida, sem processo e sem finalização", () => {
+  it("só deixa editar requisição devolvida ou rascunho, sem processo e sem finalização", () => {
     expect(clientePodeEditar({ status: "DEVOLVIDA" })).toBe(true);
+    expect(clientePodeEditar({ status: "RASCUNHO" })).toBe(true);
+    expect(clientePodeEditar({ status: "RASCUNHO", processId: "p1" })).toBe(false);
     expect(clientePodeEditar({ status: "DEVOLVIDA", processId: "p1" })).toBe(false);
     expect(clientePodeEditar({ status: "DEVOLVIDA", finalizadaEm: new Date() })).toBe(false);
   });
@@ -65,5 +69,24 @@ describe("validarMotivoDevolucao", () => {
   it("recusa mais que o máximo", () => {
     expect(validarMotivoDevolucao("a".repeat(MOTIVO_DEVOLUCAO_MAX))).toMatchObject({ ok: true });
     expect(validarMotivoDevolucao("a".repeat(MOTIVO_DEVOLUCAO_MAX + 1))).toMatchObject({ ok: false });
+  });
+});
+
+describe("rascunho e atendimento", () => {
+  it("o atendimento não vê rascunho", () => {
+    expect(visivelAoAtendimento("RASCUNHO")).toBe(false);
+    expect(visivelAoAtendimento("PENDENTE")).toBe(true);
+    expect(visivelAoAtendimento("DEVOLVIDA")).toBe(true);
+  });
+
+  it.each(["RASCUNHO", "DEVOLVIDA", "AGUARDANDO_LIBERACAO", "AGUARDANDO_CLIENTE", "ARQUIVADA", "ARQUIVAMENTO_SOLICITADO"])(
+    "bloqueia abrir processo e pagamento em %s",
+    (status) => {
+      expect(bloqueioAcaoAtendimento(status)).toEqual(expect.any(String));
+    }
+  );
+
+  it.each(["PENDENTE", "EM_ANALISE", "APROVADA", "CONCLUIDA"])("libera em %s", (status) => {
+    expect(bloqueioAcaoAtendimento(status)).toBeNull();
   });
 });

@@ -77,7 +77,7 @@ export function acompanhamentoRequisicao(dados: {
  * como "em breve" e passa a funcionar quando o código do status entrar na lista.
  */
 export const GRUPOS_STATUS_GERAL = [
-  { chave: "nao-enviadas", rotulo: "Não enviadas", status: [] as string[] }, // PEND-42: ["RASCUNHO"]
+  { chave: "nao-enviadas", rotulo: "Não enviadas", status: ["RASCUNHO"] },
   { chave: "em-analise", rotulo: "Em análise", status: ["PENDENTE", "EM_ANALISE"] },
   { chave: "devolvidas", rotulo: "Devolvidas", status: ["DEVOLVIDA"] },
   { chave: "arquivadas", rotulo: "Arquivadas", status: [] as string[] }, // PEND-29: ["ARQUIVADA"]

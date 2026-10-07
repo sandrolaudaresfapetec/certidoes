@@ -31,9 +31,40 @@ export type StatusSolicitacao = (typeof STATUS_SOLICITACAO)[keyof typeof STATUS_
 /**
  * Situações em que o solicitante pode alterar a própria requisição. Depois da abertura
  * do processo os dados alimentam a análise técnica e só o backoffice altera; a devolução
- * existe justamente para o cliente corrigir. Rascunho entra na Fase 4.
+ * existe justamente para o cliente corrigir, e o rascunho ainda é só dele.
  */
-export const STATUS_EDITAVEIS_PELO_CLIENTE: readonly string[] = [STATUS_SOLICITACAO.DEVOLVIDA];
+export const STATUS_EDITAVEIS_PELO_CLIENTE: readonly string[] = [
+  STATUS_SOLICITACAO.RASCUNHO,
+  STATUS_SOLICITACAO.DEVOLVIDA,
+];
+
+/** Rascunho é só do solicitante: o atendimento não o vê em lista nem em tela. */
+export function visivelAoAtendimento(status: string): boolean {
+  return status !== STATUS_SOLICITACAO.RASCUNHO;
+}
+
+/**
+ * Situações em que a DDD não abre processo nem registra pagamento: a requisição ainda
+ * não está na fila (rascunho, congelada, aguardando resposta) ou já saiu dela.
+ * Devolve a mensagem de recusa, ou null quando pode agir.
+ */
+export function bloqueioAcaoAtendimento(status: string): string | null {
+  switch (status) {
+    case STATUS_SOLICITACAO.DEVOLVIDA:
+      return "Requisição devolvida: aguarde o reenvio do solicitante.";
+    case STATUS_SOLICITACAO.RASCUNHO:
+      return "Esta requisição ainda não foi enviada pelo solicitante.";
+    case STATUS_SOLICITACAO.AGUARDANDO_LIBERACAO:
+      return "Esta requisição está congelada, aguardando liberação.";
+    case STATUS_SOLICITACAO.AGUARDANDO_CLIENTE:
+      return "Aguardando a resposta do solicitante a uma pergunta do chat.";
+    case STATUS_SOLICITACAO.ARQUIVAMENTO_SOLICITADO:
+    case STATUS_SOLICITACAO.ARQUIVADA:
+      return "Esta requisição foi arquivada ou está com arquivamento solicitado.";
+    default:
+      return null;
+  }
+}
 
 /** Situações em que a DDD pode devolver a requisição ao solicitante. */
 export const STATUS_DEVOLVIVEIS: readonly string[] = [

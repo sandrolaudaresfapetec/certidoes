@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirAtendimentoApi } from "@/lib/auth";
-import { STATUS_SOLICITACAO } from "@/lib/solicitacao-estados";
+import { bloqueioAcaoAtendimento } from "@/lib/solicitacao-estados";
 
 /**
  * POST /api/requisicoes/[id]/processo — Abertura de Processo (Atendimento).
@@ -30,12 +30,8 @@ export async function POST(
     );
   }
 
-  if (requisicao.status === STATUS_SOLICITACAO.DEVOLVIDA) {
-    return NextResponse.json(
-      { error: "Requisição devolvida: aguarde o reenvio do solicitante para abrir o processo." },
-      { status: 409 }
-    );
-  }
+  const bloqueio = bloqueioAcaoAtendimento(requisicao.status);
+  if (bloqueio) return NextResponse.json({ error: bloqueio }, { status: 409 });
 
   const body = await request.json().catch(() => ({}));
   const expediente = (body.expediente ?? "").toString().trim() || null;

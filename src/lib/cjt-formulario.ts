@@ -425,6 +425,57 @@ export function normalizarParaPersistencia(form: FormularioCjt): DadosCjtPersist
   };
 }
 
+export interface DadosCjtRascunho {
+  cjtQualidade: string | null;
+  cjtResultado: string | null;
+  cjtSituacao: string | null;
+  cjtPropriedadeDe: string | null;
+  cjtInformaMatricula: string | null;
+  cjtMatricula: string | null;
+  cjtQtdPoligonos: number | null;
+  cjtNomesPoligonos: string | null;
+  cjtCodigoIncra: string | null;
+  cjtDeclaracaoAceita: boolean;
+}
+
+const LIMITE_TEXTO_RASCUNHO = 300;
+const LIMITE_POLIGONOS_RASCUNHO = 100;
+
+/**
+ * Rascunho (#PEND-42): guarda o que o solicitante já respondeu, sem exigir nada. Respostas
+ * fora das opções, textos enormes e campos que não pertencem à combinação ativa são
+ * descartados; o envio de verdade valida tudo com `validarFormulario`.
+ */
+export function normalizarRascunho(form: FormularioCjt): DadosCjtRascunho {
+  const limpo = limparCamposNaoAplicaveis(form);
+  const codigo = (valor: string, opcoes: readonly { codigo: string }[]) =>
+    opcoes.some((o) => o.codigo === valor) ? valor : null;
+  const qtd = quantidadeValida(limpo.qtdPoligonos) ? parseInt(limpo.qtdPoligonos, 10) : NaN;
+  const nomes = limpo.nomesPoligonos
+    .slice(0, LIMITE_POLIGONOS_RASCUNHO)
+    .map((n) => n.trim().slice(0, LIMITE_NOME_POLIGONO));
+  const informa =
+    limpo.informaMatricula === "SIM" || limpo.informaMatricula === "NAO"
+      ? limpo.informaMatricula
+      : null;
+
+  return {
+    cjtQualidade: codigo(limpo.qualidade, QUALIDADE_OPCOES),
+    cjtResultado: codigo(limpo.resultado, RESULTADO_OPCOES),
+    cjtSituacao: codigo(limpo.situacao, SITUACAO_OPCOES),
+    cjtPropriedadeDe: limpo.propriedadeDe.trim().slice(0, LIMITE_TEXTO_RASCUNHO) || null,
+    cjtInformaMatricula: informa,
+    cjtMatricula:
+      informa === "NAO"
+        ? MATRICULA_USUCAPIAO
+        : somenteDigitos(limpo.matricula).slice(0, 30) || null,
+    cjtQtdPoligonos: Number.isInteger(qtd) && qtd <= LIMITE_POLIGONOS_RASCUNHO ? qtd : null,
+    cjtNomesPoligonos: nomes.some(Boolean) ? JSON.stringify(nomes) : null,
+    cjtCodigoIncra: somenteDigitos(limpo.codigoIncra).slice(0, LIMITE_DIGITOS_INCRA) || null,
+    cjtDeclaracaoAceita: limpo.declaracao,
+  };
+}
+
 /** Reconstroi o formulario a partir do corpo JSON recebido pela API. */
 export function formularioDoPayload(raw: unknown): FormularioCjt {
   const bruto = (raw ?? {}) as Record<string, unknown>;

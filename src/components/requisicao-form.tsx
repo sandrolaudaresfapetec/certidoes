@@ -74,6 +74,8 @@ export interface RequisicaoEdicao {
   observacao: string | null;
   /** Documentos já anexados, que não precisam ser reenviados. */
   documentosEnviados: string[];
+  /** Rascunho salvo (#PEND-42): continuar e enviar, não é uma alteração de requisição enviada. */
+  rascunho?: boolean;
 }
 
 interface RequisicaoFormProps {
@@ -145,6 +147,10 @@ export function RequisicaoForm({
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [protocolo, setProtocolo] = useState<string | null>(null);
+  // Rascunho salvo nesta tela (ainda sem `edicao`): os próximos salvamentos e o envio o atualizam.
+  const [rascunhoId, setRascunhoId] = useState<string | null>(null);
+  const [rascunhoSalvo, setRascunhoSalvo] = useState<{ protocolo: string } | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
   // Ao concluir, leva a tela e o foco para a confirmação.
   useEffect(() => {
@@ -218,6 +224,11 @@ export function RequisicaoForm({
   const procurador = form.qualidade === "1a";
   const exigeDocsImovel = etapaImovel === "semRegistro";
   const enviados = edicao?.documentosEnviados ?? [];
+  // Alterar uma requisição já enviada (devolvida); rascunho continuado conta como envio novo.
+  const reenvio = Boolean(edicao) && !edicao?.rascunho;
+  const podeRascunho = variante === "SOLICITANTE" && (!edicao || Boolean(edicao.rascunho));
+  const alvoEnvio =
+    edicao?.endpoint ?? (rascunhoId ? `${criarEndpoint}/${rascunhoId}` : criarEndpoint);
   const temPlanta = Boolean(planta) || enviados.includes("PLANTA");
   const temDocPropriedade =
     Boolean(docPropriedade) || enviados.includes("DOC_PROPRIEDADE");
@@ -270,8 +281,8 @@ export function RequisicaoForm({
     setErro(null);
     try {
       const limpo = limparCamposNaoAplicaveis(form);
-      const res = await fetch(edicao?.endpoint ?? criarEndpoint, {
-        method: edicao ? "PATCH" : "POST",
+      const res = await fetch(alvoEnvio, {
+        method: alvoEnvio === criarEndpoint ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...payloadExtra,
@@ -304,7 +315,7 @@ export function RequisicaoForm({
       const data = await res.json();
       if (!res.ok) {
         throw new Error(
-          data.error || (edicao ? "Erro ao alterar requisição." : "Erro ao criar requisição.")
+          data.error || (reenvio ? "Erro ao alterar requisição." : "Erro ao criar requisição.")
         );
       }
 
@@ -334,6 +345,56 @@ export function RequisicaoForm({
     }
   }
 
+  /** Guarda o que já foi respondido, sem validar nem enviar (#PEND-42). Anexos não entram. */
+  async function salvarRascunho() {
+    if (salvando) return;
+    setSalvando(true);
+    setErro(null);
+    setRascunhoSalvo(null);
+    try {
+      const limpo = limparCamposNaoAplicaveis(form);
+      const res = await fetch(alvoEnvio, {
+        method: alvoEnvio === criarEndpoint ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rascunho: true,
+          tipoViaSigef: etapaImovel !== "semRegistro",
+          sigefCodigoImovel: selecionada?.codigoImovel,
+          sigefParcelaCodigo: selecionada?.parcelaCodigo,
+          sigefNomeArea: selecionada?.nomeArea,
+          sigefAreaHectares: selecionada?.areaHectares,
+          sigefMunicipio: selecionada?.municipio,
+          sigefUf: selecionada?.uf,
+          sigefStatus: selecionada?.status,
+          sigefOrigem: sigef?.origem,
+          emNomeDeCpf: procurador ? emNomeDeCpf : undefined,
+          emNomeDeNome: procurador ? emNomeDeNome : undefined,
+          observacao: observacao || undefined,
+          cjt: {
+            qualidade: limpo.qualidade,
+            resultado: limpo.resultado,
+            situacao: limpo.situacao,
+            propriedadeDe: limpo.propriedadeDe,
+            informaMatricula: limpo.informaMatricula,
+            matricula: limpo.matricula,
+            qtdPoligonos: limpo.qtdPoligonos,
+            nomesPoligonos: limpo.nomesPoligonos,
+            codigoIncra: limpo.codigoIncra,
+            declaracao: limpo.declaracao,
+          },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Não foi possível salvar o rascunho.");
+      setRascunhoId(data.id);
+      setRascunhoSalvo({ protocolo: data.protocolo });
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   if (protocolo) {
     if (variante === "SOLICITANTE") {
       return (
@@ -348,7 +409,7 @@ export function RequisicaoForm({
             tabIndex={-1}
             className="text-lg font-semibold text-gray-900 outline-none"
           >
-            {edicao ? "Solicitação reenviada com sucesso" : "Solicitação enviada com sucesso"}
+            {reenvio ? "Solicitação reenviada com sucesso" : "Solicitação enviada com sucesso"}
           </h2>
           <p className="text-sm text-gray-600 mt-1">
             Protocolo <strong>{protocolo}</strong>
@@ -916,9 +977,42 @@ export function RequisicaoForm({
             className="w-full bg-emerald-700 text-white py-2.5 rounded-md text-sm font-medium hover:bg-emerald-800 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {enviando && <Loader2 className="h-4 w-4 animate-spin" />}
-            {edicao ? "Salvar alterações" : "Enviar requisição"}
+            {reenvio ? "Salvar alterações" : "Enviar requisição"}
           </button>
         </section>
+      )}
+
+      {podeRascunho && (
+        <div className="space-y-3">
+          {rascunhoSalvo && (
+            <p
+              role="status"
+              className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"
+            >
+              <strong className="font-semibold">Rascunho salvo.</strong> Protocolo{" "}
+              {rascunhoSalvo.protocolo}. Você pode sair e continuar depois em Minhas Requisições,
+              no cartão &quot;Não enviadas&quot;.{" "}
+              <Link href="/portal?grupo=nao-enviadas" className="underline">
+                Ver não enviadas
+              </Link>
+            </p>
+          )}
+          <div className="rounded-lg border border-gray-200 bg-white px-6 py-4">
+            <button
+              type="button"
+              onClick={salvarRascunho}
+              disabled={salvando || enviando}
+              className="inline-flex items-center gap-2 rounded-md border border-gray-400 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50"
+            >
+              {salvando && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              Salvar rascunho
+            </button>
+            <p className="mt-2 text-xs text-gray-600">
+              Os anexos só são enviados com a solicitação. Em um rascunho, anexe de novo ao
+              continuar.
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
