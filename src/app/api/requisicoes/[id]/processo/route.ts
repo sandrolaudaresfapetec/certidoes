@@ -34,11 +34,13 @@ export async function POST(
   const observacaoEntrada = (body.observacaoEntrada ?? "").toString().trim() || null;
 
   const processo = await prisma.$transaction(async (tx) => {
-    const jaAberta = await tx.solicitacao.findUnique({
+    // Os dados do imóvel são relidos aqui: o cliente pode corrigir a requisição
+    // até a abertura, e o processo tem de herdar a versão vencedora da corrida.
+    const atual = await tx.solicitacao.findUnique({
       where: { id: requisicao.id },
-      select: { processId: true },
+      include: { solicitante: true },
     });
-    if (jaAberta?.processId) {
+    if (!atual || atual.processId) {
       throw new Error("PROCESSO_JA_ABERTO");
     }
 
@@ -55,29 +57,32 @@ export async function POST(
         expediente,
         dtAbertoSei: new Date(),
         tipo: "Comum-CPF",
-        interessado: requisicao.solicitante.nome,
-        email: requisicao.solicitante.email,
-        telefone: requisicao.solicitante.telefone,
-        cpfCnpj: requisicao.solicitante.cpf,
-        municipio: requisicao.sigefMunicipio,
+        interessado: atual.solicitante.nome,
+        email: atual.solicitante.email,
+        telefone: atual.solicitante.telefone,
+        cpfCnpj: atual.solicitante.cpf,
+        municipio: atual.sigefMunicipio,
         observacaoEntrada,
         situacao: "entrada_sdtc",
         criadoPorId: sessao.usuario.id,
-        sigefCodigoImovel: requisicao.sigefCodigoImovel,
-        sigefParcelaCodigo: requisicao.sigefParcelaCodigo,
-        sigefAreaHectares: requisicao.sigefAreaHectares,
-        sigefMunicipio: requisicao.sigefMunicipio,
-        sigefUf: requisicao.sigefUf,
-        sigefStatus: requisicao.sigefStatus,
-        sigefOrigem: requisicao.sigefOrigem,
-        sigefConsultadoEm: requisicao.sigefCodigoImovel ? new Date() : null,
+        sigefCodigoImovel: atual.sigefCodigoImovel,
+        sigefParcelaCodigo: atual.sigefParcelaCodigo,
+        sigefAreaHectares: atual.sigefAreaHectares,
+        sigefMunicipio: atual.sigefMunicipio,
+        sigefUf: atual.sigefUf,
+        sigefStatus: atual.sigefStatus,
+        sigefOrigem: atual.sigefOrigem,
+        sigefConsultadoEm: atual.sigefCodigoImovel ? new Date() : null,
       },
     });
 
-    await tx.solicitacao.update({
-      where: { id: requisicao.id },
+    const vinculadas = await tx.solicitacao.updateMany({
+      where: { id: requisicao.id, processId: null },
       data: { processId: criado.id, status: "EM_ANALISE" },
     });
+    if (vinculadas.count === 0) {
+      throw new Error("PROCESSO_JA_ABERTO");
+    }
 
     return criado;
   }).catch((e: Error) => {

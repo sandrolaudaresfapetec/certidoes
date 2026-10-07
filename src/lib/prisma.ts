@@ -27,6 +27,11 @@ function createPrismaClient() {
   return new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: `file:${dbPath}` }) });
 }
 
+/** true quando o banco em uso e o PostgreSQL (producao). */
+export function usaPostgres(): boolean {
+  return (process.env.DATABASE_URL ?? "").startsWith("postgres");
+}
+
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

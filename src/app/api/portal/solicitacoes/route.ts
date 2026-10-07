@@ -7,6 +7,7 @@ import {
   primeiroErro,
   validarFormulario,
 } from "@/lib/cjt-formulario";
+import { IMOVEL_SIGEF_VAZIO, resolverImovelSigef } from "@/lib/sigef-imovel";
 
 function gerarProtocolo(sequencial: number): string {
   const ano = new Date().getFullYear();
@@ -75,6 +76,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: erroCjt }, { status: 400 });
   }
   const cjt = normalizarParaPersistencia(formulario);
+  const imovel = tipoViaSigef
+    ? await resolverImovelSigef(body, solicitante.cpf)
+    : IMOVEL_SIGEF_VAZIO;
+  if (!imovel) {
+    return NextResponse.json(
+      { error: "Imóvel do SIGEF não encontrado para o seu CPF/CNPJ. Refaça a consulta e selecione o imóvel na lista." },
+      { status: 400 }
+    );
+  }
 
   const total = await prisma.solicitacao.count();
 
@@ -82,17 +92,7 @@ export async function POST(request: NextRequest) {
     data: {
       protocolo: gerarProtocolo(total + 1),
       tipoViaSigef,
-      sigefCodigoImovel: tipoViaSigef ? body.sigefCodigoImovel : null,
-      sigefParcelaCodigo: tipoViaSigef ? body.sigefParcelaCodigo : null,
-      sigefNomeArea: tipoViaSigef ? body.sigefNomeArea || null : null,
-      sigefAreaHectares:
-        tipoViaSigef && body.sigefAreaHectares != null
-          ? parseFloat(body.sigefAreaHectares)
-          : null,
-      sigefMunicipio: tipoViaSigef ? body.sigefMunicipio || null : null,
-      sigefUf: tipoViaSigef ? body.sigefUf || null : null,
-      sigefStatus: tipoViaSigef ? body.sigefStatus || null : null,
-      sigefOrigem: tipoViaSigef ? body.sigefOrigem || null : null,
+      ...imovel,
       emNomeDeCpf,
       emNomeDeNome,
       observacao: (body.observacao ?? "").toString() || null,

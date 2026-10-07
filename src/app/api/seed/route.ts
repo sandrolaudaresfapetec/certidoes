@@ -120,7 +120,7 @@ export async function POST() {
 
   // Usuarios de demonstracao recebem a senha inicial; senhas ja definidas
   // permanecem intactas.
-  const senhaHash = hashSenha(SENHA_INICIAL);
+  const senhaHash = await hashSenha(SENHA_INICIAL);
   await prisma.user.updateMany({
     where: { passwordHash: null },
     data: { passwordHash: senhaHash },

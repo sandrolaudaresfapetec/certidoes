@@ -1,47 +1,60 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Barreira de entrada do backoffice: sem cookie de sessao, paginas internas
- * vao para /login e APIs internas respondem 401. E uma checagem otimista —
- * a validacao da assinatura e do usuario continua sendo feita no servidor,
- * em cada pagina e rota de API.
+ * Proxy (Next.js 16; antes chamado middleware).
+ *
+ * As sessões do backoffice (`igc_session`) e do portal (`portal_session`) são
+ * mantidas em cookie, então qualquer site poderia disparar uma mutação no
+ * navegador de um usuário logado. Toda requisição que altera dados precisa vir
+ * da própria origem: o `Origin` é comparado com o host da requisição e pedidos
+ * sem `Origin` só passam quando o navegador informa `Sec-Fetch-Site` própria
+ * (formulários e fetch de terceiros sempre enviam um dos dois).
  */
-
-/** Mesmo nome de cookie de `src/lib/auth.ts` (o proxy nao compartilha modulos). */
-const SESSION_COOKIE = "igc_session";
-
-/** Areas abertas: login do backoffice, portal do solicitante e seus endpoints. */
-const PUBLICO = [
-  "/login",
-  "/portal",
-  "/api/auth",
-  "/api/portal",
-  // usada pelo portal e pelo backoffice; a propria rota valida as duas sessoes
-  "/api/sigef/consulta",
-  // bootstrap da instalacao; a propria rota exige ADMIN depois do primeiro uso
-  "/api/seed",
-];
+const METODOS_SEGUROS = ["GET", "HEAD", "OPTIONS"];
 
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (PUBLICO.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+  if (METODOS_SEGUROS.includes(request.method)) {
     return NextResponse.next();
   }
 
-  if (request.cookies.get(SESSION_COOKIE)?.value) {
-    return NextResponse.next();
+  const site = request.headers.get("sec-fetch-site");
+  if (site && site !== "same-origin" && site !== "none") {
+    return recusar();
   }
 
-  if (pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
+  const origin = request.headers.get("origin");
+  if (origin) {
+    const host = request.headers.get("host");
+    let originHost: string;
+    try {
+      originHost = new URL(origin).host;
+    } catch {
+      return recusar();
+    }
+    if (!host || originHost !== host) {
+      return recusar();
+    }
+  } else if (!site) {
+    // Cliente sem `Origin` nem `Sec-Fetch-Site`: pode ser um script legítimo
+    // (curl, integrações) ou um navegador antigo. Sem sessão de cookie não há
+    // risco de CSRF; com sessão, exigimos a origem.
+    const temSessao =
+      request.cookies.has("igc_session") || request.cookies.has("portal_session");
+    if (temSessao) {
+      return recusar();
+    }
   }
 
-  const login = new URL("/login", request.url);
-  return NextResponse.redirect(login);
+  return NextResponse.next();
+}
+
+function recusar() {
+  return NextResponse.json(
+    { error: "Origem da requisição não autorizada." },
+    { status: 403 }
+  );
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: "/api/:path*",
 };
