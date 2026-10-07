@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUsuario, podeAtender } from "@/lib/auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
+import { geometriaDoAcervo } from "@/components/requisicao/geometria";
 import { AberturaProcesso, FinalizacaoPagamento } from "@/components/atendimento-acoes";
 
 export const dynamic = "force-dynamic";
@@ -21,10 +22,21 @@ export default async function VisualizarRequisicaoPage({
     include: {
       solicitante: true,
       documentos: { select: { id: true, tipo: true, nomeArquivo: true } },
-      process: { select: { id: true, ordem: true, situacao: true, tipoServico: true } },
+      process: {
+        select: { id: true, ordem: true, situacao: true, tipoServico: true, expediente: true },
+      },
     },
   });
   if (!requisicao) notFound();
+
+  // Contorno do imóvel no acervo SIGEF importado (vazio até a importação; #PEND-33).
+  const parcela = requisicao.sigefParcelaCodigo
+    ? await prisma.sigefParcela.findUnique({
+        where: { codigoParcela: requisicao.sigefParcelaCodigo },
+        select: { geometria: true },
+      })
+    : null;
+  const geometriaImovel = geometriaDoAcervo(parcela?.geometria);
 
   const atendimento = podeAtender(usuario);
 
@@ -39,7 +51,7 @@ export default async function VisualizarRequisicaoPage({
       </Link>
       <h1 className="text-2xl font-bold text-gray-900">Visualizar Requisição</h1>
 
-      <RequisicaoDetalhe requisicao={requisicao} escopo="INTERNO" />
+      <RequisicaoDetalhe requisicao={requisicao} escopo="INTERNO" geometriaImovel={geometriaImovel} />
 
       {atendimento && (
         <div className="space-y-6">

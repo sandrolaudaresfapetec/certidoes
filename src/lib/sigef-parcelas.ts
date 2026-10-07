@@ -98,7 +98,7 @@ export async function parcelaNoPonto(
       maxLat: { gte: lat },
     },
     select: CAMPOS,
-    take: 50,
+    take: 500,
   });
   const ponto = turf.point([lon, lat]);
   for (const linha of candidatos) {
@@ -110,8 +110,11 @@ export async function parcelaNoPonto(
 }
 
 export async function parcelaPorCodigo(codigo: string): Promise<SigefParcelaGeo | null> {
-  const linha = await prisma.sigefParcela.findUnique({
-    where: { codigoParcela: codigo.trim() },
+  const bruto = codigo.trim();
+  // O codigo da parcela e um UUID: aceita qualquer grafia de caixa (SQLite e Postgres).
+  const variantes = [...new Set([bruto, bruto.toLowerCase(), bruto.toUpperCase()])];
+  const linha = await prisma.sigefParcela.findFirst({
+    where: { codigoParcela: { in: variantes } },
     select: CAMPOS,
   });
   return linha ? paraGeo(linha) : null;

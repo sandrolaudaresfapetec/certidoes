@@ -1,0 +1,33 @@
+# Inngest self-hosted (jobs em background do FasterFixes). Só na rede interna do Fly:
+# o app fala com http://certidoes-inngest.internal:8288 e o Inngest chama
+# http://certidoes-fasterfixes.internal:3000/api/inngest.
+app = "certidoes-inngest"
+primary_region = "iad"
+
+[build]
+  image = "inngest/inngest:v1.14.0"
+
+[env]
+  INNGEST_PORT = "8288"
+  INNGEST_SQLITE_DIR = "/data"
+  INNGEST_SDK_URL = "http://certidoes-fasterfixes.internal:3000/api/inngest"
+  INNGEST_POLL_INTERVAL = "60"
+
+[experimental]
+  cmd = ["inngest", "start", "--host", "[::]"]
+
+[[mounts]]
+  source = "inngest_data"
+  destination = "/data"
+  initial_size = "1gb"
+
+[[services]]
+  internal_port = 8288
+  protocol = "tcp"
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

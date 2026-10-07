@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSolicitanteLogado } from "@/lib/portal-auth";
-import { STATUS_EDITAVEIS } from "@/lib/solicitacao-status";
+import { STATUS_ACEITA_DOCUMENTOS } from "@/lib/solicitacao-status";
 
 const TIPOS_VALIDOS = ["PLANTA", "DOC_PROPRIEDADE", "PROCURACAO"];
 const MIME_VALIDOS = ["application/pdf", "image/jpeg", "image/png"];
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   if (
     solicitacao.processId ||
     solicitacao.finalizadaEm ||
-    !STATUS_EDITAVEIS.includes(solicitacao.status)
+    !STATUS_ACEITA_DOCUMENTOS.includes(solicitacao.status)
   ) {
     return NextResponse.json(
       { error: "Esta requisição já está em andamento e não aceita novos documentos." },

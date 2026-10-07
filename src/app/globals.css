@@ -24,3 +24,58 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Padrões de interação: valem para toda a plataforma. Estão em `base` para um
+   componente poder optar por outro valor com um utilitário (ex.: cursor-default). */
+@layer base {
+  /* Cores fixas: sem isso o campo herda a do body (#ededed no modo escuro do sistema)
+     e, sem fundo, o texto escuro some sobre o body escuro. */
+  input,
+  textarea,
+  select {
+    color: #111827;
+    background-color: #ffffff;
+    color-scheme: light;
+    font-weight: 400;
+  }
+
+  ::placeholder {
+    color: #6b7280;
+    opacity: 1;
+  }
+
+  /* O Tailwind 4 deixou de pôr cursor de mão nos botões. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  input:is([type="button"], [type="submit"], [type="reset"], [type="checkbox"], [type="radio"]):not(:disabled),
+  label:has(> input:is([type="checkbox"], [type="radio"]):not(:disabled)) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  input:is([type="button"], [type="submit"], [type="reset"], [type="checkbox"], [type="radio"]):disabled,
+  label:has(> input:is([type="checkbox"], [type="radio"]):disabled) {
+    cursor: not-allowed;
+  }
+}
+
+/* Caixas do formulário que se abrem conforme o preenchimento (portal). */
+@keyframes caixa-entra {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.caixa-entra {
+  animation: caixa-entra 0.35s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .caixa-entra {
+    animation: none;
+  }
+}

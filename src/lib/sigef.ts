@@ -14,7 +14,7 @@
 
 export interface SigefParcela {
   codigoImovel: string;
-  geometria?: unknown; // GeoJSON (quando enriquecido com CAR)
+  geometria?: unknown; // GeoJSON (quando vem do acervo SIGEF importado)
   parcelaCodigo: string;
   nomeArea: string;
   detentorNome: string;
@@ -203,37 +203,6 @@ async function gerarParcelasDoAcervo(
 }
 
 /**
- * Versao enriquecida do mock: tenta buscar geometrias REAIS do CAR (SICAR)
- * e mescla com os atributos simulados (titular, codigo SIGEF). Se o CAR
- * estiver fora, cai no mock puro. Controlado por SIGEF_CAR (padrao: true).
- */
-async function gerarParcelasMockComCar(cpfCnpjDigits: string): Promise<{ parcelas: SigefParcela[]; aviso?: string }> {
-  const parcelas = gerarParcelasMock(cpfCnpjDigits);
-  if ((process.env.SIGEF_CAR || "true").toLowerCase() !== "true") {
-    return { parcelas };
-  }
-  try {
-    const { buscarImoveisCar } = await import("@/lib/car");
-    const imoveis = await buscarImoveisCar("SP", parcelas.length);
-    imoveis.forEach((car, i) => {
-      if (parcelas[i]) {
-        parcelas[i].geometria = car.geometria;
-        parcelas[i].municipio = car.municipio || parcelas[i].municipio;
-        parcelas[i].uf = car.uf || parcelas[i].uf;
-        parcelas[i].areaHectares = car.areaHa || parcelas[i].areaHectares;
-        parcelas[i].nomeArea = `${parcelas[i].nomeArea} (CAR ${car.codImovel})`;
-      }
-    });
-    return {
-      parcelas,
-      aviso: "Dados simulados enriquecidos com geometrias reais do CAR/SICAR (GeoServer publico).",
-    };
-  } catch {
-    return { parcelas, aviso: "CAR indisponivel — usando geometrias 100% simuladas." };
-  }
-}
-
-/**
  * Consulta as parcelas georreferenciadas de um CPF/CNPJ no SIGEF.
  * Nunca lança exceção: em qualquer falha, retorna dados simulados com aviso.
  */
@@ -251,10 +220,9 @@ export async function consultarParcelasSigef(
     if (acervo) {
       return { origem: "SIMULADO", parcelas: acervo.parcelas, aviso: acervo.aviso };
     }
-    const mock = await gerarParcelasMockComCar(digits);
     return {
       origem: "SIMULADO",
-      parcelas: mock.parcelas,
+      parcelas: gerarParcelasMock(digits),
       aviso: temCredenciais
         ? "SIGEF_MOCK=true: retornando dados simulados."
         : "Credenciais do Conecta gov.br não configuradas (SIGEF_CLIENT_ID/SIGEF_CLIENT_SECRET). Retornando dados simulados.",
@@ -287,10 +255,9 @@ export async function consultarParcelasSigef(
         aviso: `Falha na integração real com o SIGEF (${(err as Error).message}). ${acervo.aviso}`,
       };
     }
-    const mock = await gerarParcelasMockComCar(digits);
     return {
       origem: "SIMULADO",
-      parcelas: mock.parcelas,
+      parcelas: gerarParcelasMock(digits),
       aviso: `Falha na integração real com o SIGEF (${(err as Error).message}). Retornando dados simulados.`,
     };
   }

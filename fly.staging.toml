@@ -1,0 +1,22 @@
+# Staging (widget FasterFixes ativo via secrets NEXT_PUBLIC_FASTERFIXES_*; banco certidoes_staging no mesmo cluster).
+# Deploy: fly deploy -c fly.staging.toml --ha=false
+app = 'certidoes-staging'
+primary_region = 'iad'
+
+[build]
+
+# Migration roda em VM de release descartavel ANTES do deploy entrar no ar.
+# Se falhar, o deploy aborta e a versao atual continua no ar (sem SSH, sem downtime).
+[deploy]
+  release_command = "npx prisma migrate deploy --config prisma.config.postgres.ts"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '1gb'
