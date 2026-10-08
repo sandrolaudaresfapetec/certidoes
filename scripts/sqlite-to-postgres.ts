@@ -15,13 +15,13 @@ const pg = new Client({ connectionString: process.env.DATABASE_URL });
 
 // Colunas de data por tabela (conversao SQLite -> TIMESTAMP)
 const DATE_COLS: Record<string, string[]> = {
-  Process: ["dtAbertoSei","dtCompile","dtNascimentoIdoso","dtEmail","dtVisita1","dtVisita2","dtConf","dtAssTecnico","dtAssGerente","dtAssDiretor","dtSaida","dtInicioSobrestado","dtFimSobrestado","dtCancelado","dtUpadoSei","sigefConsultadoEm","createdAt","updatedAt"],
+  Process: ["dtAbertoSei","dtCompile","dtNascimentoIdoso","dtEmail","dtVisita1","dtVisita2","dtConf","dtAssTecnico","dtAssGerente","dtAssDiretor","dtSaida","dtInicioSobrestado","dtFimSobrestado","dtCancelado","dtUpadoSei","sigefConsultadoEm","nivelComplexidadeEm","createdAt","updatedAt"],
   User: ["createdAt","updatedAt"],
   Notification: ["createdAt"],
   WorkflowAction: ["createdAt"],
   SigefConsulta: ["createdAt"],
   Solicitante: ["createdAt","updatedAt"],
-  Solicitacao: ["pagamentoEm","finalizadaEm","chatLidoSolicitanteEm","chatLidoAtendimentoEm","devolvidaEm","congeladaEm","liberadaEm","analiseDuplicidadeEm","arquivadaEm","arquivamentoSolicitadoEm","createdAt","updatedAt"],
+  Solicitacao: ["pagamentoEm","finalizadaEm","chatLidoSolicitanteEm","chatLidoAtendimentoEm","devolvidaEm","congeladaEm","liberadaEm","analiseDuplicidadeEm","arquivadaEm","arquivamentoSolicitadoEm","docsConferidosEm","createdAt","updatedAt"],
   MensagemSolicitacao: ["respondidaEm","createdAt"],
   ExecucaoAgendada: ["iniciadaEm","concluidaEm"],
   Documento: ["createdAt"],
@@ -30,7 +30,7 @@ const DATE_COLS: Record<string, string[]> = {
 };
 const BOOL_COLS: Record<string, string[]> = {
   User: ["active"], Notification: ["read"], SigefConsulta: ["sucesso"],
-  Solicitante: ["cadastroCompleto"], Solicitacao: ["tipoViaSigef","cjtDeclaracaoAceita","sobreposicao"],
+  Solicitante: ["cadastroCompleto"], Solicitacao: ["tipoViaSigef","cjtDeclaracaoAceita","sobreposicao"], LinhaDivisa: ["finalizada"],
 };
 const TABLES = ["User","Process","Notification","WorkflowAction","SigefConsulta","Solicitante","Solicitacao","Documento","MensagemSolicitacao","ExecucaoAgendada","LinhaDivisa","CorteDivisa"];
 

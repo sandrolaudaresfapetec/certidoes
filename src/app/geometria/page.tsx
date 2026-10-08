@@ -924,6 +924,16 @@ export default function GeometriaPage() {
                 : "bg-emerald-100 text-emerald-800"}`}>
                 Caso: {resultado.classificacao}
               </span>
+              {resultado.nivelSugerido != null && (
+                <span className="ml-2 text-xs font-bold px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                  Nível sugerido: {resultado.nivelSugerido}
+                </span>
+              )}
+              {resultado.nivelMotivo && (
+                <p className="mt-1 text-xs text-gray-700">
+                  {resultado.nivelMotivo}. O técnico responsável confirma o nível no processo.
+                </p>
+              )}
               {processoGravado && (
                 <p className="mt-2 text-sm text-gray-800">
                   Corte gravado no processo{" "}

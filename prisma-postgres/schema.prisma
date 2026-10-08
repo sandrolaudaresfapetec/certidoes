@@ -97,6 +97,9 @@ model Solicitacao {
   congeladaEm       DateTime?
   liberadaEm        DateTime?
 
+  // Checagem de documentos pelo Atendimento (subetapa do acompanhamento, #PEND-27)
+  docsConferidosEm  DateTime?
+
   // Analise de duplicidade (#PEND-30): so entra na fila da DDD depois de analisada.
   analiseDuplicidadeEm DateTime?
   sobreposicao      Boolean  @default(false) // aponta (ou e apontada) para outra requisicao com geometria repetida/sobreposta
@@ -196,6 +199,9 @@ model Process {
   ra                String?  // Regiao Administrativa
   dra               String?
   divisaDificuldade String?
+  // Nivel de complexidade 1 a 9: sugerido pelo corte e confirmado pelo tecnico (#PEND-32)
+  nivelComplexidade Int?
+  nivelComplexidadeEm DateTime?
 
   // Workflow Status
   situacao          String   @default("entrada_sdtc") // entrance stage
@@ -331,7 +337,8 @@ model LinhaDivisa {
   id            String   @id @default(cuid())
   codigo        String   @unique
   descricao     String?  // ex.: "Divisa Brazlandia/Planaltina"
-  tipo          String   // DIVISA_MUNICIPAL | TRIPLICE | QUADRUPLA | RIO
+  tipo          String   // DIVISA_MUNICIPAL | TRIPLICE | QUADRUPLA | QUINTUPLA | RIO | RETA | FOZ | CONFLITO
+  finalizada    Boolean  @default(false) // divisa finalizada: baixa o nivel de complexidade (#PEND-32)
   geometria     String   // GeoJSON LineString/MultiLineString
   bancoOrigem   String   // rastreabilidade: banco de dados de origem
   dataValidacao DateTime
@@ -344,6 +351,7 @@ model LinhaDivisa {
 model CorteDivisa {
   id              String      @id @default(cuid())
   classificacao   String      // FACIL | MEDIO | DIFICIL | PIOR_CASO
+  nivelSugerido   Int?        // nivel de complexidade 1 a 9 sugerido pelo corte (#PEND-32)
   geometriaImovel String      // GeoJSON Polygon do imovel (vindo do SIGEF)
   resultadoJson   String      // JSON: [{fragmento, areaHa, percentual, municipio, geometria}]
   dataCorte       DateTime    @default(now())

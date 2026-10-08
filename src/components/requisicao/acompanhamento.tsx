@@ -1,4 +1,4 @@
-import { Check, Clock } from "lucide-react";
+import { Check, Circle, Clock } from "lucide-react";
 import {
   ETAPAS_ACOMPANHAMENTO,
   acompanhamentoRequisicao,
@@ -17,8 +17,13 @@ interface AcompanhamentoProps {
   pagamentoStatus: string | null;
   pagamentoValor: number | null;
   finalizadaEm: Date | null;
-  /** Status da requisição (hoje só `ARQUIVADA` muda o acompanhamento). */
+  /** Status da requisição: define o aviso antes do processo e o ramo "Arquivada". */
   statusRequisicao?: string;
+  /** Quando o Atendimento conferiu os documentos (subetapa do Setor de Atendimentos). */
+  docsConferidosEm?: Date | null;
+  analiseDuplicidadeEm?: Date | null;
+  /** Nível de complexidade 1 a 9, só depois de confirmado pelo técnico (#PEND-32). */
+  nivelComplexidade?: number | null;
 }
 
 type Estado = "FEITA" | "ATUAL" | "PENDENTE";
@@ -84,8 +89,19 @@ export function AcompanhamentoRequisicao({
   pagamentoValor,
   finalizadaEm,
   statusRequisicao,
+  docsConferidosEm,
+  analiseDuplicidadeEm,
+  nivelComplexidade,
 }: AcompanhamentoProps) {
-  const acomp = acompanhamentoRequisicao({ situacaoProcesso, pagamentoStatus, finalizadaEm, statusRequisicao });
+  const acomp = acompanhamentoRequisicao({
+    situacaoProcesso,
+    pagamentoStatus,
+    finalizadaEm,
+    statusRequisicao,
+    docsConferidosEm,
+    expediente,
+    analiseDuplicidadeEm,
+  });
   const ultima = ETAPAS_ACOMPANHAMENTO.length - 1;
   const mostrarRodape = Boolean(pagamentoStatus) || Boolean(finalizadaEm);
 
@@ -101,6 +117,19 @@ export function AcompanhamentoRequisicao({
           </h3>
           <p className="text-xs text-gray-500">Etapa atual da sua solicitação no IGC.</p>
         </div>
+        <div className="flex flex-wrap gap-3">
+        {nivelComplexidade != null && (
+          <div className="min-w-24 rounded-md border border-gray-200 bg-gray-50 px-4 py-2 text-center">
+            <p className="text-[11px] uppercase tracking-wide text-gray-500">Nível</p>
+            <p
+              className="text-2xl font-bold leading-tight text-gray-900"
+              aria-label={`Nível ${nivelComplexidade} de 9`}
+            >
+              {nivelComplexidade}
+            </p>
+            <p className="text-[11px] text-gray-500">1 fácil · 9 complexo</p>
+          </div>
+        )}
         {expediente ? (
           <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-2">
             <p className="text-[11px] uppercase tracking-wide text-gray-500">Número SEI</p>
@@ -115,6 +144,7 @@ export function AcompanhamentoRequisicao({
             </p>
           </div>
         )}
+        </div>
       </div>
 
       {acomp.tipo === "SOBRESTADO" && (
@@ -205,6 +235,43 @@ export function AcompanhamentoRequisicao({
               );
             })}
           </ol>
+
+          {acomp.subetapas && (
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5">
+              <span className="text-xs font-semibold text-gray-900">
+                {acomp.atual === 1 ? "Setor de Atendimentos" : "Setor Técnico"}:
+              </span>
+              <ol aria-label="Subetapas" className="flex flex-wrap items-center gap-2">
+                {acomp.subetapas.map((sub) => (
+                  <li
+                    key={sub.rotulo}
+                    aria-current={sub.estado === "ATUAL" ? "step" : undefined}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${
+                      sub.estado === "FEITA"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                        : sub.estado === "ATUAL"
+                          ? "border-emerald-600 bg-white font-bold text-gray-900 ring-2 ring-emerald-100"
+                          : "border-gray-200 bg-white text-gray-600"
+                    }`}
+                  >
+                    {sub.estado === "FEITA" && <Check className="h-3 w-3" aria-hidden="true" />}
+                    {sub.estado === "ATUAL" && <Circle className="h-2.5 w-2.5 fill-emerald-600 text-emerald-600" aria-hidden="true" />}
+                    {sub.rotulo}
+                    <span className="sr-only"> ({TEXTO_ESTADO[sub.estado]})</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {acomp.aviso && (
+            <p
+              role="status"
+              className="mt-5 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm text-gray-800"
+            >
+              <strong className="font-semibold">{acomp.aviso.titulo}</strong> {acomp.aviso.texto}
+            </p>
+          )}
         </>
       )}
 

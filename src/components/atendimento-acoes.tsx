@@ -467,6 +467,60 @@ export function DesarquivarRequisicao({
   );
 }
 
+/**
+ * Checagem de documentos (primeira subetapa do Setor de Atendimentos, #PEND-27). Um clique
+ * marca como conferidos; o solicitante é avisado no chat e o acompanhamento avança.
+ */
+export function ConferirDocumentos({ requisicaoId }: { requisicaoId: string }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function conferir() {
+    if (loading) return;
+    setLoading(true);
+    setErro(null);
+    try {
+      const res = await fetch(`/api/requisicoes/${requisicaoId}/documentos-conferidos`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErro(data.error || "Não foi possível registrar a conferência.");
+        if (res.status === 409) router.refresh();
+        return;
+      }
+      router.refresh();
+    } catch {
+      setErro("Erro de conexão. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <h3 className="font-semibold text-gray-900">Checagem de documentos</h3>
+      <p className="mt-1 text-xs text-gray-600">
+        Confira os documentos anexados e marque quando estiverem em ordem. O solicitante é avisado
+        no chat e o acompanhamento avança para &quot;Liberação do número SEI&quot;.
+      </p>
+      {erro && (
+        <p role="alert" className="mt-2 text-xs text-red-600">
+          {erro}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={conferir}
+        disabled={loading}
+        className="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm text-white hover:bg-emerald-800 disabled:opacity-50"
+      >
+        {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+        Marcar documentos como conferidos
+      </button>
+    </div>
+  );
+}
+
 /** Abertura de Processo a partir de uma requisição (Atendimento). */
 export function AberturaProcesso({ requisicaoId }: { requisicaoId: string }) {
   const router = useRouter();

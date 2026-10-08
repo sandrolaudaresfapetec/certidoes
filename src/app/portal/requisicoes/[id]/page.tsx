@@ -28,7 +28,14 @@ export default async function AcompanharRequisicaoPage({
       solicitante: true,
       documentos: { select: { id: true, tipo: true, nomeArquivo: true } },
       process: {
-        select: { id: true, ordem: true, situacao: true, tipoServico: true, expediente: true },
+        select: {
+          id: true,
+          ordem: true,
+          situacao: true,
+          tipoServico: true,
+          expediente: true,
+          nivelComplexidade: true,
+        },
       },
     },
   });

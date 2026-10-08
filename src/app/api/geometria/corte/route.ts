@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
     id: l.id,
     codigo: l.codigo,
     tipo: l.tipo,
+    finalizada: l.finalizada,
     municipios: JSON.parse(l.municipios),
     feature: { type: "Feature", properties: { codigo: l.codigo }, geometry: JSON.parse(l.geometria) },
   }));
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
   const corte = await prisma.corteDivisa.create({
     data: {
       classificacao: resultado.classificacao,
+      nivelSugerido: resultado.nivelSugerido,
       geometriaImovel: JSON.stringify(imovel.geometry ?? imovel),
       resultadoJson: JSON.stringify(resultado.fragmentos),
       processId,

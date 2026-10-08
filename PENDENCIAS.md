@@ -47,12 +47,12 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-24 | Sem testes automatizados nas bibliotecas de regra | backend | adição | média | aberta |
 | #PEND-25 | Chat da solicitação (não existe modelo, rota nem tela) | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-26 | Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA` | backend | adição | alta | resolvida (2026-10-07) |
-| #PEND-27 | Modelo de status da requisição para o solicitante (5 gerais + 6 etapas) | backend | adição | alta | aberta |
+| #PEND-27 | Modelo de status da requisição para o solicitante (5 gerais + 6 etapas) | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-28 | Download da certidão emitida pelo solicitante | backend | adição | média | aberta |
 | #PEND-29 | Pedido de arquivamento pelo solicitante (regra de custo/tempo) | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-30 | Análise agendada de duplicidade e sobreposição (4 situações) | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-31 | Solicitação com 13+ polígonos: congelar e liberar pela DDD | backend | adição | alta | resolvida (2026-10-07) |
-| #PEND-32 | Nível de complexidade 1–9 (hoje são 4 classes) | backend | adição | média | aberta |
+| #PEND-32 | Nível de complexidade 1–9 (hoje são 4 classes) | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-33 | SIGEF no portal: CPF/CNPJ do representado, parcelas e geometria | backend | adição | média | aberta |
 | #PEND-34 | Persistir vínculo polígono nomeado ↔ parcela SIGEF | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-35 | Matrícula "Usucapião" na validação e na persistência | backend | adição | média | resolvida (2026-10-07) |
@@ -75,6 +75,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-52 | Agendador da duplicidade em produção: `CRON_TOKEN`, `AGENDADOR_DUPLICIDADE` e instância sempre ligada | infra | documentação | média | aberta |
 | #PEND-53 | Decisão: confirmar com o cliente as regras de duplicidade que o documento não detalha | negócio | decisão | média | aberta |
 | #PEND-54 | Decisão: aceitar o arquivamento não cancela o processo aberto | negócio | decisão | média | aberta |
+| #PEND-55 | Decisão: quem marca a divisa como finalizada e confirmar as hipóteses do nível de complexidade | negócio | decisão | média | aberta |
 
 ## Detalhes
 
@@ -294,7 +295,7 @@ O documento pede que o cliente "não possa editar enquanto não tiver sido devol
 O documento (Minhas Requisições) define **Status Geral** — não enviadas · em análise · devolvidas · arquivadas · concluídas — e **Status da requisição** — conformidade mínima → Setor de Atendimentos (checagem de documentos, liberação do SEI) → Setor Técnico (triagem, elaboração da divisa, conferência, expedição) → documento em assinatura → aguardando pagamento → liberado para download. O dado atual cobre `PENDENTE/EM_ANALISE/APROVADA/DEVOLVIDA/CONCLUIDA` e as 9 etapas do workflow. Faltam rascunho ("não enviada"), arquivada, as sub-etapas de Atendimento e Técnico e a posição do pagamento (`pagamentoStatus` é solto). Definir o mapeamento com o negócio e expor ao portal.
 **Impacto no frontend:** o stepper e os filtros só chegam ao grau de detalhe que o dado permitir; hoje dá para derivar o grau grosso.
 **Bloqueia:** #PEND-29, #PEND-42.
-
+**Resolução:** Fase 9 do plano de atendimento CJT, branch `feat/portal-correcoes-cjt` (2026-10-07). O acompanhamento do portal passou a mostrar as subetapas: Setor de Atendimentos ("Checagem de documentos", pela nova ação "Documentos conferidos" do Atendimento, `Solicitacao.docsConferidosEm`, e "Liberação do número SEI", quando `Process.expediente` é preenchido) e Setor Técnico ("Triagem", "Elaboração da divisa", "Conferência da divisa" e "Expedição", esta a assinatura do técnico). Antes do processo a etapa "Conformidade mínima" explica a espera conforme a situação da requisição (devolvida, congelada, aguardando resposta, em análise de duplicidade etc.). Regra pura em `acompanhamentoRequisicao` (`src/lib/requisicao-status.ts`, testada), rota `POST /api/requisicoes/[id]/documentos-conferidos` (ADMIN e SDTC, uma vez, avisa no chat). Hipótese: o "Documento em expedição – CJT" do documento corresponde à assinatura do técnico; ver #PEND-55. As colunas de pagamento e as pendências #PEND-29 e #PEND-42 já foram atendidas nas fases anteriores.
 ### #PEND-28 · Download da certidão emitida pelo solicitante
 
 **Responsável:** backend · **Tipo:** adição · **Registrada em:** 2026-10-06
@@ -343,7 +344,7 @@ Documento (Nova Requisição §4): o máximo visto foi 12 polígonos. Com 13 ou 
 
 Documento (Minhas Requisições, triagem): Nível 1–2 longe da divisa; 3–4 na divisa com divisa finalizada; 5–6 divisa simples não finalizada; 7–8 tríplice não finalizada; 9 reta, foz, quádrupla, quíntupla ou zona de conflito (ímpar = um polígono, par = vários). O código tem 4 classes e não considera o número de polígonos nem se a divisa está "finalizada" (`LinhaDivisa` não tem esse campo). Precisa do novo critério, de um campo no processo e da exposição ao portal ("caixa com apenas o nível").
 **Impacto no frontend:** caixa do nível em Acompanhar.
-
+**Resolução:** Fase 9 do plano de atendimento CJT, branch `feat/portal-correcoes-cjt` (2026-10-07). `src/lib/complexidade.ts` (`sugerirNivel`, testada) calcula o nível 1 a 9 a partir das linhas de divisa que o corte cruza e do número de polígonos (longe 1 e 2; divisa finalizada 3 e 4; simples não finalizada 5 e 6; tríplice não finalizada 7 e 8; reta, foz, quádrupla, quíntupla, conflito e rio 9). O corte devolve e grava `CorteDivisa.nivelSugerido`; o técnico responsável (ou ADMIN) confirma ou muda em `/processos/[id]` por `PUT /api/processes/[id]/complexidade` (`Process.nivelComplexidade`); o solicitante vê só o número (caixa ao lado do "Número SEI") depois da confirmação. Colunas novas: `LinhaDivisa.finalizada` (padrão não finalizada; `PATCH /api/geometria/linhas/[id]`, ADMIN) e tipos novos de linha (QUINTUPLA, RETA, FOZ, CONFLITO). `Process.divisaDificuldade` (texto livre, ninguém grava) fica obsoleto. Quem preenche `finalizada` por linha e as hipóteses do cálculo: #PEND-55.
 ### #PEND-33 · SIGEF no portal: CPF/CNPJ do representado, parcelas e geometria
 
 **Responsável:** backend · **Tipo:** adição · **Registrada em:** 2026-10-06
@@ -538,4 +539,13 @@ O documento descreve quatro situações; o time completou o resto com hipóteses
 
 Quando a DDD aceita o pedido de arquivamento de uma requisição que já tem processo (`EM_ANALISE`), a requisição vira `ARQUIVADA` mas o processo continua na etapa em que estava; o painel avisa o número do processo e o cancelamento segue sendo feito em Processos, pela etapa "Cancelado" (SDTC, Gerente ou Administrador). O time escolheu esse caminho por prudência (cancelar mexe no fluxo e pode ter custo). Falta decidir se o arquivamento deve cancelar o processo sozinho, em que etapas isso é permitido e se a cobrança já feita muda algo. Se for decidido, a mudança é do backend: mover o processo para `cancelado` (com `dtCancelado` e o registro em `WorkflowAction`) na mesma transação do aceite.
 **Impacto no frontend:** o aviso do painel "Decidir arquivamento" deixaria de existir.
+**Depende de:** resposta do cliente.
+
+### #PEND-55 · Decisão: quem marca a divisa como finalizada e confirmar as hipóteses do nível de complexidade
+
+**Responsável:** negócio · **Tipo:** decisão · **Registrada em:** 2026-10-07
+**Onde:** `LinhaDivisa.finalizada`, `src/lib/complexidade.ts`, `src/lib/requisicao-status.ts`
+
+O nível de complexidade (#PEND-32) depende de a linha de divisa estar "finalizada", dado que não existia e hoje ninguém preenche: toda linha nasce **não finalizada**, o que dá o nível mais alto (cautela). Só há uma API para o Administrador marcar (`PATCH /api/geometria/linhas/[id]`) e nenhuma tela. Falta decidir quem marca, onde (tela, importação das divisas validadas) e com que critério. Hipóteses do time, aprovadas em 2026-10-07 e pendentes de confirmação do cliente: (a) imóvel no corredor de 1 km sem cortar a divisa conta como "longe" (nível 1 ou 2); (b) rio continua no nível 9, por cautela; (c) tríplice finalizada cai em 3 ou 4 ("na divisa com divisa finalizada"); (d) cortando mais de uma linha vale a mais difícil, e três municípios entre as linhas cortadas valem como tríplice; (e) o número par vale quando o imóvel tem mais de um polígono, e o 9 não tem par; (f) o "Documento em expedição – CJT" do documento corresponde à assinatura do técnico (subetapa "Expedição"), e as assinaturas do gerente e do diretor ficam em "Documento em assinatura".
+**Impacto no frontend:** uma tela para marcar a divisa como finalizada, quando houver decisão.
 **Depende de:** resposta do cliente.

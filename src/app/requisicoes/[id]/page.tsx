@@ -7,6 +7,7 @@ import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
 import { geometriaDoAcervo } from "@/components/requisicao/geometria";
 import {
   AberturaProcesso,
+  ConferirDocumentos,
   DecidirArquivamento,
   DesarquivarRequisicao,
   DevolverRequisicao,
@@ -45,7 +46,14 @@ export default async function VisualizarRequisicaoPage({
       solicitante: true,
       documentos: { select: { id: true, tipo: true, nomeArquivo: true } },
       process: {
-        select: { id: true, ordem: true, situacao: true, tipoServico: true, expediente: true },
+        select: {
+          id: true,
+          ordem: true,
+          situacao: true,
+          tipoServico: true,
+          expediente: true,
+          nivelComplexidade: true,
+        },
       },
     },
   });
@@ -211,6 +219,9 @@ export default async function VisualizarRequisicaoPage({
           {podeDevolver(requisicao) && <DevolverRequisicao requisicaoId={requisicao.id} />}
           {bloqueioAcaoAtendimento(requisicao.status) === null && (
             <>
+              {requisicao.analiseDuplicidadeEm && !requisicao.docsConferidosEm && (
+                <ConferirDocumentos requisicaoId={requisicao.id} />
+              )}
               {!requisicao.process && <AberturaProcesso requisicaoId={requisicao.id} />}
               <FinalizacaoPagamento
                 requisicaoId={requisicao.id}

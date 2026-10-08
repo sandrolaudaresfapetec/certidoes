@@ -21,7 +21,14 @@ export type RequisicaoDetalhada = Prisma.SolicitacaoGetPayload<{
     solicitante: true;
     documentos: { select: { id: true; tipo: true; nomeArquivo: true } };
     process: {
-      select: { id: true; ordem: true; situacao: true; tipoServico: true; expediente: true };
+      select: {
+        id: true;
+        ordem: true;
+        situacao: true;
+        tipoServico: true;
+        expediente: true;
+        nivelComplexidade: true;
+      };
     };
   };
 }>;
@@ -215,6 +222,9 @@ export function RequisicaoDetalhe({
           pagamentoValor={requisicao.pagamentoValor}
           finalizadaEm={requisicao.finalizadaEm}
           statusRequisicao={requisicao.status}
+          docsConferidosEm={requisicao.docsConferidosEm}
+          analiseDuplicidadeEm={requisicao.analiseDuplicidadeEm}
+          nivelComplexidade={requisicao.process?.nivelComplexidade ?? null}
         />
       )}
 
