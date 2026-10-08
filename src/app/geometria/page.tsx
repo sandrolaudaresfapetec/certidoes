@@ -438,6 +438,7 @@ export default function GeometriaPage() {
       const bounds = layer.getBounds();
       if (bounds.isValid()) map.fitBounds(bounds.pad(0.2));
     } catch (e) {
+      if (pedido !== pedidoLimitesRef.current) return;
       setErro((e as Error).message || "Falha ao abrir o arquivo de limites de municipios");
     } finally {
       setCarregandoLimites(false);
