@@ -218,6 +218,7 @@ export default function GeometriaPage() {
   const [carregandoLimites, setCarregandoLimites] = useState(false);
   const limitesArquivoLayerRef = useRef<any>(null);
   const limitesArquivoRef = useRef<HTMLInputElement>(null);
+  const pedidoLimitesRef = useRef(0);
   const [modoRascunho, setModoRascunho] = useState(false);
   const [rascunhoTotal, setRascunhoTotal] = useState(0);
   const desenhandoRef = useRef(false);
@@ -410,12 +411,13 @@ export default function GeometriaPage() {
     const L = (window as any).L;
     const map = mapRef.current;
     if (!map) return;
+    const pedido = ++pedidoLimitesRef.current;
     setCarregandoLimites(true);
     setErro(null);
     try {
       const nome = arquivo.name;
       const fc = await lerArquivoGeografico(arquivo);
-      removerLimitesMunicipais();
+      if (pedido !== pedidoLimitesRef.current) return;
       const layer = L.geoJSON(fc, {
         style: { color: "#7c3aed", weight: 2, dashArray: "6 4", fillOpacity: 0 },
         pointToLayer: (_f: any, latlng: any) => L.circleMarker(latlng, { radius: 4, color: "#7c3aed" }),
@@ -427,7 +429,9 @@ export default function GeometriaPage() {
             .map(([k, v]) => `<b>${esc(k)}</b>: ${esc(v)}`);
           l.bindPopup(`<div style="font-size:12px"><b>Limites de municipios (pré-análise) — ${esc(nome)}</b><br/>${linhas.join("<br/>")}</div>`);
         },
-      }).addTo(map);
+      });
+      removerLimitesMunicipais();
+      layer.addTo(map);
       limitesArquivoLayerRef.current = layer;
       const poligonos = fc.features.filter((f: any) => /Polygon$/.test(f.geometry?.type ?? "")).length;
       setCamadaLimites({ nome, total: fc.features.length, poligonos });
@@ -442,6 +446,7 @@ export default function GeometriaPage() {
   }
 
   function removerLimitesMunicipais() {
+    pedidoLimitesRef.current++;
     if (limitesArquivoLayerRef.current) mapRef.current?.removeLayer(limitesArquivoLayerRef.current);
     limitesArquivoLayerRef.current = null;
     setCamadaLimites(null);
@@ -1016,7 +1021,7 @@ export default function GeometriaPage() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scissors className="h-4 w-4" />}
             Calcular pré-análise
           </button>
-          {erro && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">{erro}</p>}
+          {erro && <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">{erro}</p>}
 
           {resultado && (
             <div className="border-t border-gray-100 pt-3">
