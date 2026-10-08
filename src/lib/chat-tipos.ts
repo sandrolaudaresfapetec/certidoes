@@ -7,6 +7,9 @@ import { STATUS_SOLICITACAO } from "@/lib/solicitacao-estados";
 
 export const LIMITE_TEXTO_CHAT = 2000;
 
+/** Resposta gravada numa pergunta que perdeu o sentido (a outra requisição foi arquivada). */
+export const RESPOSTA_ENCERRADA = "encerrada";
+
 export type AutorChat = "SOLICITANTE" | "ATENDIMENTO" | "SISTEMA";
 export type TipoMensagemChat = "TEXTO" | "PERGUNTA" | "EVENTO";
 /** Quem está olhando o chat: define o que conta como "nova" e quem pode responder. */

@@ -21,6 +21,8 @@ const PUBLICO = [
   "/api/sigef/consulta",
   // bootstrap da instalacao; a propria rota exige ADMIN depois do primeiro uso
   "/api/seed",
+  // gancho do agendador externo; a propria rota exige o token (CRON_TOKEN)
+  "/api/cron",
 ];
 
 export function proxy(request: NextRequest) {

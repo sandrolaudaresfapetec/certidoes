@@ -9,15 +9,20 @@ import { STATUS_FORA_DA_FILA } from "@/lib/solicitacao-estados";
 import type { Prisma } from "@prisma/client";
 import { naoLidasPorSolicitacao } from "@/lib/chat";
 import { SeloMensagensNovas } from "@/components/requisicao/selo-mensagens-novas";
+import { SeloSobreposicao } from "@/components/requisicao/avisos-duplicidade";
+import { PainelDuplicidade } from "@/components/painel-duplicidade";
+import { descreverResumo } from "@/lib/duplicidade-resumo";
+import { contarAguardandoAnalise, idsComSobreposicao } from "@/lib/duplicidade-servidor";
+import { proximoHorario, ultimaExecucao } from "@/lib/agendador";
 
 export const dynamic = "force-dynamic";
 
 export default async function RequisicoesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; semProcesso?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; semProcesso?: string; analise?: string }>;
 }) {
-  const { q = "", status = "", semProcesso = "" } = await searchParams;
+  const { q = "", status = "", semProcesso = "", analise = "" } = await searchParams;
   const usuario = await requireUsuario();
   const atendimento = podeAtender(usuario);
 
@@ -26,10 +31,15 @@ export default async function RequisicoesPage({
     NOT: { status: "RASCUNHO", congeladaEm: null },
   };
   if (status) where.status = status;
-  if (semProcesso === "1") {
+  if (analise === "1") {
+    // Enviadas que ainda esperam a análise de duplicidade (12:00 e 00:00).
+    where.status = "PENDENTE";
+    where.analiseDuplicidadeEm = null;
+  } else if (semProcesso === "1") {
     where.processId = null;
-    // Só o que está na fila: sem rascunho, congelada, devolvida, arquivada etc.
+    // Só o que está na fila: sem rascunho, congelada, devolvida, arquivada etc., e já analisada.
     if (!status) where.status = { notIn: [...STATUS_FORA_DA_FILA] };
+    where.analiseDuplicidadeEm = { not: null };
   }
   if (q) {
     where.OR = [
@@ -50,6 +60,15 @@ export default async function RequisicoesPage({
       process: { select: { id: true, ordem: true } },
     },
   });
+  const comSobreposicao = await idsComSobreposicao();
+  const aguardandoAnalise = atendimento ? await contarAguardandoAnalise() : 0;
+  const ultima = usuario.role === "ADMIN" ? await ultimaExecucao() : null;
+  const formatoQuando = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+  const proximo = proximoHorario(new Date());
   // Selo de mensagens novas só para quem pode abrir o chat (ADMIN e SDTC).
   const novas = atendimento
     ? await naoLidasPorSolicitacao(requisicoes, "ATENDIMENTO")
@@ -75,6 +94,21 @@ export default async function RequisicoesPage({
         )}
       </div>
 
+      {usuario.role === "ADMIN" && (
+        <PainelDuplicidade
+          ultima={
+            ultima?.concluidaEm
+              ? {
+                  quando: formatoQuando.format(ultima.concluidaEm),
+                  resumo: ultima.resumo ? descreverResumo(ultima.resumo) : "sem detalhes",
+                }
+              : null
+          }
+          proxima={`${proximo.quando} às ${proximo.hora}`}
+          aguardandoInicial={aguardandoAnalise}
+        />
+      )}
+
       <RequisicaoFiltros
         action="/requisicoes"
         q={q}
@@ -87,7 +121,7 @@ export default async function RequisicoesPage({
         <Link
           href="/requisicoes"
           className={`px-3 py-1 rounded-full border ${
-            semProcesso === "1"
+            semProcesso === "1" || analise === "1"
               ? "border-gray-200 text-gray-600"
               : "border-gray-900 text-gray-900"
           }`}
@@ -104,6 +138,16 @@ export default async function RequisicoesPage({
         >
           Aguardando abertura de processo
         </Link>
+        {atendimento && (
+          <Link
+            href="/requisicoes?analise=1"
+            className={`px-3 py-1 rounded-full border ${
+              analise === "1" ? "border-gray-900 text-gray-900" : "border-gray-200 text-gray-600"
+            }`}
+          >
+            Em análise de duplicidade ({aguardandoAnalise})
+          </Link>
+        )}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg">
@@ -138,6 +182,7 @@ export default async function RequisicoesPage({
                       </div>
                     </div>
                     <span className="flex shrink-0 items-center gap-2">
+                      {comSobreposicao.has(r.id) && <SeloSobreposicao />}
                       {novas.has(r.id) && <SeloMensagensNovas quantidade={novas.get(r.id)!} />}
                       <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}>
                         {st.label}

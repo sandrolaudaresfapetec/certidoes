@@ -120,6 +120,10 @@ export async function PATCH(
       observacao: (body.observacao ?? "").toString() || null,
       // Requisição devolvida volta à fila de atendimento depois da correção.
       status: "PENDENTE",
+      // Os dados mudaram: a análise de duplicidade recomeça (#PEND-30).
+      analiseDuplicidadeEm: null,
+      sobreposicao: false,
+      sobreposicaoCom: null,
       ...cjt,
       cjtPoligonos: vinculo.cjtPoligonos,
     },

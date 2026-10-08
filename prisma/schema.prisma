@@ -97,6 +97,15 @@ model Solicitacao {
   congeladaEm       DateTime?
   liberadaEm        DateTime?
 
+  // Analise de duplicidade (#PEND-30): so entra na fila da DDD depois de analisada.
+  analiseDuplicidadeEm DateTime?
+  sobreposicao      Boolean  @default(false) // aponta (ou e apontada) para outra requisicao com geometria repetida/sobreposta
+  sobreposicaoCom   String?  // JSON [{id, protocolo, situacao, motivo}]
+
+  // Arquivamento (#PEND-29/#PEND-30): hoje so a resposta "nao" da duplicidade arquiva
+  arquivadaEm       DateTime?
+  arquivamentoMotivo String?
+
   solicitanteId     String
   solicitante       Solicitante @relation(fields: [solicitanteId], references: [id])
 
@@ -372,4 +381,17 @@ model SigefParcela {
   @@index([uf, minLon, maxLon])
   @@index([uf, minLat, maxLat])
   @@index([municipioIbge])
+}
+
+/// Registro de cada execucao agendada (analise de duplicidade). A `chave` e unica por horario
+/// (ex.: duplicidade:2026-10-07T12): so quem conseguir grava-la executa o horario.
+model ExecucaoAgendada {
+  id          String    @id @default(cuid())
+  chave       String    @unique
+  tipo        String
+  iniciadaEm  DateTime  @default(now())
+  concluidaEm DateTime?
+  resumo      String?   // JSON com a contagem do que foi analisado
+
+  @@index([tipo, iniciadaEm])
 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirSolicitanteApi } from "@/lib/portal-auth";
 import { chatAceitaMensagens, chatVisivel, responderPergunta } from "@/lib/chat";
+import { lerChaveDuplicidade } from "@/lib/duplicidade";
+import { responderDuplicidade } from "@/lib/duplicidade-respostas";
 
 /**
  * POST /api/portal/solicitacoes/[id]/mensagens/[mid]/responder  { opcao }
@@ -31,11 +33,20 @@ export async function POST(
   }
 
   const body = await request.json().catch(() => ({}));
-  const resultado = await responderPergunta({
+  const dados = {
     solicitacaoId: id,
     mensagemId: mid,
     opcaoId: typeof body.opcao === "string" ? body.opcao : "",
+  };
+  // Perguntas de duplicidade (#PEND-30) têm efeito sobre a requisição: resposta e efeito
+  // acontecem na mesma transação.
+  const pergunta = await prisma.mensagemSolicitacao.findFirst({
+    where: { id: mid, solicitacaoId: id },
+    select: { chave: true },
   });
+  const resultado = lerChaveDuplicidade(pergunta?.chave)
+    ? await responderDuplicidade(dados)
+    : await responderPergunta(dados);
   if (!resultado.ok) {
     return NextResponse.json({ error: resultado.erro }, { status: resultado.status });
   }

@@ -21,6 +21,8 @@ import {
 import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
 import { ChatSolicitacao } from "@/components/requisicao/chat";
 import { carregarPoligonosDetalhe } from "@/lib/poligonos-detalhe";
+import { sobreposicoesDe } from "@/lib/duplicidade-servidor";
+import { AvisoAnaliseDuplicidade, AvisoSobreposicao } from "@/components/requisicao/avisos-duplicidade";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +58,9 @@ export default async function VisualizarRequisicaoPage({
 
   const atendimento = podeAtender(usuario);
 
+  // Repetições e sobreposições achadas pela análise de duplicidade (#PEND-30).
+  const sobreposicoes = await sobreposicoesDe(requisicao);
+
   // Polígonos nomeados ligados às parcelas do SIGEF (gleba com 2 ou mais).
   const poligonosVinculados = await carregarPoligonosDetalhe(requisicao);
 
@@ -74,6 +79,15 @@ export default async function VisualizarRequisicaoPage({
         Requisições
       </Link>
       <h1 className="text-2xl font-bold text-gray-900">Visualizar Requisição</h1>
+
+      <AvisoSobreposicao sobreposicoes={sobreposicoes} />
+      {atendimento && (
+        <AvisoAnaliseDuplicidade
+          status={requisicao.status}
+          processId={requisicao.processId}
+          analiseDuplicidadeEm={requisicao.analiseDuplicidadeEm}
+        />
+      )}
 
       <RequisicaoDetalhe
         requisicao={requisicao}

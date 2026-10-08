@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Info, Loader2, Lock } from "lucide-react";
-import { LIMITE_TEXTO_CHAT, type LadoChat, type MensagemChat } from "@/lib/chat-tipos";
+import { useRouter } from "next/navigation";
+import { Info, Loader2, Lock, MessageCircleQuestion } from "lucide-react";
+import { LIMITE_TEXTO_CHAT, RESPOSTA_ENCERRADA, type LadoChat, type MensagemChat } from "@/lib/chat-tipos";
 
 const INTERVALO_ATUALIZACAO_MS = 20_000;
 
@@ -49,7 +50,10 @@ export function ChatSolicitacao({
   const [respondendo, setRespondendo] = useState<string | null>(null);
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
   const listaRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const tema = TEMA[lado];
+  const perguntaAberta =
+    lado === "SOLICITANTE" && mensagens.some((m) => m.tipo === "PERGUNTA" && !m.respondidaEm);
 
   const carregar = useCallback(async () => {
     try {
@@ -130,6 +134,9 @@ export function ChatSolicitacao({
         return;
       }
       setMensagens((atual) => atual.map((m) => (m.id === data.mensagem.id ? data.mensagem : m)));
+      // A resposta pode mudar a situação da requisição (seguir para a fila, arquivar).
+      await carregar();
+      router.refresh();
     } catch {
       setErro("Erro de conexão. Tente novamente.");
     } finally {
@@ -171,6 +178,17 @@ export function ChatSolicitacao({
           )}
         </span>
       </header>
+
+      {perguntaAberta && (
+        <p
+          role="status"
+          className="mx-5 mt-4 flex items-start gap-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900"
+        >
+          <MessageCircleQuestion className="mt-px h-4 w-4 shrink-0" aria-hidden="true" />
+          Há uma pergunta esperando a sua resposta abaixo. Ela precisa ser respondida para a análise da
+          requisição continuar.
+        </p>
+      )}
 
       <div
         ref={listaRef}
@@ -279,7 +297,9 @@ function Mensagem({
         </p>
         {m.tipo === "PERGUNTA" && m.opcoes && (
           <>
-            {m.respondidaEm ? (
+            {m.respondidaEm && m.respostaOpcao === RESPOSTA_ENCERRADA ? (
+              <p className="text-xs font-semibold text-gray-600">Pergunta encerrada.</p>
+            ) : m.respondidaEm ? (
               <p className="text-xs font-semibold text-emerald-800">
                 {lado === "SOLICITANTE" ? "Você respondeu" : "O solicitante respondeu"}:{" "}
                 {escolhida?.rotulo ?? "—"}

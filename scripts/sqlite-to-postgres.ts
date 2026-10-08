@@ -21,17 +21,18 @@ const DATE_COLS: Record<string, string[]> = {
   WorkflowAction: ["createdAt"],
   SigefConsulta: ["createdAt"],
   Solicitante: ["createdAt","updatedAt"],
-  Solicitacao: ["pagamentoEm","finalizadaEm","chatLidoSolicitanteEm","chatLidoAtendimentoEm","devolvidaEm","congeladaEm","liberadaEm","createdAt","updatedAt"],
+  Solicitacao: ["pagamentoEm","finalizadaEm","chatLidoSolicitanteEm","chatLidoAtendimentoEm","devolvidaEm","congeladaEm","liberadaEm","analiseDuplicidadeEm","arquivadaEm","createdAt","updatedAt"],
   MensagemSolicitacao: ["respondidaEm","createdAt"],
+  ExecucaoAgendada: ["iniciadaEm","concluidaEm"],
   Documento: ["createdAt"],
   LinhaDivisa: ["dataValidacao","createdAt"],
   CorteDivisa: ["dataCorte"],
 };
 const BOOL_COLS: Record<string, string[]> = {
   User: ["active"], Notification: ["read"], SigefConsulta: ["sucesso"],
-  Solicitante: ["cadastroCompleto"], Solicitacao: ["tipoViaSigef","cjtDeclaracaoAceita"],
+  Solicitante: ["cadastroCompleto"], Solicitacao: ["tipoViaSigef","cjtDeclaracaoAceita","sobreposicao"],
 };
-const TABLES = ["User","Process","Notification","WorkflowAction","SigefConsulta","Solicitante","Solicitacao","Documento","MensagemSolicitacao","LinhaDivisa","CorteDivisa"];
+const TABLES = ["User","Process","Notification","WorkflowAction","SigefConsulta","Solicitante","Solicitacao","Documento","MensagemSolicitacao","ExecucaoAgendada","LinhaDivisa","CorteDivisa"];
 
 function toDate(v: unknown): Date | null {
   if (v === null || v === undefined) return null;

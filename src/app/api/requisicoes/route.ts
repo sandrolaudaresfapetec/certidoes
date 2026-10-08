@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirAtendimentoApi } from "@/lib/auth";
 import { criarComProtocolo } from "@/lib/protocolo";
+import { analisarSolicitacao } from "@/lib/duplicidade-servidor";
 import { resolverPoligonos } from "@/lib/poligonos-parcelas-servidor";
 import {
   formularioDoPayload,
@@ -90,5 +91,14 @@ export async function POST(request: NextRequest) {
     })
   );
 
-  return NextResponse.json(solicitacao, { status: 201 });
+  // Aberta pelo balcão: analisada na hora (as do portal esperam 12:00 ou 00:00). Se a análise
+  // falhar a requisição fica salva e a próxima execução do agendador a pega.
+  try {
+    await analisarSolicitacao(solicitacao.id);
+  } catch (e) {
+    console.error("[duplicidade] falha ao analisar a requisição do balcão:", e);
+  }
+  const atual = await prisma.solicitacao.findUnique({ where: { id: solicitacao.id } });
+
+  return NextResponse.json(atual ?? solicitacao, { status: 201 });
 }

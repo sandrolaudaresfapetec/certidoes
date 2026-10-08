@@ -50,7 +50,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-27 | Modelo de status da requisição para o solicitante (5 gerais + 6 etapas) | backend | adição | alta | aberta |
 | #PEND-28 | Download da certidão emitida pelo solicitante | backend | adição | média | aberta |
 | #PEND-29 | Pedido de arquivamento pelo solicitante (regra de custo/tempo) | backend | adição | média | bloqueada (#PEND-27) |
-| #PEND-30 | Análise agendada de duplicidade e sobreposição (4 situações) | backend | adição | alta | aberta |
+| #PEND-30 | Análise agendada de duplicidade e sobreposição (4 situações) | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-31 | Solicitação com 13+ polígonos: congelar e liberar pela DDD | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-32 | Nível de complexidade 1–9 (hoje são 4 classes) | backend | adição | média | aberta |
 | #PEND-33 | SIGEF no portal: CPF/CNPJ do representado, parcelas e geometria | backend | adição | média | aberta |
@@ -72,6 +72,8 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-49 | `Process.total` nunca é calculado (a tela mostra R$ 0,00 mesmo com taxas) | backend | bugfix | média | aberta |
 | #PEND-50 | Decisão: acesso à API b-Cadastro (Portal Integrador): processo SEI de acordo bilateral e credencial | negócio | decisão | média | aberta |
 | #PEND-51 | Integração com o SEI como última etapa do fluxo da certidão | backend | adição | média | aberta |
+| #PEND-52 | Agendador da duplicidade em produção: `CRON_TOKEN`, `AGENDADOR_DUPLICIDADE` e instância sempre ligada | infra | documentação | média | aberta |
+| #PEND-53 | Decisão: confirmar com o cliente as regras de duplicidade que o documento não detalha | negócio | decisão | média | aberta |
 
 ## Detalhes
 
@@ -319,6 +321,7 @@ Documento (Acompanhar): botão para solicitar arquivamento. Se a DDD ainda não 
 
 Documento (Nova Requisição §7): antes de a requisição subir para a DDD, rodar 2–3 vezes ao dia (sugestão 12:00 e 00:00) uma checagem de geometria **e** de dados cadastrais. Situação 1: mesma área e cadastro, já finalizada, mesmo solicitante → mensagem no chat perguntando se quer a nova (não → encerra). Situação 2: mesma geometria, cadastro alterado, finalizada, mesmo solicitante → idem. Situação 3: em andamento, mesmo solicitante → perguntar qual manter e encerrar o outro. Situação 4: sobreposição geométrica, mesmo ou outro solicitante, em andamento ou finalizado → sinalizar internamente à DDD e aos técnicos (possível litígio ou fraude).
 **Depende de:** #PEND-25 (chat com resposta rápida).
+**Resolução:** Fase 7 do plano de atendimento CJT, branch `feat/portal-correcoes-cjt` (2026-10-07). Campos `analiseDuplicidadeEm`, `sobreposicao`, `sobreposicaoCom`, `arquivadaEm`, `arquivamentoMotivo` em `Solicitacao` e tabela `ExecucaoAgendada` nos dois schemas (migration `20261007170000_analise_duplicidade`). Comparação pura em `src/lib/duplicidade.ts` (testada); análise, respostas e agendador em `duplicidade-servidor.ts`, `duplicidade-respostas.ts`, `agendador.ts` e `src/instrumentation.ts` (12:00 e 00:00 de Brasília, dentro do app). Idempotência: horário único em `ExecucaoAgendada`, reserva condicional por requisição na mesma transação das mensagens, chave fixa por pergunta e decisão atômica em S3. Só entra na fila de abertura de processo depois de analisada (a abertura confere de novo na transação). Rotas `POST /api/admin/duplicidade/executar` (ADMIN) e `POST /api/cron/duplicidade` (token `CRON_TOKEN`). Regras que o documento não detalha estão em [`docs/atendimento-cjt-pedidos-restantes.md`](docs/atendimento-cjt-pedidos-restantes.md) e na #PEND-53. Em produção, ver #PEND-52.
 
 ### #PEND-31 · Solicitação com 13+ polígonos: congelar e liberar pela DDD
 
@@ -508,3 +511,19 @@ Pedido do Sandro (07/10/2026), junto com o e-mail da #PEND-50: no fluxo do siste
 **Impacto no frontend:** quando existir, o campo "Expediente (SEI)" da edição do processo e o box "Número SEI" do portal (item 12 do documento do cliente) deixam de ser preenchimento manual e passam a refletir o que a integração gravar; a tela de edição pode mostrá-lo somente leitura.
 **Depende de:** contrato da API do SEI e credencial (possivelmente #PEND-50).
 **Andamento (2026-10-07):** adiada por decisão do time; retomar quando o Sandro responder o que a integração deve fazer, por qual interface e quando dispara.
+
+### #PEND-52 · Agendador da duplicidade em produção: `CRON_TOKEN`, `AGENDADOR_DUPLICIDADE` e instância sempre ligada
+
+**Responsável:** infra · **Tipo:** documentação · **Registrada em:** 2026-10-07
+**Onde:** `.env.example`, `fly*.toml`, secrets do Fly; código em `src/instrumentation.ts`, `src/lib/agendador-processo.ts`, `src/app/api/cron/duplicidade/route.ts`
+
+A análise de duplicidade (#PEND-30) roda dentro do app, às 12:00 e 00:00 de Brasília, e também ao subir se o horário atual ainda não rodou. Para funcionar em produção a infra precisa: (1) manter ao menos uma máquina ligada nesses horários (se o Fly desligar por ociosidade, o horário é recuperado quando a máquina voltar, em até 5 minutos); (2) documentar no `.env.example` as variáveis opcionais `CRON_TOKEN` (habilita `POST /api/cron/duplicidade` com `Authorization: Bearer <token>`, para um agendador externo; sem ela a rota responde 404) e `AGENDADOR_DUPLICIDADE=off` (desliga o agendador do app, para quando só o externo deve rodar); (3) no primeiro deploy, saber que as requisições pendentes já existentes são analisadas na subida, o que pode gerar perguntas no chat de vários solicitantes de uma vez; (4) aplicar a migration `20261007170000_analise_duplicidade` e conferir sua ordem com a `9999_postgis_geometry`. O agendador não foi exercitado contra o Postgres do Fly, só contra o SQLite de desenvolvimento.
+**Depende de:** #PEND-30.
+
+### #PEND-53 · Decisão: confirmar com o cliente as regras de duplicidade que o documento não detalha
+
+**Responsável:** negócio · **Tipo:** decisão · **Registrada em:** 2026-10-07
+**Onde:** `src/lib/duplicidade.ts`
+
+O documento descreve quatro situações; o time completou o resto com hipóteses, aprovadas internamente em 2026-10-07 e pendentes de confirmação do cliente: (a) mesma geometria com solicitantes diferentes é sobreposição (S4), sem mensagem ao cliente; (b) S3 (duas em andamento) só vale quando a outra ainda não tem processo e não foi devolvida; com processo aberto ou devolvida vira S4, porque arquivar uma requisição já em análise é decisão da DDD; (c) com mais de uma repetição o solicitante recebe uma só pergunta (prioridade S3, S1, S2) e as demais entram na lista de sobreposição; (d) "mesma geometria" é o mesmo código de parcela ou 98% de sobreposição mútua, e sobreposição (S4) começa em 1% da menor parcela e 100 m²; (e) "mesmo cadastro" compara qualidade, resultado, situação, propriedade de, matrícula, código INCRA e representado; (f) "finalizada" é a requisição com finalização registrada pelo Atendimento; (g) requisição sem registro no INCRA não tem geometria e segue para a fila sem comparação; (h) requisição aberta pelo balcão é analisada na hora, a do portal espera o horário. Os limiares são constantes em `src/lib/duplicidade.ts`.
+**Depende de:** resposta do cliente.

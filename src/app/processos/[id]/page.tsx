@@ -13,6 +13,8 @@ import { ArrowLeft, Clock, User, FileText, MapPin, FileCheck, Pencil, Scissors }
 import { WorkflowActions } from "@/components/workflow-actions";
 import { podeAtender, podeUsarGeometria, requireUsuario } from "@/lib/auth";
 import { exibirCpfCnpj } from "@/lib/mascaras";
+import { sobreposicoesDe } from "@/lib/duplicidade-servidor";
+import { AvisoSobreposicao } from "@/components/requisicao/avisos-duplicidade";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,7 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
       tecnicoResp: true,
       tecnicoConf: true,
       criadoPor: true,
+      solicitacao: { select: { id: true, sobreposicaoCom: true } },
       workflowActions: {
         include: { user: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
@@ -48,6 +51,8 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
   const etapaAtual = processo.situacao as WorkflowStage;
   const bloqueio = bloqueioDeSaida(etapaAtual, usuario, processo);
   const mostrarCorte = await podeUsarGeometria(usuario);
+  // Sobreposição achada na análise de duplicidade da requisição de origem (#PEND-30).
+  const sobreposicoes = processo.solicitacao ? await sobreposicoesDe(processo.solicitacao) : [];
   const allowedNext = bloqueio
     ? []
     : (ALLOWED_TRANSITIONS[etapaAtual] || []).filter(
@@ -110,6 +115,12 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
           </div>
         </div>
       </div>
+
+      {sobreposicoes.length > 0 && (
+        <div className="mb-6">
+          <AvisoSobreposicao sobreposicoes={sobreposicoes} />
+        </div>
+      )}
 
       {salvo && (
         <div

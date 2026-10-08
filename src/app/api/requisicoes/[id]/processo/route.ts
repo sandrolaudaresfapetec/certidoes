@@ -32,6 +32,12 @@ export async function POST(
 
   const bloqueio = bloqueioAcaoAtendimento(requisicao.status);
   if (bloqueio) return NextResponse.json({ error: bloqueio }, { status: 409 });
+  if (!requisicao.analiseDuplicidadeEm) {
+    return NextResponse.json(
+      { error: "Esta requisição ainda aguarda a análise de duplicidade (12:00 e 00:00)." },
+      { status: 409 }
+    );
+  }
 
   const body = await request.json().catch(() => ({}));
   const expediente = (body.expediente ?? "").toString().trim() || null;
@@ -40,10 +46,15 @@ export async function POST(
   const processo = await prisma.$transaction(async (tx) => {
     const jaAberta = await tx.solicitacao.findUnique({
       where: { id: requisicao.id },
-      select: { processId: true },
+      select: { processId: true, status: true, analiseDuplicidadeEm: true },
     });
     if (jaAberta?.processId) {
       throw new Error("PROCESSO_JA_ABERTO");
+    }
+    // Entre a leitura acima e agora a análise pode ter feito uma pergunta ao solicitante
+    // (ou a requisição ter sido arquivada): nesse caso não abre o processo.
+    if (jaAberta?.status !== requisicao.status || !jaAberta?.analiseDuplicidadeEm) {
+      throw new Error("SITUACAO_MUDOU");
     }
 
     const maxOrdem = await tx.process.findFirst({
@@ -86,8 +97,16 @@ export async function POST(
     return criado;
   }).catch((e: Error) => {
     if (e.message === "PROCESSO_JA_ABERTO") return null;
+    if (e.message === "SITUACAO_MUDOU") return "SITUACAO_MUDOU" as const;
     throw e;
   });
+
+  if (processo === "SITUACAO_MUDOU") {
+    return NextResponse.json(
+      { error: "A situação da requisição mudou agora há pouco. Atualize a página e confira." },
+      { status: 409 }
+    );
+  }
 
   if (!processo) {
     return NextResponse.json(
