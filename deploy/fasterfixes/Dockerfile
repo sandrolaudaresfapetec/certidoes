@@ -45,6 +45,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
 WORKDIR /src
 COPY --from=build /src /src
 COPY entrypoint.sh release.sh /
+# CA do Amazon RDS: DATABASE_URL usa sslmode=verify-full&sslrootcert=/certs/rds-global-bundle.pem
+ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /certs/rds-global-bundle.pem
 RUN chmod +x /entrypoint.sh /release.sh
 EXPOSE 3000
 ENTRYPOINT ["/entrypoint.sh"]

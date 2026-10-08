@@ -45,16 +45,20 @@ FROM base
 
 # Install packages needed for deployment
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y ca-certificates openssl && \
+    apt-get install --no-install-recommends -y ca-certificates openssl unzip && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Copy built application
 COPY --from=build /app /app
+
+# CA do Amazon RDS (banco em sa-east-1). DATABASE_URL usa
+# sslmode=verify-full&sslrootcert=/app/certs/rds-global-bundle.pem
+ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /app/certs/rds-global-bundle.pem
 
 # Entrypoint roda as migrations (postgres) e sobe o servidor.
 ENTRYPOINT [ "/app/docker-entrypoint.js" ]
 
 # Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
-# DATABASE_URL e injetada pelo `fly postgres attach` (postgresql://...)
+# DATABASE_URL (secret do app) aponta para o PostgreSQL no Amazon RDS
 CMD [ "npm", "run", "start" ]

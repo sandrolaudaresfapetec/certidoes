@@ -5,9 +5,9 @@
 # Executa, em ordem, com verificação em cada etapa:
 #   1. Pré-requisitos (flyctl autenticado)
 #   2. Infra: app + cluster Postgres (cria só se não existirem)
-#   3. Secrets do app (DATABASE_URL via attach + portal/SIGEF)
-#   4. Sincronização do schema (inclui a migration pendente do dtVisita2)
-#      via túnel fly proxy — SEM SSH
+#   3. Secrets do app (portal/SIGEF; DATABASE_URL aponta para o Amazon RDS e
+#      e definida uma vez com `fly secrets set DATABASE_URL=...`)
+#   4. (legado, BANCO_FLY=1) sincronização do schema no Postgres do Fly via túnel
 #   5. Deploy (release_command roda migrate deploy numa VM de release estável)
 #   6. Verificação de saúde de todas as rotas
 #
@@ -16,7 +16,7 @@
 #   ./scripts/deploy-fly.sh
 #
 # Variáveis opcionais (valores padrão = ambiente atual):
-#   APP_NAME=certidoes-app  PG_NAME=certidoes-pg  REGION=iad
+#   APP_NAME=certidoes-app  REGION=iad  BANCO_FLY=0 (1 = usar/criar cluster Postgres no Fly)
 # =============================================================================
 set -euo pipefail
 
@@ -50,18 +50,27 @@ else
   ok "App já existe: $APP_NAME"
 fi
 
-if ! $FLY status -a "$PG_NAME" >/dev/null 2>&1; then
-  $FLY postgres create --name "$PG_NAME" --region "$REGION" \
-    --vm-size shared-cpu-1x --volume-size 10 --initial-cluster-size 1
-  ok "Cluster Postgres criado: $PG_NAME (anote a senha exibida acima!)"
+BANCO_FLY="${BANCO_FLY:-0}"
+if [ "$BANCO_FLY" = "1" ]; then
+  if ! $FLY status -a "$PG_NAME" >/dev/null 2>&1; then
+    $FLY postgres create --name "$PG_NAME" --region "$REGION" \
+      --vm-size shared-cpu-1x --volume-size 10 --initial-cluster-size 1
+    ok "Cluster Postgres criado: $PG_NAME (anote a senha exibida acima!)"
+  else
+    ok "Cluster Postgres já existe: $PG_NAME"
+  fi
 else
-  ok "Cluster Postgres já existe: $PG_NAME"
+  ok "Banco externo (Amazon RDS): cluster Postgres do Fly não é usado"
 fi
 
 # -----------------------------------------------------------------------------
 log "3/6 Secrets (banco + portal + SIGEF)"
 # Attach injeta DATABASE_URL automaticamente; ignora se já anexado
-$FLY postgres attach "$PG_NAME" -a "$APP_NAME" 2>/dev/null || warn "Postgres já anexado (DATABASE_URL existente)"
+if [ "$BANCO_FLY" = "1" ]; then
+  $FLY postgres attach "$PG_NAME" -a "$APP_NAME" 2>/dev/null || warn "Postgres já anexado (DATABASE_URL existente)"
+elif ! $FLY secrets list -a "$APP_NAME" --json 2>/dev/null | grep -q '"DATABASE_URL"'; then
+  die "Secret DATABASE_URL ausente em $APP_NAME: defina a URL do RDS com 'fly secrets set DATABASE_URL=postgresql://...?sslmode=verify-full&sslrootcert=/app/certs/rds-global-bundle.pem -a $APP_NAME'"
+fi
 if SECRETS_ATUAIS=$($FLY secrets list -a "$APP_NAME" --json 2>/dev/null); then
   SECRETS_CONHECIDOS=1
 else
@@ -93,32 +102,43 @@ $FLY secrets set -a "$APP_NAME" "${SECRETS_A_DEFINIR[@]}"
 ok "Secrets configurados"
 
 # -----------------------------------------------------------------------------
-log "4/6 Sincronização do schema (inclui coluna dtVisita2) — via fly proxy, sem SSH"
-# Recupera a senha do banco de dentro do cluster (sem interação)
-# Le o DATABASE_URL real do app (criado pelo attach) e troca o host pelo tunel local
-APP_DB_URL=$($FLY ssh console -a "$APP_NAME" -C "printenv DATABASE_URL" 2>/dev/null | tr -d '\r' | tail -1)
-[ -n "$APP_DB_URL" ] || die "DATABASE_URL nao encontrado no app (rode 'fly postgres attach' antes)"
-# Extrai usuario:senha@ e remonta apontando para o tunel
-CREDS=$(echo "$APP_DB_URL" | sed -E 's|^postgres(ql)?://([^@]+)@.*$|\2|')
-DB_PATH=$(echo "$APP_DB_URL" | sed -E 's|^postgres(ql)?://[^@]+@([^/]+)/([^?]+).*$|\3|')
-TUNNEL_URL="postgres://${CREDS}@localhost:${PROXY_PORT}/${DB_PATH}?sslmode=disable"
+if [ "$BANCO_FLY" = "1" ]; then
+  log "4/6 Sincronização do schema (inclui coluna dtVisita2) — via fly proxy, sem SSH"
+  # Recupera a senha do banco de dentro do cluster (sem interação)
+  # Le o DATABASE_URL real do app (criado pelo attach) e troca o host pelo tunel local
+  APP_DB_URL=$($FLY ssh console -a "$APP_NAME" -C "printenv DATABASE_URL" 2>/dev/null | tr -d '\r' | tail -1)
+  [ -n "$APP_DB_URL" ] || die "DATABASE_URL nao encontrado no app (rode 'fly postgres attach' antes)"
+  # Extrai usuario:senha@ e remonta apontando para o tunel
+  CREDS=$(echo "$APP_DB_URL" | sed -E 's|^postgres(ql)?://([^@]+)@.*$|\2|')
+  DB_PATH=$(echo "$APP_DB_URL" | sed -E 's|^postgres(ql)?://[^@]+@([^/]+)/([^?]+).*$|\3|')
+  TUNNEL_URL="postgres://${CREDS}@localhost:${PROXY_PORT}/${DB_PATH}?sslmode=disable"
 
-$FLY proxy ${PROXY_PORT}:5432 -a "$PG_NAME" &
-PROXY_PID=$!
-trap "kill $PROXY_PID 2>/dev/null || true" EXIT
-sleep 6
+  $FLY proxy ${PROXY_PORT}:5432 -a "$PG_NAME" &
+  PROXY_PID=$!
+  trap "kill $PROXY_PID 2>/dev/null || true" EXIT
+  sleep 6
 
-# db push sincroniza o schema completo (cria dtVisita2 e qualquer coluna faltante).
-# Seguro aqui: banco ainda sem dados de producao.
-DATABASE_URL="$TUNNEL_URL" npx prisma db push --config prisma.config.postgres.ts --accept-data-loss
-ok "Schema sincronizado (dtVisita2 e demais colunas criadas)"
+  # db push sincroniza o schema completo (cria dtVisita2 e qualquer coluna faltante).
+  # Seguro aqui: banco ainda sem dados de producao.
+  DATABASE_URL="$TUNNEL_URL" npx prisma db push --config prisma.config.postgres.ts --accept-data-loss
+  ok "Schema sincronizado (dtVisita2 e demais colunas criadas)"
 
-kill $PROXY_PID 2>/dev/null || true
-trap - EXIT
+  kill $PROXY_PID 2>/dev/null || true
+  trap - EXIT
+else
+  log "4/6 Schema: migrations rodam no release_command (migrate deploy) contra o RDS"
+fi
 
 # -----------------------------------------------------------------------------
 log "5/6 Deploy (release_command roda migrate deploy na VM de release)"
 $FLY deploy -a "$APP_NAME" --remote-only --ha=false
+# O processo sigef_sync precisa estar em gru (o INCRA so responde a IPs do Brasil);
+# o deploy cria maquinas novas na primary_region (iad), entao reposiciona.
+$FLY scale count sigef_sync=1 --region gru -a "$APP_NAME" -y
+if [ "$($FLY machine list -a "$APP_NAME" --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).filter(m=>m.config?.metadata?.fly_process_group==="sigef_sync"&&m.region!=="gru").length))')" != "0" ]; then
+  $FLY scale count sigef_sync=0 --region iad -a "$APP_NAME" -y
+fi
+ok "sigef_sync em gru (sincronizacao diaria do acervo SIGEF as 02:00)"
 ok "Deploy concluído"
 
 # -----------------------------------------------------------------------------

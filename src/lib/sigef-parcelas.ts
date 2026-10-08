@@ -119,3 +119,37 @@ export async function parcelaPorCodigo(codigo: string): Promise<SigefParcelaGeo 
   });
   return linha ? paraGeo(linha) : null;
 }
+
+export type SincronizacaoAcervo = {
+  status: string;
+  iniciadoEm: string;
+  terminadoEm: string | null;
+  fonteModificadoEm: string | null;
+  inseridas: number;
+  atualizadas: number;
+  removidas: number;
+};
+
+/** Ultima execucao da sincronizacao diaria do acervo (processo sigef_sync). */
+export async function ultimaSincronizacaoAcervo(uf: string): Promise<SincronizacaoAcervo | null> {
+  const s = await prisma.sigefSincronizacao.findFirst({
+    where: { uf, status: { in: ["CONCLUIDA", "SEM_ALTERACAO"] } },
+    orderBy: { iniciadoEm: "desc" },
+    select: {
+      status: true,
+      iniciadoEm: true,
+      terminadoEm: true,
+      fonteModificadoEm: true,
+      inseridas: true,
+      atualizadas: true,
+      removidas: true,
+    },
+  });
+  if (!s) return null;
+  return {
+    ...s,
+    iniciadoEm: s.iniciadoEm.toISOString(),
+    terminadoEm: s.terminadoEm?.toISOString() ?? null,
+    fonteModificadoEm: s.fonteModificadoEm?.toISOString() ?? null,
+  };
+}

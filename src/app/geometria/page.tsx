@@ -192,6 +192,7 @@ export default function GeometriaPage() {
   const [carregandoSigef, setCarregandoSigef] = useState(false);
   const [totalSigefVisivel, setTotalSigefVisivel] = useState<number | null>(null);
   const [totalSigefImportado, setTotalSigefImportado] = useState<number | null>(null);
+  const [sigefSincronizadoEm, setSigefSincronizadoEm] = useState<string | null>(null);
   const sigefLayerRef = useRef<any>(null);
   const selecaoRef = useRef<any>(null);
   const mostrarSigefRef = useRef(false);
@@ -550,8 +551,10 @@ export default function GeometriaPage() {
       try {
         const total = await (await fetch("/api/sigef/parcelas?uf=SP")).json();
         setTotalSigefImportado(total.total ?? null);
+        setSigefSincronizadoEm(total.sincronizacao?.iniciadoEm ?? null);
       } catch {
         setTotalSigefImportado(null);
+        setSigefSincronizadoEm(null);
       }
     } else {
       pedidoSigefRef.current++;
@@ -717,11 +720,14 @@ export default function GeometriaPage() {
             {mostrarSigef && (
               <p className="text-[11px] text-violet-700">
                 {totalSigefImportado === 0
-                  ? "Nenhuma parcela importada — rode scripts/import-sigef-shp.ts com o shapefile do acervo do INCRA."
+                  ? "Nenhuma parcela no acervo — a sincronização diária com o INCRA (02:00) ainda não carregou as parcelas."
                   : totalSigefVisivel === null
                     ? `Aproxime o mapa (zoom ${ZOOM_MIN_SIGEF}+) para carregar as parcelas do SIGEF.`
                     : `${totalSigefVisivel} parcelas nesta janela — contorno violeta` +
-                      (totalSigefImportado === null ? "." : `, de ${totalSigefImportado.toLocaleString("pt-BR")} importadas de SP.`)}
+                      (totalSigefImportado === null ? "." : `, de ${totalSigefImportado.toLocaleString("pt-BR")} de SP.`) +
+                      (sigefSincronizadoEm
+                        ? ` Acervo INCRA sincronizado em ${new Date(sigefSincronizadoEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`
+                        : "")}
               </p>
             )}
             <label className="flex items-center gap-2 text-xs font-medium text-violet-900 cursor-pointer">

@@ -388,6 +388,7 @@ model SigefParcela {
   maxLon         Float
   maxLat         Float
   fonte          String
+  assinatura     String?   // hash dos atributos+geometria, para a sincronizacao diaria
   importadoEm    DateTime  @default(now())
 
   @@index([uf, minLon, maxLon])
@@ -406,4 +407,23 @@ model ExecucaoAgendada {
   resumo      String?   // JSON com a contagem do que foi analisado
 
   @@index([tipo, iniciadaEm])
+}
+
+/// Execucoes da sincronizacao diaria do acervo SIGEF (scripts/sigef-scheduler.ts).
+model SigefSincronizacao {
+  id                String    @id @default(cuid())
+  uf                String
+  status            String    // EXECUTANDO | CONCLUIDA | SEM_ALTERACAO | ERRO
+  fonteUrl          String
+  fonteEtag         String?
+  fonteModificadoEm DateTime?
+  lidas             Int       @default(0)
+  inseridas         Int       @default(0)
+  atualizadas       Int       @default(0)
+  removidas         Int       @default(0)
+  mensagem          String?
+  iniciadoEm        DateTime  @default(now())
+  terminadoEm       DateTime?
+
+  @@index([uf, iniciadoEm])
 }

@@ -10,7 +10,7 @@ const CAMPOS_EDITAVEIS = [
   "tipoServico", "expediente", "anoEntrada", "tipo", "interessado", "email",
   "telefone", "cpfCnpj", "municipio", "ra", "dra", "pasta", "utm", "base",
   "departamento", "observacaoEntrada", "observacoesTecnico", "taxaAbertura",
-  "taxaVistoria", "tecnicoRespId", "tecnicoConfId", "divisaDificuldade",
+  "taxaVistoria", "servicoTecGabinete", "servicoTecCampo", "tecnicoRespId", "tecnicoConfId", "divisaDificuldade",
   "nivelPrioridade", "statusEscritorio", "quemVaiAssinar", "numeroSaidaIGC",
   "dtAbertoSei", "dtCompile", "dtNascimentoIdoso", "dtEmail", "dtVisita1",
   "dtVisita2",
@@ -20,6 +20,60 @@ const CAMPOS_DATA = [
   "dtAbertoSei", "dtCompile", "dtNascimentoIdoso", "dtEmail", "dtVisita1",
   "dtVisita2",
 ];
+
+/** Valores em R$ que compoem `Process.total` (mesma ordem do cartao "Financeiro"). */
+const CAMPOS_FINANCEIROS = [
+  "taxaAbertura", "servicoTecGabinete", "taxaVistoria", "servicoTecCampo",
+] as const;
+
+const CAMPOS_INTEIRO = ["anoEntrada"];
+
+const CAMPOS_OBRIGATORIOS = ["anoEntrada", "interessado"];
+
+type Normalizado = { valor: unknown } | { erro: string };
+
+/** Converte o JSON recebido no tipo da coluna; `""` e `null` limpam o campo. */
+function normalizarCampo(campo: string, valor: unknown): Normalizado {
+  if (valor === null || valor === undefined || valor === "") {
+    return CAMPOS_OBRIGATORIOS.includes(campo)
+      ? { erro: "campo obrigatorio" }
+      : { valor: null };
+  }
+  if (CAMPOS_DATA.includes(campo)) {
+    if (typeof valor !== "string" && typeof valor !== "number") return { erro: "data invalida" };
+    const data = new Date(valor);
+    return Number.isNaN(data.getTime()) ? { erro: "data invalida" } : { valor: data };
+  }
+  if ((CAMPOS_FINANCEIROS as readonly string[]).includes(campo)) {
+    const n = lerNumero(valor);
+    if (n === null || n < 0) return { erro: "informe um valor em reais, ex.: 350.00" };
+    return { valor: Math.round(n * 100) / 100 };
+  }
+  if (CAMPOS_INTEIRO.includes(campo)) {
+    const n = lerNumero(valor);
+    if (n === null || !Number.isInteger(n) || n < 1900 || n > 2100) {
+      return { erro: "informe um ano entre 1900 e 2100" };
+    }
+    return { valor: n };
+  }
+  if (typeof valor !== "string") return { erro: "deve ser texto" };
+  return { valor };
+}
+
+/** Aceita numero ou texto no formato "1350.50" / "1.350,50"; null se nao for numerico. */
+function lerNumero(valor: unknown): number | null {
+  if (typeof valor === "number") return Number.isFinite(valor) ? valor : null;
+  if (typeof valor !== "string") return null;
+  const limpo = valor.trim().replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");
+  if (!/^-?\d+(\.\d+)?$/.test(limpo)) return null;
+  return Number(limpo);
+}
+
+/** Soma dos valores financeiros do processo (campos vazios contam como zero). */
+function somarTotal(valores: Record<(typeof CAMPOS_FINANCEIROS)[number], number | null>): number {
+  const soma = CAMPOS_FINANCEIROS.reduce((acc, c) => acc + (valores[c] ?? 0), 0);
+  return Math.round(soma * 100) / 100;
+}
 
 /** Papeis aceitos em cada atribuicao pessoal do processo. */
 const PAPEIS_ATRIBUICAO: Record<"tecnicoRespId" | "tecnicoConfId", string[]> = {
@@ -94,12 +148,23 @@ export async function PATCH(
   if ("erro" in sessao) return sessao.erro;
 
   const { id } = await params;
-  const body = await request.json();
+  const body: unknown = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Corpo deve ser um objeto JSON" }, { status: 400 });
+  }
 
   const data: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
     if (!CAMPOS_EDITAVEIS.includes(key)) continue;
-    data[key] = CAMPOS_DATA.includes(key) && value ? new Date(value as string) : value;
+    if (key === "tecnicoRespId" || key === "tecnicoConfId") {
+      data[key] = value;
+      continue;
+    }
+    const normalizado = normalizarCampo(key, value);
+    if ("erro" in normalizado) {
+      return NextResponse.json({ error: `${key}: ${normalizado.erro}`, campo: key }, { status: 400 });
+    }
+    data[key] = normalizado.valor;
   }
 
   if (Object.keys(data).length === 0) {
@@ -109,6 +174,23 @@ export async function PATCH(
   const erroAtribuicao = await validarAtribuicoes(data);
   if (erroAtribuicao) {
     return NextResponse.json({ error: erroAtribuicao }, { status: 400 });
+  }
+
+  const atual = await prisma.process.findUnique({
+    where: { id },
+    select: { taxaAbertura: true, servicoTecGabinete: true, taxaVistoria: true, servicoTecCampo: true },
+  });
+  if (!atual) {
+    return NextResponse.json({ error: "Processo nao encontrado" }, { status: 404 });
+  }
+
+  if (CAMPOS_FINANCEIROS.some((c) => c in data)) {
+    data.total = somarTotal({
+      taxaAbertura: (data.taxaAbertura ?? atual.taxaAbertura) as number | null,
+      servicoTecGabinete: (data.servicoTecGabinete ?? atual.servicoTecGabinete) as number | null,
+      taxaVistoria: (data.taxaVistoria ?? atual.taxaVistoria) as number | null,
+      servicoTecCampo: (data.servicoTecCampo ?? atual.servicoTecCampo) as number | null,
+    });
   }
 
   const processo = await prisma.process.update({
