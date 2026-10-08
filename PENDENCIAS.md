@@ -264,7 +264,7 @@ O Dockerfile e o `fly.toml` já não usam Litestream (ver `docs/MIGRACAO-POSTGIS
 **Onde:** `src/lib/cjt-formulario.ts`, `src/lib/workflow.ts`, `src/lib/geometria.ts`
 
 Nenhum framework de teste instalado e nenhum script `test`. São bibliotecas puras, sem I/O — as 12 combinações da matriz do CJT viram 12 casos de teste quase por transcrição. É o que permite corrigir #PEND-9 e #PEND-36 sem regressão.
-**Andamento (2026-10-07):** Vitest instalado (`npm test`, `vitest.config.ts`, testes ao lado do código em `src/**/*.test.ts`). Cobertos até agora: `protocolo.ts`, `solicitacao-estados.ts` e uma linha de base da matriz de `cjt-formulario.ts` (7 casos). Faltam as 12 combinações completas, `workflow.ts` e `geometria.ts`; a pendência segue aberta.
+**Andamento (2026-10-07):** Vitest instalado (`npm test`, `vitest.config.ts`, testes ao lado do código em `src/**/*.test.ts`). Cobertos até agora (189 testes): `protocolo.ts`, `solicitacao-estados.ts`, `cjt-formulario.ts` (matriz, usucapião, nomenclatura, limite de polígonos, representação), `cpf.ts`, `chat-tipos.ts`, `solicitacao-rascunho.ts`, `poligonos-parcelas.ts`, `duplicidade.ts`, `agendador.ts`, arquivamento, grupos de situação, `complexidade.ts` e `acompanhamentoRequisicao`. Faltam `workflow.ts` e `geometria.ts` (corte e classificação) e os testes de rota (hoje exercitadas à mão e por script); a pendência segue aberta.
 
 ### #PEND-25 · Chat da solicitação (não existe modelo, rota nem tela)
 
@@ -351,6 +351,7 @@ Documento (Minhas Requisições, triagem): Nível 1–2 longe da divisa; 3–4 n
 **Onde:** `src/app/api/sigef/consulta/route.ts` (portal só consulta o próprio CPF; outro → 403); `src/app/api/sigef/parcelas/route.ts` (`exigirUsuarioApi`: só servidor); `src/lib/sigef.ts` (`mapearParcela`, caminho `SIGEF_REAL`, não devolve geometria)
 
 Documento (§2 e §5): o representante informa o CPF ou CNPJ de quem representa (provisório) e o solicitante precisa ver o polígono do imóvel. Hoje a consulta é sempre pelo CPF logado, o portal não consulta outro CPF/CNPJ, não alcança o acervo por mapa/código (rota só de servidor) e, no modo real, a parcela vem sem geometria (só acervo e CAR trazem). Precisa permitir a consulta pelo representado (com a regra de segurança definida), rota de parcelas com escopo de solicitante e geometria em todos os modos. No ambiente local o acervo está vazio (`SigefParcela` = 0): a geometria vem do CAR externo ou não vem.
+**Andamento (2026-10-07):** o vínculo de cada polígono a uma parcela (#PEND-34) e o limite do formulário funcionam sobre a consulta simulada (`SIGEF_MOCK`); com a consulta real o servidor passa a conferir contra ela sem mudança de código, mas a parcela vem sem geometria no modo real e o mapa do acompanhamento depende do acervo `SigefParcela` importado.
 **Impacto no frontend:** mapa do imóvel e campo CPF/CNPJ do representado. O campo já existe (Fase 4), mas a consulta ao SIGEF do formulário continua pelo CPF logado; ao liberar, passar o documento do representado a `/api/sigef/consulta` em `RequisicaoForm`.
 
 ### #PEND-34 · Persistir vínculo polígono nomeado ↔ parcela SIGEF

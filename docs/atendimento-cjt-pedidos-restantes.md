@@ -1,6 +1,6 @@
 # Pedidos do CJT que exigiam backend (front e back)
 
-Status: **em andamento** na branch `feat/portal-correcoes-cjt`. Fases 0 a 8 implementadas e commitadas (`a0fd7ed` a `a0157bf`); fase 9 implementada e aguardando aceite do commit.
+Status: **concluído** na branch `feat/portal-correcoes-cjt`. Fases 0 a 9 implementadas e commitadas (`a0fd7ed` a `7a62588`); fase 10 é este fechamento da documentação. Só falta o push, que é do time.
 
 Este documento é o terceiro registro da branch. [`correcoes-cjt-portal.md`](correcoes-cjt-portal.md) cobre os 16 itens de frontend do portal e [`melhorias-frontend-backoffice.md`](melhorias-frontend-backoffice.md) cobre as melhorias de backoffice e plataforma. Este cobre os pedidos do documento de correções do cliente (`Correções CJT_2026-09-16.pdf`, 29 pedidos) que precisaram de **backend** ou de backend e frontend juntos. Autorização: o time autorizou editar backend e frontend; infra (Dockerfile, `fly*.toml`, `.github`, `.env.example`) continua fora e vira pendência.
 
@@ -25,7 +25,7 @@ Este documento é o terceiro registro da branch. [`correcoes-cjt-portal.md`](cor
 | 6 | Cada polígono nomeado ligado à sua parcela do SIGEF | #PEND-34, #PEND-45 | front e back | `d9247af` |
 | 7 | Análise de duplicidade e sobreposição (4 situações), agendada | #PEND-30 | front e back | `e873e0f` |
 | 8 | Arquivamento pelo solicitante (imediato ou decidido pela DDD), desarquivar e cartões de situação | #PEND-29 | front e back | `a0157bf` |
-| 9 | Subetapas do acompanhamento e nível de complexidade 1 a 9 | #PEND-27, #PEND-32 | front e back | a commitar |
+| 9 | Subetapas do acompanhamento e nível de complexidade 1 a 9 | #PEND-27, #PEND-32 | front e back | `7a62588` |
 
 ## 3. O que cada fase entregou
 
@@ -60,7 +60,7 @@ Este documento é o terceiro registro da branch. [`correcoes-cjt-portal.md`](cor
 - *Lista de Requisições* (`/requisicoes`): cartões de situação com contagem, um por grupo e cada requisição em um só (`src/lib/requisicao-grupos-atendimento.ts`): Aguardando análise, Na fila, Aguardando cliente, Congeladas, Em análise, Devolvidas, Arquivamento solicitado, Arquivadas e Concluídas. Substituem os atalhos "Aguardando abertura de processo" e "Em análise de duplicidade" (os links antigos `?semProcesso=1` e `?analise=1` continuam e viram o cartão equivalente). Valem junto com a busca e o seletor de situação; aparecem para todos os papéis. Na tela de uma requisição arquivada, a DDD vê no topo o aviso "desarquive-a", que leva ao painel (âncora `#desarquivar`).
 - *Decisões do time:* aceitar **não cancela o processo** aberto (o painel avisa; ver #PEND-54); "pode haver custo" é só um aviso, a cobrança segue em "Finalização e pagamento"; sem "retirar o pedido" e sem arquivamento iniciado pela DDD nesta fase.
 
-**Fase 9 — Subetapas do acompanhamento e nível de complexidade (a commitar).**
+**Fase 9 — Subetapas do acompanhamento e nível de complexidade (`7a62588`).**
 - *Subetapas* (`acompanhamentoRequisicao`, `src/lib/requisicao-status.ts`): **Setor de Atendimentos** = "Checagem de documentos" (nova ação "Marcar documentos como conferidos" em `/requisicoes/{id}`, ADMIN e SDTC, `POST /api/requisicoes/[id]/documentos-conferidos`, uma vez só e avisa no chat) e "Liberação do número SEI" (quando o expediente do processo é preenchido); **Setor Técnico** = "Triagem" (distribuição), "Elaboração da divisa", "Conferência da divisa" e "Expedição" (hipótese do time: é a assinatura do técnico; as assinaturas do gerente e do diretor ficam em "Documento em assinatura"). Uma faixa abaixo do acompanhamento mostra as subetapas do setor atual (feita, atual, pendente). Antes de haver processo, a etapa "Conformidade mínima" ganha um aviso conforme a situação da requisição: devolvida, congelada, liberada, aguardando resposta, pedido de arquivamento, em análise de duplicidade ou aguardando a abertura do processo. O acompanhamento agora considera o status da requisição, não só o do processo.
 - *Nível de complexidade* (`src/lib/complexidade.ts`): o corte de divisas sugere de 1 a 9 e grava `CorteDivisa.nivelSugerido`: longe da divisa 1 (um polígono) ou 2 (vários); divisa finalizada 3 ou 4; simples não finalizada 5 ou 6; tríplice não finalizada 7 ou 8; reta, foz, quádrupla, quíntupla, zona de conflito e rio 9. O técnico responsável pelo processo (ou ADMIN) confirma ou muda no painel "Nível de complexidade" de `/processos/{id}` (`PUT /api/processes/[id]/complexidade`; vazio retira o nível); os demais papéis veem em texto. O solicitante vê só o número e a escala "1 fácil · 9 complexo", sem explicação, numa caixa ao lado do "Número SEI", e só depois da confirmação. A tela do corte (`/geometria`) mostra o "Nível sugerido" e o motivo.
 - *Linhas de divisa:* `LinhaDivisa.finalizada` (padrão **não finalizada**, o que dá o nível mais alto) e os tipos novos QUINTUPLA, RETA, FOZ e CONFLITO. O cadastro (`POST /api/geometria/linhas`) aceita `finalizada` e valida o tipo; `PATCH /api/geometria/linhas/[id]` (ADMIN) marca ou desmarca. Não há tela para isso: quem marca no dia a dia está em aberto (#PEND-55). `Process.divisaDificuldade` (texto livre que ninguém grava) fica obsoleto.
@@ -110,6 +110,10 @@ Todo model ou coluna entrou nos dois schemas (`prisma/schema.prisma` e `prisma-p
 
 Erros seguem o padrão `{ error }`. Toda transição de status é condicional (`updateMany` com o status esperado), então chamadas simultâneas só deixam passar a primeira.
 
+## 5.1 O que fica de fora (dependia de definição do cliente ou de outro dono)
+
+Cores e logos do IGC (#PEND-38), e-mail ou SMS no cadastro (#PEND-37), Bloco 2 do documento (a página em branco), integração com o SEI e a b-Cadastro (#PEND-50 e #PEND-51, adiadas), decisões #PEND-12, #PEND-14 e #PEND-39, e a infra de produção (#PEND-52: agendador, `CRON_TOKEN`, migrations e a ordem com a `9999_postgis_geometry`). As hipóteses que o time assumiu onde o documento é omisso estão nas decisões de negócio abertas: #PEND-53 (duplicidade), #PEND-54 (arquivar não cancela o processo) e #PEND-55 (divisa finalizada e hipóteses do nível).
+
 ## 6. Testes
 
 189 testes automatizados (Vitest) cobrindo protocolo, estados, chat, formulário CJT (matriz, usucapião, nomenclatura, limite de polígonos, representação), CPF e CNPJ, rascunho, vínculo polígono ↔ parcela, comparação de geometrias e as quatro situações de duplicidade, e o agendador (horário em Brasília, disputa pelo horário, retomada de execução travada). As rotas foram verificadas no navegador (API e tela) a cada fase, com solicitante, ADMIN, GERENTE e outro solicitante.
@@ -118,12 +122,15 @@ Erros seguem o padrão `{ error }`. Toda transição de status é condicional (`
 
 - Só ADMIN e SDTC veem o chat no backoffice; sem anexos no chat e sem e-mail ou SMS (#PEND-37).
 - Anexos não ficam no rascunho.
-- A DDD não recebe notificação própria do pedido congelado: ela o encontra em Requisições pelo status "Aguardando liberação".
+- A DDD não recebe notificação própria do pedido congelado nem do pedido de arquivamento: encontra-os nos cartões "Congeladas" e "Arquivamento solicitado" de Requisições.
 - O seletor de situação do atendimento mostra rótulos pensados para o solicitante nos status novos (ex.: "Aguardando sua resposta").
 - A matrícula e a nomenclatura mais estritas passam a exigir correção na edição de requisições antigas fora do padrão.
 - A comparação usa as geometrias do acervo SIGEF local; parcela fora do acervo é comparada só pelo código, e imóvel sem registro no INCRA não é comparado.
 - O agendador foi exercitado só contra o SQLite de desenvolvimento; em produção depende da #PEND-52 (instância ligada, variáveis, migration).
 - Na primeira subida depois do deploy as requisições pendentes antigas são analisadas de uma vez, e podem gerar várias perguntas no chat.
+- As migrations só existem para o Postgres e nunca rodaram contra o banco de produção; os testes de rota foram feitos à mão e por script contra o SQLite de desenvolvimento (a suíte automática cobre as regras puras).
+- Não há tela para marcar a divisa como finalizada (só a API do Administrador, #PEND-55), nem como retirar um pedido de arquivamento.
+- Aceitar o arquivamento não cancela o processo aberto (#PEND-54).
 
 ## 8. Como testar
 
