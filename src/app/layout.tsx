@@ -47,7 +47,7 @@ export default async function RootLayout({
             />
           )}
           <main
-            className={`flex-1 bg-gray-50 min-h-screen ${usuario ? "ml-64" : ""}`}
+            className={`flex-1 min-w-0 bg-gray-50 min-h-screen ${usuario ? "ml-64" : ""}`}
           >
             {children}
           </main>

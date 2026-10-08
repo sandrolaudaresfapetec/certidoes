@@ -24,6 +24,10 @@ interface AcompanhamentoProps {
   analiseDuplicidadeEm?: Date | null;
   /** Nível de complexidade 1 a 9, só depois de confirmado pelo técnico (#PEND-32). */
   nivelComplexidade?: number | null;
+  /** Link do recibo de pagamento (portal), mostrado quando o pagamento foi registrado. */
+  reciboHref?: string;
+  /** Link da certidão (portal), mostrado na etapa "Liberado para download" (#PEND-28). */
+  certidaoHref?: string;
 }
 
 type Estado = "FEITA" | "ATUAL" | "PENDENTE";
@@ -92,6 +96,8 @@ export function AcompanhamentoRequisicao({
   docsConferidosEm,
   analiseDuplicidadeEm,
   nivelComplexidade,
+  reciboHref,
+  certidaoHref,
 }: AcompanhamentoProps) {
   const acomp = acompanhamentoRequisicao({
     situacaoProcesso,
@@ -290,13 +296,32 @@ export function AcompanhamentoRequisicao({
           {pagamentoStatus && finalizadaEm && " · "}
           {finalizadaEm &&
             `Finalizada em ${new Date(finalizadaEm).toLocaleDateString("pt-BR")}`}
+          {reciboHref && (pagamentoStatus === "PAGO" || pagamentoStatus === "ISENTO") && (
+            <>
+              {" · "}
+              <a href={reciboHref} target="_blank" rel="noopener" className="font-medium text-blue-700 hover:underline">
+                Recibo de pagamento
+              </a>
+            </>
+          )}
         </p>
       )}
 
       {acomp.tipo === "ETAPA" && acomp.atual === ultima && (
-        <p className="mt-2 text-xs text-gray-500">
-          O download da certidão ainda não está disponível neste portal.
-        </p>
+        certidaoHref ? (
+          <a
+            href={certidaoHref}
+            target="_blank"
+            rel="noopener"
+            className="mt-3 inline-flex items-center rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+          >
+            Baixar a certidão (PDF)
+          </a>
+        ) : (
+          <p className="mt-2 text-xs text-gray-500">
+            O download da certidão ainda não está disponível neste portal.
+          </p>
+        )
       )}
     </section>
   );

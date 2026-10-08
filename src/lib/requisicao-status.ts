@@ -186,3 +186,28 @@ export type ChaveGrupoStatus = (typeof GRUPOS_STATUS_GERAL)[number]["chave"];
 export function grupoStatusGeral(chave: string | undefined) {
   return GRUPOS_STATUS_GERAL.find((g) => g.chave === chave);
 }
+
+/**
+ * Certidão liberada para o solicitante baixar (#PEND-28): última etapa do acompanhamento,
+ * ou seja, processo finalizado (assinaturas e SEI) e pagamento registrado como pago ou isento.
+ */
+export function certidaoLiberadaParaDownload(dados: {
+  status: string;
+  pagamentoStatus: string | null;
+  finalizadaEm?: Date | string | null;
+  process: { situacao: string } | null;
+}): boolean {
+  if (!dados.process) return false;
+  const acomp = acompanhamentoRequisicao({
+    situacaoProcesso: dados.process.situacao,
+    pagamentoStatus: dados.pagamentoStatus,
+    finalizadaEm: dados.finalizadaEm,
+    statusRequisicao: dados.status,
+  });
+  return acomp.tipo === "ETAPA" && acomp.atual === ETAPAS_ACOMPANHAMENTO.length - 1;
+}
+
+/** Recibo de pagamento disponível quando o Atendimento registrou o pagamento (pago ou isento). */
+export function reciboDisponivel(pagamentoStatus: string | null | undefined): boolean {
+  return pagamentoStatus === "PAGO" || pagamentoStatus === "ISENTO";
+}

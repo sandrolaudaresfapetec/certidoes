@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { exigirAtendimentoApi, exigirUsuarioApi } from "@/lib/auth";
+import { exigirUsuarioApi, podeAtender } from "@/lib/auth";
 
 /**
  * Campos editaveis pelo Atendimento. Situacao, datas de assinatura e autoria
@@ -76,6 +76,14 @@ function somarTotal(valores: Record<(typeof CAMPOS_FINANCEIROS)[number], number 
 }
 
 /** Papeis aceitos em cada atribuicao pessoal do processo. */
+const CAMPOS_ATRIBUICAO: string[] = ["tecnicoRespId", "tecnicoConfId"];
+
+/** Papeis da etapa distribuicao_gdat (AUTORIZACAO_SAIDA em workflow.ts). */
+export const PAPEIS_DISTRIBUICAO = ["GERENTE", "ADMIN"];
+function podeDistribuir(usuario: { role: string }): boolean {
+  return PAPEIS_DISTRIBUICAO.includes(usuario.role);
+}
+
 const PAPEIS_ATRIBUICAO: Record<"tecnicoRespId" | "tecnicoConfId", string[]> = {
   tecnicoRespId: ["TECNICO", "ADMIN"],
   tecnicoConfId: ["CONFERENTE", "ADMIN"],
@@ -144,13 +152,22 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const sessao = await exigirAtendimentoApi();
+  const sessao = await exigirUsuarioApi();
   if ("erro" in sessao) return sessao.erro;
 
   const { id } = await params;
   const body: unknown = await request.json().catch(() => null);
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "Corpo deve ser um objeto JSON" }, { status: 400 });
+  }
+
+  // Atendimento (ADMIN/SDTC) edita tudo; quem distribui (GERENTE) so atribui tecnico e conferente.
+  const apenasAtribuicao = Object.keys(body).every((k) => CAMPOS_ATRIBUICAO.includes(k));
+  if (!podeAtender(sessao.usuario) && !(apenasAtribuicao && podeDistribuir(sessao.usuario))) {
+    return NextResponse.json(
+      { error: apenasAtribuicao ? "Atribuição exclusiva do Atendimento e da Gerência." : "Ação exclusiva do Atendimento." },
+      { status: 403 }
+    );
   }
 
   const data: Record<string, unknown> = {};

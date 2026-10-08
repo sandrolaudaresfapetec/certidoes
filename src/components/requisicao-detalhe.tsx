@@ -225,6 +225,8 @@ export function RequisicaoDetalhe({
           docsConferidosEm={requisicao.docsConferidosEm}
           analiseDuplicidadeEm={requisicao.analiseDuplicidadeEm}
           nivelComplexidade={requisicao.process?.nivelComplexidade ?? null}
+          reciboHref={`/portal/requisicoes/${requisicao.id}/recibo`}
+          certidaoHref={requisicao.process ? `/portal/requisicoes/${requisicao.id}/certidao` : undefined}
         />
       )}
 
@@ -378,7 +380,15 @@ export function RequisicaoDetalhe({
             {requisicao.documentos.map((d) => (
               <li key={d.id} className="flex items-center gap-2 text-sm text-gray-700">
                 <Paperclip className="h-4 w-4 text-gray-400" />
-                {TIPO_DOC_LABEL[d.tipo] ?? d.tipo} — {d.nomeArquivo}
+                {TIPO_DOC_LABEL[d.tipo] ?? d.tipo} —{" "}
+                <a
+                  href={`${escopo === "CLIENTE" ? "/api/portal/documentos" : "/api/requisicoes/documentos"}/${d.id}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="text-blue-700 underline-offset-2 hover:underline"
+                >
+                  {d.nomeArquivo}
+                </a>
               </li>
             ))}
           </ul>

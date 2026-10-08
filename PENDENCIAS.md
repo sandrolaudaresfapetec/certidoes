@@ -21,14 +21,14 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 
 | ID | Título | Responsável | Tipo | Prioridade | Status |
 | --- | --- | --- | --- | --- | --- |
-| #PEND-1 | Login do portal não autentica de verdade; `GOVBR_MOCK` não é lida | backend | segurança | alta | aberta |
-| #PEND-2 | Sessão do portal: segredo padrão em produção, sem expiração e sem `secure` | backend | segurança | alta | aberta |
-| #PEND-3 | Documentos anexados não podem ser lidos (sem rota de download) | backend | adição | alta | aberta |
+| #PEND-1 | Login do portal não autentica de verdade; `GOVBR_MOCK` não é lida | backend | segurança | alta | resolvida (2026-10-08) |
+| #PEND-2 | Sessão do portal: segredo padrão em produção, sem expiração e sem `secure` | backend | segurança | alta | resolvida (2026-10-08) |
+| #PEND-3 | Documentos anexados não podem ser lidos (sem rota de download) | backend | adição | alta | resolvida (2026-10-08) |
 | #PEND-4 | Listar/baixar documentos anexados na tela da requisição | frontend | adição | alta | bloqueada (#PEND-3) |
 | #PEND-5 | Tela de edição do processo e atribuição de técnico/conferente | frontend | adição | alta | resolvida (2026-10-07) |
-| #PEND-6 | GERENTE (quem distribui) não consegue atribuir técnico/conferente | backend | bugfix | alta | aberta |
+| #PEND-6 | GERENTE (quem distribui) não consegue atribuir técnico/conferente | backend | bugfix | alta | resolvida (2026-10-08) |
 | #PEND-7 | `/geometria` fora da navegação e sem vínculo com o processo | frontend | melhoria | média | resolvida (2026-10-07) |
-| #PEND-8 | Leaflet carregado do unpkg em runtime, sem `integrity` | frontend | melhoria | baixa | aberta |
+| #PEND-8 | Leaflet carregado do unpkg em runtime, sem `integrity` | frontend | melhoria | baixa | resolvida (2026-10-08) |
 | #PEND-9 | Múltiplos proprietários: regra do "e outros" não implementada | backend | adição | média | aberta |
 | #PEND-10 | Nomes de gleba/polígono: não rejeita matrícula nem município | backend | adição | média | descartada (substituída por #PEND-36) |
 | #PEND-11 | Decisão: usucapião — matrícula numérica ou literal "USUCAPIÃO"? | negócio | decisão | média | resolvida (2026-10-06) |
@@ -38,22 +38,22 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-15 | Decisão: Pergunta 1 × checkbox "procurador" — qual controla? | negócio | decisão | média | resolvida (2026-10-06) |
 | #PEND-16 | Amarrar o fluxo do procurador à Pergunta 1 | frontend | bugfix | média | resolvida (2026-10-06) |
 | #PEND-17 | Acessibilidade do formulário CJT (`aria-*`, rótulo órfão) | frontend | bugfix | média | resolvida (2026-10-06) |
-| #PEND-18 | Migrations SQLite não reconstroem o banco do zero | backend | bugfix | média | aberta |
-| #PEND-19 | Colunas legadas sem uso em `Process` (`processes`, `users`) | backend | refatoração | baixa | aberta |
-| #PEND-20 | `.env.example` desatualizado (caminho do banco, variáveis ausentes) | infra | documentação | média | aberta |
-| #PEND-21 | Sem CI de qualidade (tsc, eslint, build) | infra | adição | média | aberta |
-| #PEND-22 | `eslint` falha em `docker-entrypoint.js` | infra | bugfix | baixa | aberta |
-| #PEND-23 | Restos do Litestream no `package.json` | infra | refatoração | baixa | aberta |
-| #PEND-24 | Sem testes automatizados nas bibliotecas de regra | backend | adição | média | aberta |
+| #PEND-18 | Migrations SQLite não reconstroem o banco do zero | backend | bugfix | média | resolvida (2026-10-08) |
+| #PEND-19 | Colunas legadas sem uso em `Process` (`processes`, `users`) | backend | refatoração | baixa | resolvida (2026-10-08) |
+| #PEND-20 | `.env.example` desatualizado (caminho do banco, variáveis ausentes) | infra | documentação | média | resolvida (2026-10-08) |
+| #PEND-21 | Sem CI de qualidade (tsc, eslint, build) | infra | adição | média | resolvida (2026-10-08) |
+| #PEND-22 | `eslint` falha em `docker-entrypoint.js` | infra | bugfix | baixa | resolvida (2026-10-08) |
+| #PEND-23 | Restos do Litestream no `package.json` | infra | refatoração | baixa | resolvida (2026-10-08) |
+| #PEND-24 | Sem testes automatizados nas bibliotecas de regra | backend | adição | média | resolvida (2026-10-08) |
 | #PEND-25 | Chat da solicitação (não existe modelo, rota nem tela) | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-26 | Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA` | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-27 | Modelo de status da requisição para o solicitante (5 gerais + 6 etapas) | backend | adição | alta | resolvida (2026-10-07) |
-| #PEND-28 | Download da certidão emitida pelo solicitante | backend | adição | média | aberta |
+| #PEND-28 | Download da certidão emitida pelo solicitante | backend | adição | média | resolvida (2026-10-08) |
 | #PEND-29 | Pedido de arquivamento pelo solicitante (regra de custo/tempo) | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-30 | Análise agendada de duplicidade e sobreposição (4 situações) | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-31 | Solicitação com 13+ polígonos: congelar e liberar pela DDD | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-32 | Nível de complexidade 1–9 (hoje são 4 classes) | backend | adição | média | resolvida (2026-10-07) |
-| #PEND-33 | SIGEF no portal: CPF/CNPJ do representado, parcelas e geometria | backend | adição | média | aberta |
+| #PEND-33 | SIGEF no portal: CPF/CNPJ do representado, parcelas e geometria | backend | adição | média | em andamento |
 | #PEND-34 | Persistir vínculo polígono nomeado ↔ parcela SIGEF | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-35 | Matrícula "Usucapião" na validação e na persistência | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-36 | Nomenclatura de polígonos e S/M–S/E validadas no servidor | backend | adição | média | resolvida (2026-10-07) |
@@ -67,15 +67,16 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-44 | Validar no servidor o CPF/CNPJ do representado e a coerência com a Pergunta 1 | backend | segurança | média | resolvida (2026-10-07) |
 | #PEND-45 | Associar cada polígono nomeado ao polígono do mapa (UI) | frontend | adição | média | resolvida (2026-10-07) |
 | #PEND-46 | Consulta SIGEF simulada com CAR devolve parcelas com área 0 e município vazio | backend | bugfix | baixa | descartada (obsoleta: CAR removido em `f34b945`) |
-| #PEND-47 | Layout raiz: `main` sem `min-w-0` deixa conteúdo largo esticar a página no celular | frontend | melhoria | baixa | aberta |
+| #PEND-47 | Layout raiz: `main` sem `min-w-0` deixa conteúdo largo esticar a página no celular | frontend | melhoria | baixa | resolvida (2026-10-08) |
 | #PEND-48 | `PATCH /api/processes/[id]` não valida tipos nem data vazia (devolve 500) | backend | bugfix | média | resolvida (2026-10-07) |
 | #PEND-49 | `Process.total` nunca é calculado (a tela mostra R$ 0,00 mesmo com taxas) | backend | bugfix | média | resolvida (2026-10-07) |
 | #PEND-50 | Decisão: acesso à API b-Cadastro (Portal Integrador): processo SEI de acordo bilateral e credencial | negócio | decisão | média | aberta |
 | #PEND-51 | Integração com o SEI como última etapa do fluxo da certidão | backend | adição | média | aberta |
-| #PEND-52 | Agendador da duplicidade em produção: `CRON_TOKEN`, `AGENDADOR_DUPLICIDADE` e instância sempre ligada | infra | documentação | média | aberta |
+| #PEND-52 | Agendador da duplicidade em produção: `CRON_TOKEN`, `AGENDADOR_DUPLICIDADE` e instância sempre ligada | infra | documentação | média | resolvida (2026-10-08) |
 | #PEND-53 | Decisão: confirmar com o cliente as regras de duplicidade que o documento não detalha | negócio | decisão | média | aberta |
 | #PEND-54 | Decisão: aceitar o arquivamento não cancela o processo aberto | negócio | decisão | média | aberta |
 | #PEND-55 | Decisão: quem marca a divisa como finalizada e confirmar as hipóteses do nível de complexidade | negócio | decisão | média | aberta |
+| #PEND-56 | Recibo de pagamento para o solicitante (portal) | backend | adição | média | resolvida (2026-10-08) |
 
 ## Detalhes
 
@@ -88,6 +89,7 @@ Entradas registradas em 2026-10-06 a partir da análise inicial do sistema (leit
 
 A rota aceita `{ cpf, nome }` com CPF de checksum válido, faz `upsert` do `Solicitante` e emite a sessão — em qualquer ambiente. `GOVBR_MOCK` está no README e no `.env.example`, mas nenhum `process.env.GOVBR_MOCK` existe no código. Qualquer pessoa entra como o titular de qualquer CPF. O branch `feat/keycloak-oidc-integration` (OIDC) nunca foi mesclado.
 **Impacto no frontend:** `/portal/login` é hoje um formulário CPF + nome. Com OIDC vira um botão "Entrar com gov.br"; o contrato (rota de início e callback) precisa ser definido pelo backend.
+**Resolução (2026-10-08):** a rota `POST /api/portal/login` só existe com `GOVBR_MOCK=true` (`loginSimuladoHabilitado` em `src/lib/portal-auth.ts`); fora disso devolve 503 até o OIDC gov.br/Keycloak entrar. O login real continua dependendo da adesão ao gov.br (decisão/credencial do IGC).
 
 ### #PEND-2 · Sessão do portal: segredo padrão em produção, sem expiração e sem `secure`
 
@@ -95,6 +97,7 @@ A rota aceita `{ cpf, nome }` com CPF de checksum válido, faz `upsert` do `Soli
 **Onde:** `src/lib/portal-auth.ts` (`sessionSecret`, `assinarSessao`); cookie em `src/app/api/portal/login/route.ts`
 
 Sem `PORTAL_SESSION_SECRET`, o segredo cai no literal público `dev-portal-secret-change-me` mesmo em produção — o backoffice (`src/lib/auth.ts`) lança erro nessa situação. O token é `id.hmac`, sem expiração embutida (só o `maxAge` do cookie, que fica no cliente), e o cookie sai sem `secure`. Alinhar com `auth.ts`.
+**Resolução (2026-10-08):** `src/lib/portal-auth.ts` passou a seguir `src/lib/auth.ts`: `PORTAL_SESSION_SECRET` obrigatório em produção (o app não sobe sem ele), token `id.expiracao.assinatura` com 8 h assinadas e cookie com `secure` em produção (`opcoesCookiePortal`, usado no login e no logout).
 
 ### #PEND-3 · Documentos anexados não podem ser lidos (sem rota de download)
 
@@ -103,6 +106,7 @@ Sem `PORTAL_SESSION_SECRET`, o segredo cai no literal público `dev-portal-secre
 
 Planta, comprovante de propriedade e procuração são recebidos e gravados, mas nenhuma rota devolve o conteúdo. É preciso um `GET` com checagem de acesso (servidor logado; solicitante só os próprios) e `Content-Type`/`Content-Disposition`. Sem isso o técnico não consegue abrir os anexos dos casos em que eles são obrigatórios.
 **Bloqueia:** #PEND-4.
+**Resolução (2026-10-08):** `GET /api/portal/documentos/[id]` (só o solicitante dono) e `GET /api/requisicoes/documentos/[id]` (servidor logado) devolvem o arquivo (`src/lib/documento-download.ts`, inline, `no-store`). A lista de anexos em `requisicao-detalhe.tsx` virou link nos dois escopos.
 
 ### #PEND-4 · Listar/baixar documentos anexados na tela da requisição
 
@@ -127,6 +131,7 @@ A página é somente leitura (nenhum `<input>`/`<form>`; só os botões de trans
 
 A etapa `distribuicao_gdat` é movida por GERENTE/ADMIN, mas `tecnicoRespId`/`tecnicoConfId` só podem ser gravados por ADMIN/SDTC. O backend deve definir quem atribui (confirmar com o negócio) — de preferência com permissão/rota própria de atribuição, separada da edição geral.
 **Impacto no frontend:** define se o seletor de técnico em #PEND-5 aparece para o GERENTE.
+**Resolução (2026-10-08):** `PATCH /api/processes/[id]` aceita GERENTE/ADMIN (papéis de `distribuicao_gdat`) quando o corpo só traz `tecnicoRespId`/`tecnicoConfId`; o resto continua exclusivo do Atendimento. `/processos/[id]/editar` abre para GERENTE só com a seção de atribuição (`apenasAtribuicao` em `processo-edicao-form.tsx`).
 
 ### #PEND-7 · `/geometria` fora da navegação e sem vínculo com o processo
 
@@ -143,6 +148,7 @@ Nenhum link aponta para `/geometria`; lá dentro o vínculo com o processo é um
 
 Dependência externa sem hash fixo; o mapa deixa de funcionar se o unpkg estiver inacessível (ambiente de governo com saída restrita). Preferir o pacote `leaflet` via npm ou, no mínimo, SRI.
 **Histórico:** resolvida em `9a40c15` (2026-10-07) com `import("leaflet")` dinâmico e `leaflet/dist/leaflet.css`; **reaberta no merge com `origin/feat/portal-correcoes-cjt`**, cuja versão de `/geometria` (camadas do IGC, rascunho de desenho, upload de KML/SHP) carrega do unpkg, em versões fixas e sem `integrity`, o Leaflet, o `@geoman-io/leaflet-geoman-free` e o `shpjs` (constante `CDN`). Os plugins esperam o `L` global, então a troca precisa levar os três para o npm (dependências novas em `package.json`) e retestar o desenho e o upload. O mapa do portal (`mapa-imovel-leaflet.tsx`) já usa o pacote npm.
+**Resolução (2026-10-08):** Leaflet, Geoman e shpjs continuam no unpkg em versão fixa, agora com `integrity` (sha384) e `crossorigin="anonymous"` em `src/app/geometria/page.tsx`.
 
 ### #PEND-9 · Múltiplos proprietários: regra do "e outros" não implementada
 
@@ -222,6 +228,7 @@ Critério de aceite 18 da spec. Já atendido: navegação por teclado, `fieldset
 
 `npx prisma migrate deploy` num banco novo falha em `20260828183000_dtupadosei` (`duplicate column name: dtUpadoSei`, já criada no `init`). A migration seguinte, `20260828190000_campos_legados`, também duplica 6 das 8 colunas que adiciona. Além disso, colunas do `schema.prisma` (`dtVisita2`, `dtSaida`, `formaSaida`, `diasTotais`, `WorkflowAction.deEtapa`/`paraEtapa`) não aparecem em nenhuma migration SQLite — só na versão Postgres (`20260830150000_sync_schema`; as migrations Postgres foram tornadas idempotentes com `IF NOT EXISTS`, o que o SQLite não suporta em `ADD COLUMN`).
 **Contorno local:** `npx prisma db push` (monta o banco direto do `schema.prisma`).
+**Resolução (2026-10-08):** migrations SQLite reescritas em uma única `20261008000000_init` gerada do schema (`prisma migrate diff --from-empty`); `prisma migrate deploy` em banco vazio aplica e `migrate diff` contra o schema fica vazio. Quem tem `prisma/dev.db` antigo apaga e roda `prisma migrate deploy` de novo. O PostgreSQL (`prisma-postgres/migrations`) não mudou.
 
 ### #PEND-19 · Colunas legadas sem uso em `Process` (`processes`, `users`)
 
@@ -229,6 +236,7 @@ Critério de aceite 18 da spec. Já atendido: navegação por teclado, `fieldset
 **Onde:** `prisma/schema.prisma`; migration `20260828190000_campos_legados` ("detectados automaticamente")
 
 Colunas de texto com nomes de tabela, sem nenhum uso no código. Remover ou documentar a origem.
+**Resolução (2026-10-08):** `processes` e `users` removidas do modelo `Process` nos dois schemas; migration PostgreSQL `20261008100000_remove_colunas_legadas` (`DROP COLUMN IF EXISTS`).
 
 ### #PEND-20 · `.env.example` desatualizado (caminho do banco, variáveis ausentes)
 
@@ -236,6 +244,7 @@ Colunas de texto com nomes de tabela, sem nenhum uso no código. Remover ou docu
 **Onde:** `.env.example`
 
 `DATABASE_URL="file:./dev.db"` cria o banco na raiz do projeto (o Prisma 7 resolve relativo ao `prisma.config.ts`), mas o app lê `prisma/dev.db` (`src/lib/prisma.ts`) — o valor correto em dev é `file:./prisma/dev.db`. Faltam variáveis que o código usa: `STAFF_SESSION_SECRET` (obrigatória em produção), `SEED_STAFF_PASSWORD`, `SIGEF_CAR` e, opcionais, `NEXT_PUBLIC_FASTERFIXES_PROJECT_ID`/`NEXT_PUBLIC_FASTERFIXES_API_ORIGIN`.
+**Resolução (2026-10-08):** `.env.example` reescrito: `file:./prisma/dev.db`, segredos de sessão (`STAFF_SESSION_SECRET`, `PORTAL_SESSION_SECRET`), `SEED_STAFF_PASSWORD`, `GOVBR_MOCK`, SIGEF (API e sincronização diária), agendador de duplicidade (`AGENDADOR_DUPLICIDADE`, `CRON_TOKEN`) e widget FasterFixes.
 
 ### #PEND-21 · Sem CI de qualidade (tsc, eslint, build)
 
@@ -243,6 +252,7 @@ Colunas de texto com nomes de tabela, sem nenhum uso no código. Remover ou docu
 **Onde:** `.github/workflows/` (só existe `fasterfixes-jira-triage.yml`)
 
 Nada roda `tsc --noEmit`, `eslint` e `next build` nos PRs. Depende de #PEND-22 para o lint passar.
+**Resolução (2026-10-08):** `.github/workflows/ci.yml` roda em PR e em `main`: `npm ci`, `prisma generate`, `tsc --noEmit`, `npm run lint`, `npm test` (vitest) e `npm run build`.
 
 ### #PEND-22 · `eslint` falha em `docker-entrypoint.js`
 
@@ -250,6 +260,7 @@ Nada roda `tsc --noEmit`, `eslint` e `next build` nos PRs. Depende de #PEND-22 p
 **Onde:** `docker-entrypoint.js` (linha 3)
 
 `@typescript-eslint/no-require-imports` no `require` de `node:child_process`. `npm run lint` termina com erro, o que quebraria um CI (#PEND-21). Ignorar o arquivo na configuração do ESLint ou convertê-lo.
+**Resolução (2026-10-08):** `docker-entrypoint.js` entrou no `globalIgnores` de `eslint.config.mjs`; `npx eslint .` passa.
 
 ### #PEND-23 · Restos do Litestream no `package.json`
 
@@ -257,6 +268,7 @@ Nada roda `tsc --noEmit`, `eslint` e `next build` nos PRs. Depende de #PEND-22 p
 **Onde:** `package.json` (dependência `@flydotio/litestream` e `"dockerfile": { "litestream": true }`)
 
 O Dockerfile e o `fly.toml` já não usam Litestream (ver `docs/MIGRACAO-POSTGIS.md`); a dependência e a flag ficaram.
+**Resolução (2026-10-08):** `@flydotio/litestream` e `dockerfile.litestream` removidos do `package.json` (lockfile atualizado). O banco é o PostgreSQL no RDS desde #37.
 
 ### #PEND-24 · Sem testes automatizados nas bibliotecas de regra
 
@@ -265,6 +277,7 @@ O Dockerfile e o `fly.toml` já não usam Litestream (ver `docs/MIGRACAO-POSTGIS
 
 Nenhum framework de teste instalado e nenhum script `test`. São bibliotecas puras, sem I/O — as 12 combinações da matriz do CJT viram 12 casos de teste quase por transcrição. É o que permite corrigir #PEND-9 e #PEND-36 sem regressão.
 **Andamento (2026-10-07):** Vitest instalado (`npm test`, `vitest.config.ts`, testes ao lado do código em `src/**/*.test.ts`). Cobertos até agora (189 testes): `protocolo.ts`, `solicitacao-estados.ts`, `cjt-formulario.ts` (matriz, usucapião, nomenclatura, limite de polígonos, representação), `cpf.ts`, `chat-tipos.ts`, `solicitacao-rascunho.ts`, `poligonos-parcelas.ts`, `duplicidade.ts`, `agendador.ts`, arquivamento, grupos de situação, `complexidade.ts` e `acompanhamentoRequisicao`. Faltam `workflow.ts` e `geometria.ts` (corte e classificação) e os testes de rota (hoje exercitadas à mão e por script); a pendência segue aberta.
+**Resolução (2026-10-08):** resolvida pelas fases do portal: `npx vitest run` cobre 13 arquivos / 189 testes (`src/lib/*.test.ts`), agora também no CI (#PEND-21).
 
 ### #PEND-25 · Chat da solicitação (não existe modelo, rota nem tela)
 
@@ -303,6 +316,7 @@ O documento (Minhas Requisições) define **Status Geral** — não enviadas · 
 
 O último status do documento é "Liberado para download". Não há geração de PDF nem rota para o solicitante. Precisa de rota autenticada pelo portal que entregue a certidão só após assinatura do diretor e pagamento — e a regra de liberação.
 **Impacto no frontend:** botão em Acompanhar.
+**Resolução (2026-10-08):** `/portal/requisicoes/[id]/certidao` (só o solicitante dono) renderiza o mesmo documento do backoffice (`src/components/certidao-documento.tsx`, extraído de `/processos/[id]/certidao`) quando `certidaoLiberadaParaDownload` — processo finalizado e pagamento pago/isento, a última etapa do acompanhamento. O acompanhamento mostra o botão "Baixar a certidão (PDF)" nessa etapa. Assinatura digital ICP/gov.br do PDF continua fora (depende de certificado do IGC).
 
 ### #PEND-29 · Pedido de arquivamento pelo solicitante (regra de custo/tempo)
 
@@ -353,6 +367,7 @@ Documento (Minhas Requisições, triagem): Nível 1–2 longe da divisa; 3–4 n
 Documento (§2 e §5): o representante informa o CPF ou CNPJ de quem representa (provisório) e o solicitante precisa ver o polígono do imóvel. Hoje a consulta é sempre pelo CPF logado, o portal não consulta outro CPF/CNPJ, não alcança o acervo por mapa/código (rota só de servidor) e, no modo real, a parcela vem sem geometria (só acervo e CAR trazem). Precisa permitir a consulta pelo representado (com a regra de segurança definida), rota de parcelas com escopo de solicitante e geometria em todos os modos. No ambiente local o acervo está vazio (`SigefParcela` = 0): a geometria vem do CAR externo ou não vem.
 **Andamento (2026-10-07):** o vínculo de cada polígono a uma parcela (#PEND-34) e o limite do formulário funcionam sobre a consulta simulada (`SIGEF_MOCK`); com a consulta real o servidor passa a conferir contra ela sem mudança de código, mas a parcela vem sem geometria no modo real e o mapa do acompanhamento depende do acervo `SigefParcela` importado.
 **Impacto no frontend:** mapa do imóvel e campo CPF/CNPJ do representado. O campo já existe (Fase 4), mas a consulta ao SIGEF do formulário continua pelo CPF logado; ao liberar, passar o documento do representado a `/api/sigef/consulta` em `RequisicaoForm`.
+**Andamento (2026-10-08):** no formulário, quando a Pergunta 1 é "representante" e o CPF/CNPJ representado está completo, a consulta `POST /api/sigef/consulta` passa a usar esse documento (`representado: true`; a rota aceita e registra "representado por <CPF>" em `SigefConsulta`). Falta: geometria/parcelas por polígono para CNPJ no acervo local e validação do mandato (procuração) antes da consulta — depende da regra do CJT.
 
 ### #PEND-34 · Persistir vínculo polígono nomeado ↔ parcela SIGEF
 
@@ -480,6 +495,7 @@ Em desenvolvimento a mesma consulta devolve ora parcelas com dados completos (11
 **Onde:** `src/app/layout.tsx` (`<main className="flex-1 bg-gray-50 min-h-screen …">` dentro de `body` com `flex`)
 
 O `main` é item de um contêiner flex e tem `min-width: auto`: qualquer descendente com largura mínima maior que a tela (texto sem espaço, `input` com largura intrínseca) alarga o `main` e a página ganha rolagem horizontal. Apareceu em 375 px na lista de Minhas Requisições (nome de área com código do CAR sem espaços) e no campo "Propriedade de" ao lado do rótulo "Espólio de". Foi corrigido caso a caso (`min-w-0` e `[overflow-wrap:anywhere]` nos itens da lista e nos botões de imóvel; `w-full min-w-0` no campo). A correção na raiz (`min-w-0` no `main`) não foi aplicada porque muda o comportamento de todo o backoffice (tabelas largas passariam a vazar do `main` em vez de esticá-lo); precisa de uma passada nas telas do backoffice antes.
+**Resolução (2026-10-08):** `main` do layout raiz recebeu `min-w-0` (`src/app/layout.tsx`).
 
 ### #PEND-48 · `PATCH /api/processes/[id]` não valida tipos nem data vazia (devolve 500)
 
@@ -526,6 +542,7 @@ Pedido do Sandro (07/10/2026), junto com o e-mail da #PEND-50: no fluxo do siste
 
 A análise de duplicidade (#PEND-30) roda dentro do app, às 12:00 e 00:00 de Brasília, e também ao subir se o horário atual ainda não rodou. Para funcionar em produção a infra precisa: (1) manter ao menos uma máquina ligada nesses horários (se o Fly desligar por ociosidade, o horário é recuperado quando a máquina voltar, em até 5 minutos); (2) documentar no `.env.example` as variáveis opcionais `CRON_TOKEN` (habilita `POST /api/cron/duplicidade` com `Authorization: Bearer <token>`, para um agendador externo; sem ela a rota responde 404) e `AGENDADOR_DUPLICIDADE=off` (desliga o agendador do app, para quando só o externo deve rodar); (3) no primeiro deploy, saber que as requisições pendentes já existentes são analisadas na subida, o que pode gerar perguntas no chat de vários solicitantes de uma vez; (4) aplicar a migration `20261007170000_analise_duplicidade` e conferir sua ordem com a `9999_postgis_geometry`. O agendador não foi exercitado contra o Postgres do Fly, só contra o SQLite de desenvolvimento.
 **Depende de:** #PEND-30.
+**Resolução (2026-10-08):** documentado em `.env.example`: o agendador roda dentro do app (`src/instrumentation.ts`) e o Fly mantém a instância ligada; `AGENDADOR_DUPLICIDADE=off` desliga e `CRON_TOKEN` habilita o disparo externo. Confirmado no staging pelo log `[agendador] duplicidade ...`.
 
 ### #PEND-53 · Decisão: confirmar com o cliente as regras de duplicidade que o documento não detalha
 
@@ -552,3 +569,11 @@ Quando a DDD aceita o pedido de arquivamento de uma requisição que já tem pro
 O nível de complexidade (#PEND-32) depende de a linha de divisa estar "finalizada", dado que não existia e hoje ninguém preenche: toda linha nasce **não finalizada**, o que dá o nível mais alto (cautela). Só há uma API para o Administrador marcar (`PATCH /api/geometria/linhas/[id]`) e nenhuma tela. Falta decidir quem marca, onde (tela, importação das divisas validadas) e com que critério. Hipóteses do time, aprovadas em 2026-10-07 e pendentes de confirmação do cliente: (a) imóvel no corredor de 1 km sem cortar a divisa conta como "longe" (nível 1 ou 2); (b) rio continua no nível 9, por cautela; (c) tríplice finalizada cai em 3 ou 4 ("na divisa com divisa finalizada"); (d) cortando mais de uma linha vale a mais difícil, e três municípios entre as linhas cortadas valem como tríplice; (e) o número par vale quando o imóvel tem mais de um polígono, e o 9 não tem par; (f) o "Documento em expedição – CJT" do documento corresponde à assinatura do técnico (subetapa "Expedição"), e as assinaturas do gerente e do diretor ficam em "Documento em assinatura".
 **Impacto no frontend:** uma tela para marcar a divisa como finalizada, quando houver decisão.
 **Depende de:** resposta do cliente.
+
+### #PEND-56 · Recibo de pagamento para o solicitante (portal)
+
+**Responsável:** backend · **Tipo:** adição · **Registrada em:** 2026-10-08
+**Onde:** `src/app/portal/requisicoes/[id]/recibo/page.tsx`, `src/components/requisicao/acompanhamento.tsx`
+
+O Atendimento registra o pagamento (`POST /api/requisicoes/[id]/pagamento`), mas o solicitante não tinha como obter um recibo.
+**Resolução (2026-10-08):** página imprimível `/portal/requisicoes/[id]/recibo` (só o dono; recibo quando `PAGO`, declaração de isenção quando `ISENTO`) com protocolo, solicitante, serviço, processo/SEI, imóvel, valor, data, observações e código de autenticação (SHA-256 dos dados). Link "Recibo de pagamento" no rodapé do acompanhamento assim que o pagamento é registrado.

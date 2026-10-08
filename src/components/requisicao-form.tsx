@@ -168,13 +168,18 @@ export function RequisicaoForm({
     tituloEnvioRef.current?.focus();
   }, [protocolo, encaminhado]);
 
+  // Representante (Pergunta 1a): as parcelas consultadas são as do CPF/CNPJ representado (#PEND-33).
+  const docRepresentado =
+    form.qualidade === "1a" && cpfCnpjCompleto(emNomeDeCpf) ? digitosCpfCnpj(emNomeDeCpf) : null;
+  const docConsulta = docRepresentado ?? cpf;
+
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch("/api/sigef/consulta", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cpfCnpj: cpf }),
+          body: JSON.stringify({ cpfCnpj: docConsulta, representado: docRepresentado != null }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
@@ -197,7 +202,7 @@ export function RequisicaoForm({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cpf]);
+  }, [docConsulta]);
 
   // Trocar uma resposta anterior recalcula a pergunta 4 e descarta os valores
   // que deixaram de ser aplicáveis (item 7 dos requisitos de interface).

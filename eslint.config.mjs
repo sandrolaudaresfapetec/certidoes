@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // CommonJS do Docker (require): fora do lint do app.
+    "docker-entrypoint.js",
   ]),
 ]);
 

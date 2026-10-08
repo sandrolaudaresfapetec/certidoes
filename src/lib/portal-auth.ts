@@ -17,30 +17,55 @@ import type { Solicitante } from "@prisma/client";
  */
 
 export const PORTAL_COOKIE = "portal_session";
+export const PORTAL_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
+/** Mesma regra do backoffice (src/lib/auth.ts): sem segredo em producao o portal nao sobe. */
 function sessionSecret(): string {
-  return process.env.PORTAL_SESSION_SECRET || "dev-portal-secret-change-me";
+  const secret = process.env.PORTAL_SESSION_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("PORTAL_SESSION_SECRET nao definido em producao");
+  }
+  return "dev-portal-secret-change-me";
 }
 
-export function assinarSessao(solicitanteId: string): string {
-  const sig = createHmac("sha256", sessionSecret())
-    .update(solicitanteId)
-    .digest("hex")
-    .slice(0, 32);
-  return `${solicitanteId}.${sig}`;
+function assinar(payload: string): string {
+  return createHmac("sha256", sessionSecret()).update(payload).digest("hex").slice(0, 32);
 }
 
-export function verificarSessao(valor: string | undefined): string | null {
+/** Token `solicitanteId.expiracaoMs.assinatura`: a validade vai assinada, nao depende so do cookie. */
+export function assinarSessao(solicitanteId: string, agoraMs = Date.now()): string {
+  const expira = agoraMs + PORTAL_SESSION_MAX_AGE_SECONDS * 1000;
+  const payload = `${solicitanteId}.${expira}`;
+  return `${payload}.${assinar(payload)}`;
+}
+
+/** Devolve o id do solicitante quando a sessao e valida e nao expirou. */
+export function verificarSessao(valor: string | undefined, agoraMs = Date.now()): string | null {
   if (!valor) return null;
-  const idx = valor.lastIndexOf(".");
-  if (idx <= 0) return null;
-  const id = valor.slice(0, idx);
-  const sig = valor.slice(idx + 1);
-  const esperado = createHmac("sha256", sessionSecret())
-    .update(id)
-    .digest("hex")
-    .slice(0, 32);
-  return sig === esperado ? id : null;
+  const partes = valor.split(".");
+  if (partes.length !== 3) return null;
+  const [id, expira, sig] = partes;
+  if (!id || sig !== assinar(`${id}.${expira}`)) return null;
+  const limite = Number(expira);
+  if (!Number.isFinite(limite) || limite <= agoraMs) return null;
+  return id;
+}
+
+/** Opcoes do cookie de sessao do portal (httpOnly, secure em producao). */
+export function opcoesCookiePortal(maxAge = PORTAL_SESSION_MAX_AGE_SECONDS) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge,
+  };
+}
+
+/** Login simulado do gov.br (CPF + nome) so existe com GOVBR_MOCK=true; ver README. */
+export function loginSimuladoHabilitado(): boolean {
+  return process.env.GOVBR_MOCK === "true";
 }
 
 export async function getSolicitanteLogado(): Promise<Solicitante | null> {

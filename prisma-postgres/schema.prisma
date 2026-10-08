@@ -260,13 +260,11 @@ model Process {
   sigefConsultadoEm  DateTime?
 
   numeroSaidaIGC    String?
-  processes    String?
   servicoTecCampo    Float?
   servicoTecGabinete    Float?
   taxaAbertura    Float?
   taxaVistoria    Float?
   total    Float?
-  users    String?
   sigefConsultas    SigefConsulta[]
   cortesDivisa      CorteDivisa[]
   solicitacao       Solicitacao?
