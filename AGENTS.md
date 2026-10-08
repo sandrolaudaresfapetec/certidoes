@@ -8,7 +8,7 @@ Sistema de emissão de **Certidão de Jurisdição Territorial (CJT)** do IGC-SP
 
 - **Portal do solicitante** (`/portal`, cookie `portal_session`) — o cidadão pede a certidão.
 - **Backoffice** (todo o resto, cookie `igc_session`) — requisições, processos (workflow de 9 etapas e assinaturas), usuários.
-- **Corte de divisas** (`/geometria`) — mapa que corta o polígono do imóvel pelas linhas de divisa municipal.
+- **Pré-análise de divisas** (`/geometria`, antes chamada "Corte de divisas") — mapa que corta o polígono do imóvel pelas linhas de divisa municipal; aceita KML/shapefile de limites de municípios como camada de pré-análise.
 
 Fluxo de domínio: `Solicitante` → `Solicitacao` (requisição) → abertura do `Process` → etapas do workflow → certidão em `/processos/[id]/certidao`. O `README.md` descreve cada módulo; `docs/` tem os planos de migração e de teste.
 

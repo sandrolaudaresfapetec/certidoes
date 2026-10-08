@@ -137,9 +137,11 @@ Passo a passo completo em `docs/MIGRACAO-POSTGIS.md`.
 
 ### Parcelas SIGEF (acervo do INCRA) no modulo de geometria
 
-O modulo de corte de divisas (`/geometria`) trabalha exclusivamente com as parcelas
+O modulo de pré-análise de divisas (`/geometria`, antes "corte de divisas") trabalha exclusivamente com as parcelas
 certificadas do SIGEF importadas do shapefile do Acervo Fundiario do INCRA
 (`scripts/import-sigef-shp.ts`, tabela `SigefParcela`). A tela permite exibir as
 parcelas da janela do mapa, selecionar uma parcela por clique ou buscar pelo codigo.
+Para a pré-análise, o técnico pode ainda sobrepor os limites municipais oficiais do IGC (WMS da IDESP),
+abrir um arquivo KML/shapefile de limites de municípios ou a camada enviada pelo proprietário.
 Endpoint: `GET /api/sigef/parcelas` (`bbox=`, `lon=&lat=`, `codigo=` ou `uf=`).
 Quando o acervo nao esta importado, a consulta por CPF/CNPJ devolve dados 100% simulados.
