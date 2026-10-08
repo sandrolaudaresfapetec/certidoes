@@ -28,7 +28,7 @@ const CAMPOS_FINANCEIROS = [
 
 const CAMPOS_INTEIRO = ["anoEntrada"];
 
-const CAMPOS_OBRIGATORIOS = ["anoEntrada", "interessado"];
+const CAMPOS_OBRIGATORIOS = ["anoEntrada", "tipoServico", "tipo", "interessado"];
 
 type Normalizado = { valor: unknown } | { erro: string };
 
@@ -176,31 +176,28 @@ export async function PATCH(
     return NextResponse.json({ error: erroAtribuicao }, { status: 400 });
   }
 
-  const atual = await prisma.process.findUnique({
-    where: { id },
-    select: { taxaAbertura: true, servicoTecGabinete: true, taxaVistoria: true, servicoTecCampo: true },
-  });
-  if (!atual) {
+  const include = {
+    tecnicoResp: { select: { id: true, name: true } },
+    tecnicoConf: { select: { id: true, name: true } },
+    criadoPor: { select: { id: true, name: true } },
+  };
+  const recalcularTotal = CAMPOS_FINANCEIROS.some((c) => c in data);
+
+  const existe = await prisma.process.findUnique({ where: { id }, select: { id: true } });
+  if (!existe) {
     return NextResponse.json({ error: "Processo nao encontrado" }, { status: 404 });
   }
 
-  if (CAMPOS_FINANCEIROS.some((c) => c in data)) {
-    data.total = somarTotal({
-      taxaAbertura: (data.taxaAbertura ?? atual.taxaAbertura) as number | null,
-      servicoTecGabinete: (data.servicoTecGabinete ?? atual.servicoTecGabinete) as number | null,
-      taxaVistoria: (data.taxaVistoria ?? atual.taxaVistoria) as number | null,
-      servicoTecCampo: (data.servicoTecCampo ?? atual.servicoTecCampo) as number | null,
+  // O total e somado sobre a linha ja atualizada, dentro da transacao: o lock da linha serializa
+  // PATCHes concorrentes e nenhum deles grava um total calculado sobre valores antigos.
+  const processo = await prisma.$transaction(async (tx) => {
+    const atualizado = await tx.process.update({ where: { id }, data, include });
+    if (!recalcularTotal) return atualizado;
+    return tx.process.update({
+      where: { id },
+      data: { total: somarTotal(atualizado) },
+      include,
     });
-  }
-
-  const processo = await prisma.process.update({
-    where: { id },
-    data,
-    include: {
-      tecnicoResp: { select: { id: true, name: true } },
-      tecnicoConf: { select: { id: true, name: true } },
-      criadoPor: { select: { id: true, name: true } },
-    },
   });
 
   return NextResponse.json(processo);
