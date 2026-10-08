@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { validarCPF } from "@/lib/cpf";
-import { assinarSessao, PORTAL_COOKIE } from "@/lib/portal-auth";
+import {
+  assinarSessao,
+  loginSimuladoHabilitado,
+  opcoesCookiePortal,
+  PORTAL_COOKIE,
+} from "@/lib/portal-auth";
 
 /**
  * POST /api/portal/login
@@ -11,6 +16,12 @@ import { assinarSessao, PORTAL_COOKIE } from "@/lib/portal-auth";
  * OIDC estiver ativo, este endpoint sera substituido pelo callback OIDC.
  */
 export async function POST(request: NextRequest) {
+  if (!loginSimuladoHabilitado()) {
+    return NextResponse.json(
+      { error: "Login simulado desligado (GOVBR_MOCK). Aguardando o login gov.br oficial." },
+      { status: 503 }
+    );
+  }
   const body = await request.json().catch(() => ({}));
   const cpf = (body.cpf ?? "").toString().replace(/\D/g, "");
   const nome = (body.nome ?? "").toString().trim();
@@ -38,11 +49,6 @@ export async function POST(request: NextRequest) {
     ok: true,
     cadastroCompleto: solicitante.cadastroCompleto,
   });
-  res.cookies.set(PORTAL_COOKIE, assinarSessao(solicitante.id), {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 8, // 8h
-  });
+  res.cookies.set(PORTAL_COOKIE, assinarSessao(solicitante.id), opcoesCookiePortal());
   return res;
 }

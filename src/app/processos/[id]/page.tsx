@@ -13,6 +13,9 @@ import { ArrowLeft, Clock, User, FileText, MapPin, FileCheck, Pencil, Scissors }
 import { WorkflowActions } from "@/components/workflow-actions";
 import { podeAtender, podeUsarGeometria, requireUsuario } from "@/lib/auth";
 import { exibirCpfCnpj } from "@/lib/mascaras";
+import { sobreposicoesDe } from "@/lib/duplicidade-servidor";
+import { AvisoSobreposicao } from "@/components/requisicao/avisos-duplicidade";
+import { NivelComplexidade } from "@/components/nivel-complexidade";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +36,7 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
       tecnicoResp: true,
       tecnicoConf: true,
       criadoPor: true,
+      solicitacao: { select: { id: true, sobreposicaoCom: true } },
       workflowActions: {
         include: { user: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
@@ -48,6 +52,15 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
   const etapaAtual = processo.situacao as WorkflowStage;
   const bloqueio = bloqueioDeSaida(etapaAtual, usuario, processo);
   const mostrarCorte = await podeUsarGeometria(usuario);
+  // Nível de complexidade (#PEND-32): sugestão do último corte; confirma o técnico responsável ou ADMIN.
+  const ultimoCorte = await prisma.corteDivisa.findFirst({
+    where: { processId: processo.id, nivelSugerido: { not: null } },
+    orderBy: { dataCorte: "desc" },
+    select: { nivelSugerido: true, dataCorte: true },
+  });
+  const podeConfirmarNivel = usuario.role === "ADMIN" || processo.tecnicoRespId === usuario.id;
+  // Sobreposição achada na análise de duplicidade da requisição de origem (#PEND-30).
+  const sobreposicoes = processo.solicitacao ? await sobreposicoesDe(processo.solicitacao) : [];
   const allowedNext = bloqueio
     ? []
     : (ALLOWED_TRANSITIONS[etapaAtual] || []).filter(
@@ -110,6 +123,12 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
           </div>
         </div>
       </div>
+
+      {sobreposicoes.length > 0 && (
+        <div className="mb-6">
+          <AvisoSobreposicao sobreposicoes={sobreposicoes} />
+        </div>
+      )}
 
       {salvo && (
         <div
@@ -181,6 +200,18 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
               <InfoField label="Dificuldade de Divisa" value={processo.divisaDificuldade} />
             </div>
           </div>
+
+          <NivelComplexidade
+            processoId={processo.id}
+            nivelAtual={processo.nivelComplexidade}
+            confirmadoEm={processo.nivelComplexidadeEm ? formatDateTime(processo.nivelComplexidadeEm) : null}
+            sugestao={
+              ultimoCorte?.nivelSugerido != null
+                ? { nivel: ultimoCorte.nivelSugerido, quando: formatDate(ultimoCorte.dataCorte) }
+                : null
+            }
+            podeEditar={podeConfirmarNivel}
+          />
 
           {/* SIGEF/INCRA */}
           {processo.sigefCodigoImovel && (

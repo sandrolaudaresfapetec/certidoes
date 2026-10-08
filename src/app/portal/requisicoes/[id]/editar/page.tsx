@@ -4,12 +4,15 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoForm } from "@/components/requisicao-form";
-import { formularioDoPayload } from "@/lib/cjt-formulario";
+import {
+  LIMITE_POLIGONOS_MAXIMO,
+  ajustarNomesPoligonos,
+  formularioDoPayload,
+  lerPoligonos,
+} from "@/lib/cjt-formulario";
+import { clientePodeEditar } from "@/lib/solicitacao-estados";
 
 export const dynamic = "force-dynamic";
-
-/** Situações em que a requisição ainda aceita alteração pelo cliente. */
-const STATUS_EDITAVEIS = ["DEVOLVIDA"];
 
 export default async function EditarRequisicaoPage({
   params,
@@ -26,18 +29,17 @@ export default async function EditarRequisicaoPage({
   });
   if (!requisicao) notFound();
 
-  const editavel =
-    !requisicao.processId &&
-    !requisicao.finalizadaEm &&
-    STATUS_EDITAVEIS.includes(requisicao.status);
+  const editavel = clientePodeEditar(requisicao);
+
+  const rascunho = requisicao.status === "RASCUNHO";
 
   const voltar = (
     <Link
-      href={`/portal/requisicoes/${requisicao.id}`}
+      href={rascunho ? "/portal?grupo=nao-enviadas" : `/portal/requisicoes/${requisicao.id}`}
       className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
     >
       <ArrowLeft className="h-4 w-4" />
-      Acompanhar Requisição
+      {rascunho ? "Minhas Requisições" : "Acompanhar Requisição"}
     </Link>
   );
 
@@ -56,20 +58,42 @@ export default async function EditarRequisicaoPage({
     );
   }
 
-  const nomes = requisicao.cjtNomesPoligonos
+  const nomesGuardados = requisicao.cjtNomesPoligonos
     ? (JSON.parse(requisicao.cjtNomesPoligonos) as string[])
     : [];
+  // Liberado pela DDD com mais de 12 polígonos: o rascunho guardou só 12 nomes; completa a lista.
+  const liberada = Boolean(requisicao.liberadaEm);
+  const qtd = requisicao.cjtQtdPoligonos;
+  const nomes =
+    liberada && qtd
+      ? ajustarNomesPoligonos(nomesGuardados, Math.min(qtd, LIMITE_POLIGONOS_MAXIMO))
+      : nomesGuardados;
 
   return (
     <div>
       {voltar}
       <h1 className="text-xl font-semibold text-gray-900 mb-1">
-        Alterar Requisição {requisicao.protocolo}
+        {rascunho ? "Continuar solicitação" : "Alterar Requisição"} {requisicao.protocolo}
       </h1>
       <p className="text-sm text-gray-600 mb-6">
-        Revise as respostas e os dados do imóvel. As alterações substituem os
-        dados enviados anteriormente.
+        {rascunho
+          ? `Este é um rascunho salvo em ${new Date(requisicao.updatedAt).toLocaleString("pt-BR", {
+              timeZone: "America/Sao_Paulo",
+              dateStyle: "short",
+              timeStyle: "short",
+            })}. Complete as respostas e envie quando estiver pronto. Nada é analisado pelo IGC antes do envio.`
+          : "Revise as respostas e os dados do imóvel. As alterações substituem os dados enviados anteriormente."}
       </p>
+      {requisicao.congeladaEm && (
+        <p className="mb-6 -mt-3 text-sm">
+          <Link
+            href={`/portal/requisicoes/${requisicao.id}#conversa`}
+            className="text-emerald-800 underline"
+          >
+            Ver conversa com a DDD
+          </Link>
+        </p>
+      )}
 
       <RequisicaoForm
         cpf={solicitante.cpf}
@@ -85,9 +109,14 @@ export default async function EditarRequisicaoPage({
             resultado: requisicao.cjtResultado,
             situacao: requisicao.cjtSituacao,
             propriedadeDe: requisicao.cjtPropriedadeDe,
+            informaMatricula: requisicao.cjtInformaMatricula,
             matricula: requisicao.cjtMatricula,
             qtdPoligonos: requisicao.cjtQtdPoligonos,
             nomesPoligonos: nomes,
+            parcelasPoligonos: ajustarNomesPoligonos(
+              lerPoligonos(requisicao.cjtPoligonos, null).map((p) => p.parcelaCodigo ?? ""),
+              nomes.length
+            ),
             codigoIncra: requisicao.cjtCodigoIncra,
             declaracao: requisicao.cjtDeclaracaoAceita,
           }),
@@ -97,6 +126,9 @@ export default async function EditarRequisicaoPage({
           emNomeDeNome: requisicao.emNomeDeNome,
           observacao: requisicao.observacao,
           documentosEnviados: requisicao.documentos.map((d) => d.tipo),
+          id: requisicao.id,
+          rascunho,
+          liberada,
         }}
       />
     </div>

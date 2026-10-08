@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirAtendimentoApi } from "@/lib/auth";
+import { criarComProtocolo } from "@/lib/protocolo";
+import { analisarSolicitacao } from "@/lib/duplicidade-servidor";
+import { resolverPoligonos } from "@/lib/poligonos-parcelas-servidor";
 import {
   formularioDoPayload,
   normalizarParaPersistencia,
   primeiroErro,
   validarFormulario,
+  validarRepresentacao,
 } from "@/lib/cjt-formulario";
-
-function gerarProtocolo(sequencial: number): string {
-  const ano = new Date().getFullYear();
-  return `CERT-${ano}-${String(sequencial).padStart(6, "0")}`;
-}
 
 /**
  * POST /api/requisicoes — abertura de requisição pelo Atendimento, em nome de
@@ -38,17 +37,36 @@ export async function POST(request: NextRequest) {
   }
 
   const formulario = formularioDoPayload(body.cjt);
-  const erroCjt = primeiroErro(validarFormulario(formulario));
+  // O atendimento é a própria DDD: não tem o limite de 12 polígonos (#PEND-31).
+  const erroCjt = primeiroErro(validarFormulario(formulario, { liberado: true, exigirParcelas: tipoViaSigef }));
   if (erroCjt) {
     return NextResponse.json({ error: erroCjt }, { status: 400 });
   }
   const cjt = normalizarParaPersistencia(formulario);
 
-  const total = await prisma.solicitacao.count();
+  // Gleba com 2+ polígonos: cada polígono liga a uma parcela do SIGEF do solicitante (#PEND-34).
+  const vinculo = await resolverPoligonos({
+    cpf: solicitante.cpf,
+    formulario,
+    tipoViaSigef,
+    parcelaPrincipal: body.sigefParcelaCodigo,
+  });
+  if (!vinculo.ok) return NextResponse.json({ error: vinculo.erro }, { status: 400 });
 
-  const solicitacao = await prisma.solicitacao.create({
+  // Representante informa CPF/CNPJ válido e nome de quem representa (#PEND-44).
+  const representacao = validarRepresentacao({
+    qualidade: formulario.qualidade,
+    emNomeDeCpf: body.emNomeDeCpf,
+    emNomeDeNome: body.emNomeDeNome,
+  });
+  if (!representacao.ok) {
+    return NextResponse.json({ error: representacao.erro }, { status: 400 });
+  }
+
+  const solicitacao = await criarComProtocolo((protocolo) =>
+    prisma.solicitacao.create({
     data: {
-      protocolo: gerarProtocolo(total + 1),
+      protocolo,
       tipoViaSigef,
       sigefCodigoImovel: tipoViaSigef ? body.sigefCodigoImovel : null,
       sigefParcelaCodigo: tipoViaSigef ? body.sigefParcelaCodigo : null,
@@ -61,15 +79,26 @@ export async function POST(request: NextRequest) {
       sigefUf: tipoViaSigef ? body.sigefUf || null : null,
       sigefStatus: tipoViaSigef ? body.sigefStatus || null : null,
       sigefOrigem: tipoViaSigef ? body.sigefOrigem || null : null,
-      emNomeDeCpf: (body.emNomeDeCpf ?? "").toString().replace(/\D/g, "") || null,
-      emNomeDeNome: (body.emNomeDeNome ?? "").toString().trim() || null,
+      emNomeDeCpf: representacao.cpf,
+      emNomeDeNome: representacao.nome,
       observacao: (body.observacao ?? "").toString() || null,
       solicitanteId: solicitante.id,
       origem: "ATENDIMENTO",
       abertaPorUserId: sessao.usuario.id,
       ...cjt,
+      cjtPoligonos: vinculo.cjtPoligonos,
     },
-  });
+    })
+  );
 
-  return NextResponse.json(solicitacao, { status: 201 });
+  // Aberta pelo balcão: analisada na hora (as do portal esperam 12:00 ou 00:00). Se a análise
+  // falhar a requisição fica salva e a próxima execução do agendador a pega.
+  try {
+    await analisarSolicitacao(solicitacao.id);
+  } catch (e) {
+    console.error("[duplicidade] falha ao analisar a requisição do balcão:", e);
+  }
+  const atual = await prisma.solicitacao.findUnique({ where: { id: solicitacao.id } });
+
+  return NextResponse.json(atual ?? solicitacao, { status: 201 });
 }

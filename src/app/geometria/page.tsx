@@ -32,24 +32,30 @@ const ZOOM_MIN_SIGEF = 12;
 const IDESP_WMS = "https://www.idesp.sp.gov.br/geoserver/idesp/wms";
 const IDESP_LIMITES_MUNICIPAIS = "idesp:dradt_mvw_lml_municipio_a_2021";
 
-const CDN = {
-  leafletCss: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
-  leafletJs: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
-  geomanCss: "https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css",
-  geomanJs: "https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js",
-  shpJs: "https://unpkg.com/shpjs@6.1.0/dist/shp.js",
+type Recurso = { href: string; integrity: string };
+
+/** Bibliotecas de mapa do unpkg, em versao fixa e com hash SRI (sha384) para o navegador recusar conteudo alterado. */
+const CDN: Record<"leafletCss" | "leafletJs" | "geomanCss" | "geomanJs" | "shpJs", Recurso> = {
+  leafletCss: { href: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css", integrity: "sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" },
+  leafletJs: { href: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js", integrity: "sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" },
+  geomanCss: { href: "https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css", integrity: "sha384-nfYqa/3Xh7kCl9/bO8fCcmqGuhuVWAle+CQgdE/LdgaQiO6fSkKh8C0fLdCVrrQJ" },
+  geomanJs: { href: "https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js", integrity: "sha384-7CTDkMmRSjHvjl8ftuwzLq/ogrEnsuNoi3825eH06KuMNWWwcfaNIHol5+I3EAzO" },
+  shpJs: { href: "https://unpkg.com/shpjs@6.1.0/dist/shp.js", integrity: "sha384-GIFORW2IBzirKvqqzlZo1DpZjgz7m+VmIHO0CWEZ8vnUPv2CVCIVe0+XEc5o7ltT" },
 };
 
-function carregarCss(id: string, href: string) {
+function carregarCss(id: string, recurso: Recurso) {
   if (document.getElementById(id)) return;
   const link = document.createElement("link");
   link.id = id;
   link.rel = "stylesheet";
-  link.href = href;
+  link.href = recurso.href;
+  link.integrity = recurso.integrity;
+  link.crossOrigin = "anonymous";
   document.head.appendChild(link);
 }
 
-function carregarScript(src: string): Promise<void> {
+function carregarScript(recurso: Recurso): Promise<void> {
+  const src = recurso.href;
   return new Promise((resolve, reject) => {
     const existente = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
     if (existente?.dataset.carregado) return resolve();
@@ -61,6 +67,8 @@ function carregarScript(src: string): Promise<void> {
     script.addEventListener("error", () => reject(new Error(`Falha ao carregar ${src}`)));
     if (!existente) {
       script.src = src;
+      script.integrity = recurso.integrity;
+      script.crossOrigin = "anonymous";
       document.body.appendChild(script);
     }
   });
@@ -930,6 +938,16 @@ export default function GeometriaPage() {
                 : "bg-emerald-100 text-emerald-800"}`}>
                 Caso: {resultado.classificacao}
               </span>
+              {resultado.nivelSugerido != null && (
+                <span className="ml-2 text-xs font-bold px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                  Nível sugerido: {resultado.nivelSugerido}
+                </span>
+              )}
+              {resultado.nivelMotivo && (
+                <p className="mt-1 text-xs text-gray-700">
+                  {resultado.nivelMotivo}. O técnico responsável confirma o nível no processo.
+                </p>
+              )}
               {processoGravado && (
                 <p className="mt-2 text-sm text-gray-800">
                   Corte gravado no processo{" "}

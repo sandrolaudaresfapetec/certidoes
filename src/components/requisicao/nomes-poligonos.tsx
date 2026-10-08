@@ -2,6 +2,17 @@
 
 import { useState } from "react";
 
+import {
+  LIMITE_COMPLEMENTO,
+  erroNomenclatura,
+  nomesRepetidos,
+  separarNome,
+  type TipoNomePoligono,
+} from "@/lib/cjt-formulario";
+
+// A nomenclatura (regras puras) mora em cjt-formulario.ts, onde o servidor também a usa (#PEND-36).
+export { LIMITE_COMPLEMENTO, erroNomenclatura, nomesRepetidos, separarNome };
+
 /** Tipos de nome de polígono; "" = apenas o complemento (documento do cliente, item 8). */
 const TIPOS = [
   { valor: "Gleba", rotulo: "Gleba" },
@@ -10,54 +21,11 @@ const TIPOS = [
   { valor: "", rotulo: "Apenas o complemento" },
 ] as const;
 
-type Tipo = (typeof TIPOS)[number]["valor"];
-
-export const LIMITE_COMPLEMENTO = 3;
-const PADRAO_COMPLEMENTO = /^[A-Za-z0-9-]{1,3}$/;
-
-/** Separa "Gleba A-1" em tipo e complemento; null quando o nome foge do padrão. */
-export function separarNome(nome: string): { tipo: Tipo; complemento: string } | null {
-  const comTipo = /^(Gleba|Parte|Parcela) (\S+)$/.exec(nome);
-  if (comTipo && PADRAO_COMPLEMENTO.test(comTipo[2])) {
-    return { tipo: comTipo[1] as Tipo, complemento: comTipo[2] };
-  }
-  return PADRAO_COMPLEMENTO.test(nome) ? { tipo: "", complemento: nome } : null;
-}
+type Tipo = TipoNomePoligono;
 
 function comporNome(tipo: Tipo, complemento: string): string {
   if (!complemento) return "";
   return tipo ? `${tipo} ${complemento}` : complemento;
-}
-
-/** Nomes que aparecem mais de uma vez (sem diferenciar maiúsculas). */
-export function nomesRepetidos(nomes: string[]): Set<string> {
-  const vistos = new Set<string>();
-  const repetidos = new Set<string>();
-  for (const n of nomes) {
-    const chave = n.trim().toLowerCase();
-    if (!chave) continue;
-    if (vistos.has(chave)) repetidos.add(chave);
-    vistos.add(chave);
-  }
-  return repetidos;
-}
-
-/**
- * Valida a nomenclatura fechada dos polígonos (tipo + complemento de até 3 caracteres).
- * Só a tela impõe o padrão; o servidor valida 1 a 15 caracteres (#PEND-36).
- */
-export function erroNomenclatura(nomes: string[]): string | null {
-  const partes = nomes.map((n) => separarNome(n.trim()));
-  if (partes.some((p) => p === null)) {
-    return `Informe o complemento de cada polígono: até ${LIMITE_COMPLEMENTO} caracteres, com letras sem acento, números ou “-”.`;
-  }
-  if (new Set(partes.map((p) => p!.tipo)).size > 1) {
-    return "Use o mesmo tipo de nome em todos os polígonos.";
-  }
-  if (nomesRepetidos(nomes).size > 0) {
-    return "Não repita nomes de polígono na mesma solicitação.";
-  }
-  return null;
 }
 
 /**

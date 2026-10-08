@@ -9,12 +9,15 @@
  * PIOR_CASO (divisa triplice/quadrupla ou rio — extend + merge automatico).
  */
 import * as turf from "@turf/turf";
+import { contarPoligonos, sugerirNivel } from "@/lib/complexidade";
 
 export interface LinhaDivisaGeo {
   id: string;
   codigo: string;
   tipo: string;
   municipios: string[];
+  /** Divisa finalizada (baixa o nível de complexidade, #PEND-32); ausente = não finalizada. */
+  finalizada?: boolean;
   feature: any; // GeoJSON LineString/MultiLineString
 }
 
@@ -30,6 +33,9 @@ export interface ResultadoCorteDivisa {
   classificacao: "FACIL" | "MEDIO" | "DIFICIL" | "PIOR_CASO";
   fragmentos: FragmentoCorte[];
   linhasUsadas: { id: string; codigo: string }[];
+  /** Nível de complexidade 1 a 9 sugerido pelo corte; o técnico confirma no processo. */
+  nivelSugerido: number;
+  nivelMotivo: string;
 }
 
 const CORREDOR_KM = 1; // corredor de seguranca de 1 km nas fronteiras
@@ -173,7 +179,21 @@ export function cortarImovel(imovel: any, linhas: LinhaDivisaGeo[]): ResultadoCo
     ...f,
     municipio: f.municipio ?? declarado,
   }));
-  return { classificacao, fragmentos, linhasUsadas };
+  const sugestao = sugerirNivel({
+    linhasCortadas: intersectantes.map((l) => ({
+      tipo: l.tipo,
+      finalizada: l.finalizada,
+      municipios: l.municipios,
+    })),
+    qtdPoligonos: contarPoligonos(imovel),
+  });
+  return {
+    classificacao,
+    fragmentos,
+    linhasUsadas,
+    nivelSugerido: sugestao.nivel,
+    nivelMotivo: sugestao.motivo,
+  };
 }
 
 /** Identifica o municipio de cada fragmento: centroide dentro do buffer (1 km)

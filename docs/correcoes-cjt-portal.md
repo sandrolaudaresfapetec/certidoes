@@ -81,15 +81,15 @@ Fora da lista dos 16, a pedido do time, antes das fases (`f371f7a`): **padrão g
 
 ## 6. Limites conhecidos
 
-- **Edição:** o servidor ainda aceita alteração com a requisição em `PENDENTE` e nada devolve a requisição; só a tela bloqueia (#PEND-26).
-- **Status:** a etapa do acompanhamento é derivada; o modelo oficial (5 gerais + 6 etapas) é do backend (#PEND-27).
+- **Edição:** o servidor só aceita alteração em rascunho e em `DEVOLVIDA`; a DDD devolve pela ação "Devolver ao solicitante" (#PEND-26, resolvida; ver [`atendimento-cjt-pedidos-restantes.md`](atendimento-cjt-pedidos-restantes.md)).
+- **Status:** a etapa do acompanhamento é derivada do processo e da situação da requisição, agora com as subetapas de Atendimento e Técnico (#PEND-27, resolvida); o Status Geral tem os cinco grupos ativos, inclusive "Não enviadas" e "Arquivadas".
 - **Download da certidão:** a etapa 6 mostra "o download ainda não está disponível" (#PEND-28).
-- **Chat:** o texto de envio cita "o chat da solicitação", que não existe (#PEND-25).
-- **Nome × polígono do mapa:** a lista de nomes aparece ao lado do mapa, mas a ligação de cada nome a um polígono depende do backend gravar o vínculo (#PEND-34 → #PEND-45).
-- **SIGEF:** a consulta continua pelo CPF logado, não pelo do representado (#PEND-33). A validação do CPF/CNPJ do representado no servidor é a #PEND-44. A nomenclatura dos polígonos só é imposta pela tela (#PEND-36).
+- **Chat:** existe (#PEND-25, resolvida): só ADMIN e SDTC o veem no backoffice, sem anexos e sem e-mail ou SMS (#PEND-37).
+- **Nome × polígono do mapa:** cada polígono nomeado de uma gleba com 2 ou mais indica a sua parcela do SIGEF e o mapa os colore (#PEND-34 e #PEND-45, resolvidas); o vínculo vale só para o que a consulta ao SIGEF devolveu, que ainda é simulada (#PEND-33).
+- **SIGEF:** a consulta continua pelo CPF logado, não pelo do representado (#PEND-33). O CPF/CNPJ do representado e a nomenclatura dos polígonos passaram a ser validados também no servidor (#PEND-44 e #PEND-36, resolvidas).
 - **Mapa no acompanhamento:** o contorno vem do acervo `SigefParcela`, vazio no banco local.
-- **Dados simulados:** a consulta SIGEF simulada com CAR devolve, às vezes, parcelas com área 0 e município vazio (#PEND-46).
-- **Pendências do plano:** #PEND-16 e #PEND-17 resolvidas; #PEND-41 a #PEND-46 criadas; #PEND-29, #PEND-33, #PEND-34 e #PEND-36 detalhadas.
+- **Dados simulados:** a variação da consulta SIGEF simulada (parcelas com área 0) vinha do enriquecimento com o CAR, removido em `f34b945`; a #PEND-46 foi descartada.
+- **Pendências do plano:** #PEND-16 e #PEND-17 resolvidas; #PEND-41 a #PEND-46 criadas; #PEND-29, #PEND-33, #PEND-34 e #PEND-36 detalhadas. Depois deste documento, as fases de atendimento (chat, devolver, usucapião, rascunho, 13+ polígonos, vínculo polígono ↔ parcela, duplicidade, arquivamento, subetapas e complexidade) resolveram a maior parte delas: ver [`atendimento-cjt-pedidos-restantes.md`](atendimento-cjt-pedidos-restantes.md).
 
 ## 7. Como testar
 

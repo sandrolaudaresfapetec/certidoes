@@ -50,6 +50,8 @@ export function CartoesStatusGeral({
       {GRUPOS_STATUS_GERAL.map((g) => {
         const { Icone, cor } = VISUAL[g.chave];
         const selecionado = ativo === g.chave;
+        // Grupo sem status ainda não é alimentado pelo backend: cartão "em breve" (hoje nenhum).
+        const semStatus = (g.status as readonly string[]).length === 0;
         const conteudo = (
           <>
             <Icone className={`h-8 w-8 shrink-0 ${cor}`} aria-hidden="true" />
@@ -58,7 +60,7 @@ export function CartoesStatusGeral({
                 {contagens[g.chave] ?? 0}
               </span>
               <span className="block text-xs text-gray-600">{g.rotulo}</span>
-              {g.status.length === 0 && (
+              {semStatus && (
                 <span className="mt-1 inline-block rounded-full border border-dashed border-gray-400 bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
                   em breve
                 </span>
@@ -68,7 +70,7 @@ export function CartoesStatusGeral({
         );
         return (
           <li key={g.chave}>
-            {g.status.length === 0 ? (
+            {semStatus ? (
               <div
                 aria-disabled="true"
                 className="flex h-full cursor-not-allowed items-center gap-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 opacity-80"

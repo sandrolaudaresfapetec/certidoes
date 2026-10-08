@@ -70,9 +70,11 @@ model Solicitacao {
   cjtResultado        String?  // 2a Matricula | 2b Gleba | 2c Area
   cjtSituacao         String?  // 3a Espolio | 3b Usucapiao | 3c Espolio com usucapiao | 3d Regular/comum
   cjtPropriedadeDe    String?
-  cjtMatricula        String?  // somente algarismos
+  cjtMatricula        String?  // somente algarismos, ou "Usucapiao" quando cjtInformaMatricula = NAO
+  cjtInformaMatricula String?  // SIM | NAO: "Quero informar o numero da matricula?" (usucapiao, 3b/3c)
   cjtQtdPoligonos     Int?
   cjtNomesPoligonos   String?  // JSON array com um nome por poligono
+  cjtPoligonos        String?  // JSON [{nome, parcelaCodigo, nomeArea, areaHa}]: parcela do SIGEF de cada poligono (gleba com 2+)
   cjtCodigoIncra      String?  // 13 algarismos, sem mascara
   cjtDeclaracaoAceita Boolean  @default(false)
 
@@ -87,11 +89,40 @@ model Solicitacao {
   pagamentoObs      String?
   finalizadaEm      DateTime?
 
+  // Devolucao ao solicitante (DDD): o motivo aparece no portal enquanto status = DEVOLVIDA
+  devolucaoMotivo   String?
+  devolvidaEm       DateTime?
+
+  // Pedido com 13+ poligonos: congelado ate a DDD liberar (#PEND-31)
+  congeladaEm       DateTime?
+  liberadaEm        DateTime?
+
+  // Checagem de documentos pelo Atendimento (subetapa do acompanhamento, #PEND-27)
+  docsConferidosEm  DateTime?
+
+  // Analise de duplicidade (#PEND-30): so entra na fila da DDD depois de analisada.
+  analiseDuplicidadeEm DateTime?
+  sobreposicao      Boolean  @default(false) // aponta (ou e apontada) para outra requisicao com geometria repetida/sobreposta
+  sobreposicaoCom   String?  // JSON [{id, protocolo, situacao, motivo}]
+
+  // Arquivamento (#PEND-29/#PEND-30): o solicitante pede (imediato ou via DDD) e a resposta "nao"
+  // da duplicidade tambem arquiva. `arquivamentoStatusAnterior` devolve a requisicao ao lugar
+  // certo quando a DDD recusa o pedido.
+  arquivadaEm       DateTime?
+  arquivamentoMotivo String?
+  arquivamentoSolicitadoEm DateTime?
+  arquivamentoStatusAnterior String?
+
   solicitanteId     String
   solicitante       Solicitante @relation(fields: [solicitanteId], references: [id])
 
   processId         String?  @unique
   process           Process? @relation(fields: [processId], references: [id])
+
+  // Chat da solicitacao: ate onde cada lado leu (mensagens mais novas = nao lidas)
+  chatLidoSolicitanteEm DateTime?
+  chatLidoAtendimentoEm DateTime?
+  mensagens         MensagemSolicitacao[]
 
   documentos        Documento[]
   createdAt         DateTime @default(now())
@@ -103,6 +134,29 @@ model Solicitacao {
 //  - PLANTA (planta do imovel)
 //  - DOC_PROPRIEDADE (comprovante de propriedade, nao precisa ser matricula)
 //  - PROCURACAO (quando o solicitante representa terceiro)
+/// Chat entre o solicitante e a DDD (ADMIN e SDTC). Mensagens de sistema (perguntas de
+/// duplicidade, avisos) usam `chave` para nunca serem gravadas duas vezes.
+model MensagemSolicitacao {
+  id            String   @id @default(cuid())
+  autorTipo     String   // SOLICITANTE | ATENDIMENTO | SISTEMA
+  autorUserId   String?  // User.id do atendente quando autorTipo = ATENDIMENTO
+  autorNome     String
+  tipo          String   @default("TEXTO") // TEXTO | PERGUNTA | EVENTO
+  texto         String
+  opcoes        String?  // JSON [{id, rotulo}] quando tipo = PERGUNTA
+  respostaOpcao String?  // id da opcao escolhida
+  respondidaEm  DateTime?
+  chave         String?  // idempotencia das mensagens de sistema (unica por solicitacao)
+
+  solicitacaoId String
+  solicitacao   Solicitacao @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+
+  @@unique([solicitacaoId, chave])
+  @@index([solicitacaoId, createdAt])
+}
+
 model Documento {
   id            String   @id @default(cuid())
   tipo          String   // PLANTA, DOC_PROPRIEDADE, PROCURACAO
@@ -145,6 +199,9 @@ model Process {
   ra                String?  // Regiao Administrativa
   dra               String?
   divisaDificuldade String?
+  // Nivel de complexidade 1 a 9: sugerido pelo corte e confirmado pelo tecnico (#PEND-32)
+  nivelComplexidade Int?
+  nivelComplexidadeEm DateTime?
 
   // Workflow Status
   situacao          String   @default("entrada_sdtc") // entrance stage
@@ -203,13 +260,11 @@ model Process {
   sigefConsultadoEm  DateTime?
 
   numeroSaidaIGC    String?
-  processes    String?
   servicoTecCampo    Float?
   servicoTecGabinete    Float?
   taxaAbertura    Float?
   taxaVistoria    Float?
   total    Float?
-  users    String?
   sigefConsultas    SigefConsulta[]
   cortesDivisa      CorteDivisa[]
   solicitacao       Solicitacao?
@@ -280,7 +335,8 @@ model LinhaDivisa {
   id            String   @id @default(cuid())
   codigo        String   @unique
   descricao     String?  // ex.: "Divisa Brazlandia/Planaltina"
-  tipo          String   // DIVISA_MUNICIPAL | TRIPLICE | QUADRUPLA | RIO
+  tipo          String   // DIVISA_MUNICIPAL | TRIPLICE | QUADRUPLA | QUINTUPLA | RIO | RETA | FOZ | CONFLITO
+  finalizada    Boolean  @default(false) // divisa finalizada: baixa o nivel de complexidade (#PEND-32)
   geometria     String   // GeoJSON LineString/MultiLineString
   bancoOrigem   String   // rastreabilidade: banco de dados de origem
   dataValidacao DateTime
@@ -293,6 +349,7 @@ model LinhaDivisa {
 model CorteDivisa {
   id              String      @id @default(cuid())
   classificacao   String      // FACIL | MEDIO | DIFICIL | PIOR_CASO
+  nivelSugerido   Int?        // nivel de complexidade 1 a 9 sugerido pelo corte (#PEND-32)
   geometriaImovel String      // GeoJSON Polygon do imovel (vindo do SIGEF)
   resultadoJson   String      // JSON: [{fragmento, areaHa, percentual, municipio, geometria}]
   dataCorte       DateTime    @default(now())
@@ -335,6 +392,19 @@ model SigefParcela {
   @@index([uf, minLon, maxLon])
   @@index([uf, minLat, maxLat])
   @@index([municipioIbge])
+}
+
+/// Registro de cada execucao agendada (analise de duplicidade). A `chave` e unica por horario
+/// (ex.: duplicidade:2026-10-07T12): so quem conseguir grava-la executa o horario.
+model ExecucaoAgendada {
+  id          String    @id @default(cuid())
+  chave       String    @unique
+  tipo        String
+  iniciadaEm  DateTime  @default(now())
+  concluidaEm DateTime?
+  resumo      String?   // JSON com a contagem do que foi analisado
+
+  @@index([tipo, iniciadaEm])
 }
 
 /// Execucoes da sincronizacao diaria do acervo SIGEF (scripts/sigef-scheduler.ts).

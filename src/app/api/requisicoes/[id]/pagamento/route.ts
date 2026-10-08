@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirAtendimentoApi } from "@/lib/auth";
+import { bloqueioAcaoAtendimento } from "@/lib/solicitacao-estados";
 
 const STATUS_VALIDOS = ["PENDENTE", "PAGO", "ISENTO"];
 
@@ -21,6 +22,9 @@ export async function POST(
   if (!requisicao) {
     return NextResponse.json({ error: "Requisição não encontrada." }, { status: 404 });
   }
+
+  const bloqueio = bloqueioAcaoAtendimento(requisicao.status);
+  if (bloqueio) return NextResponse.json({ error: bloqueio }, { status: 409 });
 
   const body = await request.json().catch(() => ({}));
   const pagamentoStatus = (body.pagamentoStatus ?? "").toString();

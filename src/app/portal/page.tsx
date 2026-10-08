@@ -11,6 +11,8 @@ import {
 import { RequisicaoFiltros } from "@/components/requisicao-filtros";
 import { CartoesStatusGeral } from "@/components/requisicao/cartoes-status-geral";
 import { FileText, PlusCircle } from "lucide-react";
+import { naoLidasPorSolicitacao } from "@/lib/chat";
+import { SeloMensagensNovas } from "@/components/requisicao/selo-mensagens-novas";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +51,7 @@ export default async function PortalHomePage({
       select: { status: true },
     }),
   ]);
+  const novas = await naoLidasPorSolicitacao(solicitacoes, "SOLICITANTE");
 
   const contagens = Object.fromEntries(
     GRUPOS_STATUS_GERAL.map((g) => [
@@ -110,7 +113,11 @@ export default async function PortalHomePage({
               return (
                 <li key={s.id}>
                   <Link
-                    href={`/portal/requisicoes/${s.id}`}
+                    href={
+                      s.status === "RASCUNHO" && !s.congeladaEm
+                        ? `/portal/requisicoes/${s.id}/editar`
+                        : `/portal/requisicoes/${s.id}`
+                    }
                     className="px-6 py-4 flex items-center justify-between gap-3 hover:bg-gray-50"
                   >
                     <div className="flex min-w-0 items-center gap-3">
@@ -128,17 +135,27 @@ export default async function PortalHomePage({
                           )}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {new Date(s.createdAt).toLocaleDateString("pt-BR")}
+                          {s.status === "RASCUNHO"
+                            ? `Rascunho salvo em ${new Date(s.updatedAt).toLocaleDateString("pt-BR")}`
+                            : new Date(s.createdAt).toLocaleDateString("pt-BR")}
                           {s.sigefMunicipio && ` · ${s.sigefMunicipio}/${s.sigefUf}`}
                           {s.documentos.length > 0 &&
                             ` · ${s.documentos.length} documento(s) anexado(s)`}
                         </p>
                       </div>
                     </div>
-                    <span
-                      className={`shrink-0 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}
-                    >
-                      {st.label}
+                    <span className="flex shrink-0 items-center gap-2">
+                      {novas.has(s.id) && <SeloMensagensNovas quantidade={novas.get(s.id)!} />}
+                      <span
+                        className={`shrink-0 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${st.classe}`}
+                      >
+                        {st.label}
+                      </span>
+                      {s.status === "RASCUNHO" && (
+                        <span className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white">
+                          Continuar
+                        </span>
+                      )}
                     </span>
                   </Link>
                 </li>

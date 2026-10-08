@@ -15,6 +15,10 @@ import {
   SITUACAO_OPCOES,
   MENSAGEM_NAO_SEI,
   ALERTA_QTD_POLIGONOS,
+  INFORMA_MATRICULA_OPCOES,
+  LIMITE_POLIGONOS_ENVIO,
+  LIMITE_POLIGONOS_MAXIMO,
+  MATRICULA_USUCAPIAO,
   PREFIXO_ESPOLIO,
   ajustarNomesPoligonos,
   camposAplicaveis,
@@ -22,8 +26,10 @@ import {
   exigeEspolio,
   formularioVazio,
   limparCamposNaoAplicaveis,
+  perguntaMatriculaAplicavel,
   cpfCnpjCompleto,
   digitosCpfCnpj,
+  erroParcelasPoligonos,
   digitosIncra,
   mascaraCpfCnpj,
   mascaraIncra,
@@ -35,10 +41,8 @@ import {
 import { ProgressoSolicitacao } from "@/components/requisicao/progresso-solicitacao";
 import { MapaImovel } from "@/components/requisicao/mapa-imovel";
 import { useConclusaoSolicitacao } from "@/components/requisicao/introducao-cjt";
-import {
-  NomesPoligonos,
-  erroNomenclatura,
-} from "@/components/requisicao/nomes-poligonos";
+import { NomesPoligonos } from "@/components/requisicao/nomes-poligonos";
+import { PoligonosParcelas } from "@/components/requisicao/poligonos-parcelas";
 
 interface SigefParcela {
   codigoImovel: string;
@@ -65,6 +69,7 @@ interface SigefResult {
 export interface RequisicaoEdicao {
   /** Endpoint PATCH da própria requisição. */
   endpoint: string;
+  id: string;
   cjt: FormularioCjt;
   tipoViaSigef: boolean;
   sigefParcelaCodigo: string | null;
@@ -73,6 +78,10 @@ export interface RequisicaoEdicao {
   observacao: string | null;
   /** Documentos já anexados, que não precisam ser reenviados. */
   documentosEnviados: string[];
+  /** Rascunho salvo (#PEND-42): continuar e enviar, não é uma alteração de requisição enviada. */
+  rascunho?: boolean;
+  /** Pedido congelado (13+ polígonos) que a DDD liberou: passa do limite de 12 polígonos. */
+  liberada?: boolean;
 }
 
 interface RequisicaoFormProps {
@@ -144,13 +153,25 @@ export function RequisicaoForm({
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [protocolo, setProtocolo] = useState<string | null>(null);
+  // Rascunho salvo nesta tela (ainda sem `edicao`): os próximos salvamentos e o envio o atualizam.
+  const [rascunhoId, setRascunhoId] = useState<string | null>(null);
+  const [rascunhoSalvo, setRascunhoSalvo] = useState<{ protocolo: string } | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  // Pedido com 13+ polígonos encaminhado à DDD nesta tela (#PEND-31).
+  const [encaminhado, setEncaminhado] = useState<{ id: string; protocolo: string } | null>(null);
+  const [encaminhando, setEncaminhando] = useState(false);
 
   // Ao concluir, leva a tela e o foco para a confirmação.
   useEffect(() => {
-    if (!protocolo) return;
+    if (!protocolo && !encaminhado) return;
     window.scrollTo({ top: 0 });
     tituloEnvioRef.current?.focus();
-  }, [protocolo]);
+  }, [protocolo, encaminhado]);
+
+  // Representante (Pergunta 1a): as parcelas consultadas são as do CPF/CNPJ representado (#PEND-33).
+  const docRepresentado =
+    form.qualidade === "1a" && cpfCnpjCompleto(emNomeDeCpf) ? digitosCpfCnpj(emNomeDeCpf) : null;
+  const docConsulta = docRepresentado ?? cpf;
 
   useEffect(() => {
     (async () => {
@@ -158,7 +179,7 @@ export function RequisicaoForm({
         const res = await fetch("/api/sigef/consulta", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cpfCnpj: cpf }),
+          body: JSON.stringify({ cpfCnpj: docConsulta, representado: docRepresentado != null }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
@@ -181,11 +202,14 @@ export function RequisicaoForm({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cpf]);
+  }, [docConsulta]);
 
   // Trocar uma resposta anterior recalcula a pergunta 4 e descarta os valores
   // que deixaram de ser aplicáveis (item 7 dos requisitos de interface).
-  function responder(campo: "qualidade" | "resultado" | "situacao", codigo: string) {
+  function responder(
+    campo: "qualidade" | "resultado" | "situacao" | "informaMatricula",
+    codigo: string
+  ) {
     setForm((atual) =>
       limparCamposNaoAplicaveis({ ...atual, [campo]: codigo } as FormularioCjt)
     );
@@ -197,8 +221,32 @@ export function RequisicaoForm({
     setForm((atual) => ({
       ...atual,
       qtdPoligonos: valor,
-      nomesPoligonos: ajustarNomesPoligonos(atual.nomesPoligonos, qtd),
+      // Acima do limite do envio normal não se geram campos (o servidor também recusa).
+      nomesPoligonos: ajustarNomesPoligonos(
+        atual.nomesPoligonos,
+        Number.isFinite(qtd)
+          ? Math.min(qtd, permitirMais ? LIMITE_POLIGONOS_MAXIMO : LIMITE_POLIGONOS_ENVIO)
+          : qtd
+      ),
+      parcelasPoligonos: ajustarNomesPoligonos(
+        atual.parcelasPoligonos,
+        Number.isFinite(qtd)
+          ? Math.min(qtd, permitirMais ? LIMITE_POLIGONOS_MAXIMO : LIMITE_POLIGONOS_ENVIO)
+          : qtd
+      ),
     }));
+  }
+
+  /** O imóvel principal da requisição é a parcela do primeiro polígono. */
+  function escolherParcelaDoPoligono(indice: number, parcelaCodigo: string) {
+    setForm((atual) => {
+      const lista = ajustarNomesPoligonos(atual.parcelasPoligonos, atual.nomesPoligonos.length);
+      lista[indice] = parcelaCodigo;
+      return { ...atual, parcelasPoligonos: lista };
+    });
+    if (indice === 0) {
+      setSelecionada(sigef?.parcelas.find((p) => p.parcelaCodigo === parcelaCodigo) ?? null);
+    }
   }
 
   const campos = camposAplicaveis(form.resultado, form.situacao);
@@ -206,10 +254,22 @@ export function RequisicaoForm({
   const nomesInformados = campos.includes("nomesPoligonos")
     ? form.nomesPoligonos.map((n) => n.trim()).filter(Boolean)
     : [];
+  // Gleba com 2 ou mais polígonos e imóvel do SIGEF: cada polígono escolhe a sua parcela (#PEND-34).
+  const usaVinculo =
+    campos.includes("nomesPoligonos") &&
+    etapaImovel === "selecao" &&
+    form.nomesPoligonos.length >= 2;
   // "Representante" na Pergunta 1 abre a caixa com os dados de quem é representado.
   const procurador = form.qualidade === "1a";
   const exigeDocsImovel = etapaImovel === "semRegistro";
   const enviados = edicao?.documentosEnviados ?? [];
+  // Alterar uma requisição já enviada (devolvida); rascunho continuado conta como envio novo.
+  const reenvio = Boolean(edicao) && !edicao?.rascunho;
+  // O atendimento é a própria DDD e o pedido liberado já passou por ela: sem o limite de 12.
+  const permitirMais = variante === "ATENDIMENTO" || Boolean(edicao?.liberada);
+  const podeRascunho = variante === "SOLICITANTE" && (!edicao || Boolean(edicao.rascunho));
+  const alvoEnvio =
+    edicao?.endpoint ?? (rascunhoId ? `${criarEndpoint}/${rascunhoId}` : criarEndpoint);
   const temPlanta = Boolean(planta) || enviados.includes("PLANTA");
   const temDocPropriedade =
     Boolean(docPropriedade) || enviados.includes("DOC_PROPRIEDADE");
@@ -221,21 +281,19 @@ export function RequisicaoForm({
     form.qualidade !== "1c" &&
     (!procurador || (cpfCnpjCompleto(emNomeDeCpf) && emNomeDeNome.trim().length > 1));
   const caixa2 = caixa1 && mostrarPergunta4;
-  // Validação do servidor mais a nomenclatura fechada dos polígonos, que só a tela impõe (#PEND-36).
-  function validarComNomenclatura(): ErrosCjt {
-    const v = validarFormulario(form);
-    if (!v.nomesPoligonos && campos.includes("nomesPoligonos")) {
-      const erroNomes = erroNomenclatura(form.nomesPoligonos);
-      if (erroNomes) v.nomesPoligonos = erroNomes;
-    }
-    return v;
-  }
-  const dadosCompletos = Object.keys(validarComNomenclatura()).every((c) => c === "declaracao");
+  // As mesmas regras do servidor, inclusive a nomenclatura fechada dos polígonos (#PEND-36).
+  const dadosCompletos = Object.keys(validarFormulario(form, { liberado: permitirMais })).every(
+    (c) => c === "declaracao"
+  );
   const caixa3 = caixa2 && dadosCompletos;
   const caixa4 =
     caixa3 &&
     etapaImovel !== "consultando" &&
-    (etapaImovel === "selecao" ? Boolean(selecionada) : temPlanta && temDocPropriedade) &&
+    (etapaImovel === "selecao"
+      ? usaVinculo
+        ? !erroParcelasPoligonos(form.parcelasPoligonos, form.nomesPoligonos.length)
+        : Boolean(selecionada)
+      : temPlanta && temDocPropriedade) &&
     (!procurador || temProcuracao) &&
     form.declaracao;
   const verCaixa2 = progressivo ? caixa1 : true;
@@ -245,7 +303,10 @@ export function RequisicaoForm({
   const entra = progressivo ? "caixa-entra" : "";
 
   async function enviar() {
-    const validacao = validarComNomenclatura();
+    const validacao: ErrosCjt = validarFormulario(form, {
+      liberado: permitirMais,
+      exigirParcelas: usaVinculo,
+    });
     setErros(validacao);
     if (Object.keys(validacao).length > 0) return;
 
@@ -270,8 +331,8 @@ export function RequisicaoForm({
     setErro(null);
     try {
       const limpo = limparCamposNaoAplicaveis(form);
-      const res = await fetch(edicao?.endpoint ?? criarEndpoint, {
-        method: edicao ? "PATCH" : "POST",
+      const res = await fetch(alvoEnvio, {
+        method: alvoEnvio === criarEndpoint ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...payloadExtra,
@@ -292,9 +353,11 @@ export function RequisicaoForm({
             resultado: limpo.resultado,
             situacao: limpo.situacao,
             propriedadeDe: limpo.propriedadeDe,
+            informaMatricula: limpo.informaMatricula,
             matricula: limpo.matricula,
             qtdPoligonos: limpo.qtdPoligonos,
             nomesPoligonos: limpo.nomesPoligonos,
+            parcelasPoligonos: limpo.parcelasPoligonos,
             codigoIncra: limpo.codigoIncra,
             declaracao: limpo.declaracao,
           },
@@ -303,7 +366,7 @@ export function RequisicaoForm({
       const data = await res.json();
       if (!res.ok) {
         throw new Error(
-          data.error || (edicao ? "Erro ao alterar requisição." : "Erro ao criar requisição.")
+          data.error || (reenvio ? "Erro ao alterar requisição." : "Erro ao criar requisição.")
         );
       }
 
@@ -333,6 +396,116 @@ export function RequisicaoForm({
     }
   }
 
+  /** Guarda o que já foi respondido, sem validar nem enviar (#PEND-42). Anexos não entram. */
+  async function salvarRascunho(
+    silencioso = false
+  ): Promise<{ id: string; protocolo: string } | null> {
+    if (salvando) return null;
+    setSalvando(true);
+    setErro(null);
+    setRascunhoSalvo(null);
+    try {
+      const limpo = limparCamposNaoAplicaveis(form);
+      const res = await fetch(alvoEnvio, {
+        method: alvoEnvio === criarEndpoint ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rascunho: true,
+          tipoViaSigef: etapaImovel !== "semRegistro",
+          sigefCodigoImovel: selecionada?.codigoImovel,
+          sigefParcelaCodigo: selecionada?.parcelaCodigo,
+          sigefNomeArea: selecionada?.nomeArea,
+          sigefAreaHectares: selecionada?.areaHectares,
+          sigefMunicipio: selecionada?.municipio,
+          sigefUf: selecionada?.uf,
+          sigefStatus: selecionada?.status,
+          sigefOrigem: sigef?.origem,
+          emNomeDeCpf: procurador ? emNomeDeCpf : undefined,
+          emNomeDeNome: procurador ? emNomeDeNome : undefined,
+          observacao: observacao || undefined,
+          cjt: {
+            qualidade: limpo.qualidade,
+            resultado: limpo.resultado,
+            situacao: limpo.situacao,
+            propriedadeDe: limpo.propriedadeDe,
+            informaMatricula: limpo.informaMatricula,
+            matricula: limpo.matricula,
+            qtdPoligonos: limpo.qtdPoligonos,
+            nomesPoligonos: limpo.nomesPoligonos,
+            parcelasPoligonos: limpo.parcelasPoligonos,
+            codigoIncra: limpo.codigoIncra,
+            declaracao: limpo.declaracao,
+          },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Não foi possível salvar o rascunho.");
+      setRascunhoId(data.id);
+      if (!silencioso) setRascunhoSalvo({ protocolo: data.protocolo });
+      return { id: data.id, protocolo: data.protocolo };
+    } catch (e) {
+      setErro((e as Error).message);
+      return null;
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  /** Pedido com 13+ polígonos: guarda o rascunho e o encaminha à DDD, que libera depois (#PEND-31). */
+  async function encaminharDDD() {
+    if (encaminhando) return;
+    setEncaminhando(true);
+    setErro(null);
+    try {
+      const salvo = await salvarRascunho(true);
+      if (!salvo) return;
+      const res = await fetch(`${criarEndpoint}/${salvo.id}/congelar`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErro(data.error || "Não foi possível encaminhar o pedido à DDD.");
+        return;
+      }
+      setEncaminhado({ id: salvo.id, protocolo: salvo.protocolo });
+      marcarConcluida();
+    } catch {
+      setErro("Erro de conexão. Tente novamente.");
+    } finally {
+      setEncaminhando(false);
+    }
+  }
+
+  if (encaminhado) {
+    return (
+      <section
+        aria-labelledby="envio-titulo"
+        className="bg-white rounded-lg border border-gray-200 p-8 text-center"
+      >
+        <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-3" aria-hidden="true" />
+        <h2
+          id="envio-titulo"
+          ref={tituloEnvioRef}
+          tabIndex={-1}
+          className="text-lg font-semibold text-gray-900 outline-none"
+        >
+          Solicitação encaminhada à DDD
+        </h2>
+        <p className="text-sm text-gray-600 mt-1">
+          Protocolo <strong>{encaminhado.protocolo}</strong>
+        </p>
+        <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-gray-700">
+          O preenchimento está pausado até a equipe liberar. Acompanhe e responda pela conversa da
+          solicitação.
+        </p>
+        <Link
+          href={`/portal/requisicoes/${encaminhado.id}#conversa`}
+          className="mt-5 inline-flex items-center rounded-md bg-emerald-700 px-4 py-2 text-sm text-white hover:bg-emerald-800"
+        >
+          Abrir conversa
+        </Link>
+      </section>
+    );
+  }
+
   if (protocolo) {
     if (variante === "SOLICITANTE") {
       return (
@@ -347,7 +520,7 @@ export function RequisicaoForm({
             tabIndex={-1}
             className="text-lg font-semibold text-gray-900 outline-none"
           >
-            {edicao ? "Solicitação reenviada com sucesso" : "Solicitação enviada com sucesso"}
+            {reenvio ? "Solicitação reenviada com sucesso" : "Solicitação enviada com sucesso"}
           </h2>
           <p className="text-sm text-gray-600 mt-1">
             Protocolo <strong>{protocolo}</strong>
@@ -358,7 +531,7 @@ export function RequisicaoForm({
               dias, período de funcionamento do Instituto, de segunda a sexta-feira, das 9h às
               17h, exceto feriados.
             </p>
-            {/* PEND-25: o chat da solicitação ainda não existe; texto do cliente mantido. */}
+            {/* Texto do cliente (documento CJT). O chat existe em Acompanhar Requisição (#PEND-25). */}
             <p>
               Todas as comunicações e solicitações de complementação serão realizadas
               exclusivamente por este sistema, no chat da solicitação.
@@ -528,7 +701,24 @@ export function RequisicaoForm({
             onChange={(c) => responder("situacao", c)}
           />
 
-          {(form.resultado === "2d" || form.situacao === "3e") && (
+          {perguntaMatriculaAplicavel(form.resultado, form.situacao) && (
+            <div className="border-l-4 border-emerald-200 pl-4">
+              <Pergunta
+                numero="3.1"
+                titulo="Quero informar o número da matrícula?"
+                nome="cjt-informa-matricula"
+                opcoes={INFORMA_MATRICULA_OPCOES}
+                valor={form.informaMatricula}
+                erro={erros.informaMatricula}
+                onChange={(c) => responder("informaMatricula", c)}
+              />
+            </div>
+          )}
+
+          {(form.resultado === "2d" ||
+            form.situacao === "3e" ||
+            (perguntaMatriculaAplicavel(form.resultado, form.situacao) &&
+              form.informaMatricula === "NAO_SEI")) && (
             <p
               role="alert"
               className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2"
@@ -600,24 +790,48 @@ export function RequisicaoForm({
               label="Matrícula *"
               erro={erros.matricula}
               dica={
-                <p>
-                  Somente algarismos. Não colocar CRI, Trans, Transcrição, “-”, “/” ou outros
-                  caracteres.
-                </p>
+                form.informaMatricula === "NAO" ? (
+                  <p>
+                    Preenchido automaticamente porque você informou que não tem o número da
+                    matrícula.
+                  </p>
+                ) : (
+                  <p>
+                    Somente algarismos. Não colocar CRI, Trans, Transcrição, “-”, “/” ou outros
+                    caracteres.
+                  </p>
+                )
               }
             >
-              <input
-                id="cjt-matricula"
-                type="text"
-                inputMode="numeric"
-                value={form.matricula}
-                onChange={(e) =>
-                  setForm((a) => ({ ...a, matricula: somenteDigitos(e.target.value) }))
-                }
-                aria-describedby={descrito("cjt-matricula", true, erros.matricula)}
-                aria-invalid={erros.matricula ? true : undefined}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-              />
+              {form.informaMatricula === "NAO" ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    id="cjt-matricula"
+                    type="text"
+                    value={MATRICULA_USUCAPIAO}
+                    readOnly
+                    aria-readonly="true"
+                    aria-describedby={descrito("cjt-matricula", true, erros.matricula)}
+                    className="min-w-0 flex-1 cursor-not-allowed rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700"
+                  />
+                  <span className="whitespace-nowrap text-xs text-gray-600">
+                    Preenchido automaticamente
+                  </span>
+                </div>
+              ) : (
+                <input
+                  id="cjt-matricula"
+                  type="text"
+                  inputMode="numeric"
+                  value={form.matricula}
+                  onChange={(e) =>
+                    setForm((a) => ({ ...a, matricula: somenteDigitos(e.target.value) }))
+                  }
+                  aria-describedby={descrito("cjt-matricula", true, erros.matricula)}
+                  aria-invalid={erros.matricula ? true : undefined}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+              )}
             </Campo>
           )}
 
@@ -637,7 +851,38 @@ export function RequisicaoForm({
                 aria-invalid={erros.qtdPoligonos ? true : undefined}
                 className="w-32 border border-gray-300 rounded-md px-3 py-2 text-sm"
               />
-              {parseInt(form.qtdPoligonos, 10) >= ALERTA_QTD_POLIGONOS && (
+              {!permitirMais && parseInt(form.qtdPoligonos, 10) > LIMITE_POLIGONOS_ENVIO && (
+                <div
+                  role="alert"
+                  className="mt-2 space-y-3 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900"
+                >
+                  <p className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span>
+                      <strong className="font-semibold">Atenção: {form.qtdPoligonos} polígonos.</strong>{" "}
+                      Pedidos com {LIMITE_POLIGONOS_ENVIO + 1} ou mais polígonos exigem análise da DDD
+                      antes de continuar. Vamos guardar o que você já preencheu e abrir uma conversa
+                      com a equipe técnica, que pode pedir informações comprobatórias. Depois da
+                      liberação você continua o preenchimento.
+                    </span>
+                  </p>
+                  {variante === "SOLICITANTE" && (
+                    <button
+                      type="button"
+                      onClick={encaminharDDD}
+                      disabled={encaminhando || salvando}
+                      className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+                    >
+                      {encaminhando && (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      )}
+                      Enviar para análise da DDD
+                    </button>
+                  )}
+                </div>
+              )}
+              {parseInt(form.qtdPoligonos, 10) >= ALERTA_QTD_POLIGONOS &&
+                (permitirMais || parseInt(form.qtdPoligonos, 10) <= LIMITE_POLIGONOS_ENVIO) && (
                 <p
                   role="status"
                   className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
@@ -648,7 +893,9 @@ export function RequisicaoForm({
             </Campo>
           )}
 
-          {campos.includes("nomesPoligonos") && form.nomesPoligonos.length > 0 && (
+          {campos.includes("nomesPoligonos") &&
+            form.nomesPoligonos.length > 0 &&
+            (permitirMais || parseInt(form.qtdPoligonos, 10) <= LIMITE_POLIGONOS_ENVIO) && (
             <NomesPoligonos
               id="cjt-nomes"
               nomes={form.nomesPoligonos}
@@ -699,6 +946,17 @@ export function RequisicaoForm({
 
           {etapaImovel === "selecao" && sigef && (
             <div>
+              {usaVinculo ? (
+                <PoligonosParcelas
+                  id="cjt-parcelas"
+                  nomes={form.nomesPoligonos}
+                  parcelas={sigef.parcelas}
+                  valores={form.parcelasPoligonos}
+                  onChange={escolherParcelaDoPoligono}
+                  erro={erros.parcelasPoligonos}
+                />
+              ) : (
+                <>
               <p className="text-sm text-gray-600 mb-3">
                 Selecione o imóvel para o qual a certidão será emitida:
               </p>
@@ -765,10 +1023,13 @@ export function RequisicaoForm({
                   )}
                 </figure>
               )}
+                </>
+              )}
               <button
                 type="button"
                 onClick={() => {
                   setSelecionada(null);
+                  setForm((a) => ({ ...a, parcelasPoligonos: [] }));
                   setEtapaImovel("semRegistro");
                 }}
                 className="mt-3 text-xs text-gray-500 underline underline-offset-2"
@@ -863,9 +1124,42 @@ export function RequisicaoForm({
             className="w-full bg-emerald-700 text-white py-2.5 rounded-md text-sm font-medium hover:bg-emerald-800 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {enviando && <Loader2 className="h-4 w-4 animate-spin" />}
-            {edicao ? "Salvar alterações" : "Enviar requisição"}
+            {reenvio ? "Salvar alterações" : "Enviar requisição"}
           </button>
         </section>
+      )}
+
+      {podeRascunho && (
+        <div className="space-y-3">
+          {rascunhoSalvo && (
+            <p
+              role="status"
+              className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"
+            >
+              <strong className="font-semibold">Rascunho salvo.</strong> Protocolo{" "}
+              {rascunhoSalvo.protocolo}. Você pode sair e continuar depois em Minhas Requisições,
+              no cartão &quot;Não enviadas&quot;.{" "}
+              <Link href="/portal?grupo=nao-enviadas" className="underline">
+                Ver não enviadas
+              </Link>
+            </p>
+          )}
+          <div className="rounded-lg border border-gray-200 bg-white px-6 py-4">
+            <button
+              type="button"
+              onClick={() => salvarRascunho()}
+              disabled={salvando || enviando}
+              className="inline-flex items-center gap-2 rounded-md border border-gray-400 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50"
+            >
+              {salvando && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              Salvar rascunho
+            </button>
+            <p className="mt-2 text-xs text-gray-600">
+              Os anexos só são enviados com a solicitação. Em um rascunho, anexe de novo ao
+              continuar.
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -881,7 +1175,7 @@ function Pergunta({
   erro,
   onChange,
 }: {
-  numero: number;
+  numero: number | string;
   titulo: string;
   nome: string;
   opcoes: readonly { codigo: string; label: string; bloqueia: boolean }[];
@@ -894,7 +1188,7 @@ function Pergunta({
   return (
     <fieldset>
       <legend className="text-sm font-medium text-gray-900">
-        {numero}. {titulo}
+        {typeof numero === "number" ? `${numero}.` : numero} {titulo}
       </legend>
       <div className="mt-2 space-y-1.5">
         {opcoes.map((o) => (

@@ -15,22 +15,24 @@ const pg = new Client({ connectionString: process.env.DATABASE_URL });
 
 // Colunas de data por tabela (conversao SQLite -> TIMESTAMP)
 const DATE_COLS: Record<string, string[]> = {
-  Process: ["dtAbertoSei","dtCompile","dtNascimentoIdoso","dtEmail","dtVisita1","dtVisita2","dtConf","dtAssTecnico","dtAssGerente","dtAssDiretor","dtSaida","dtInicioSobrestado","dtFimSobrestado","dtCancelado","dtUpadoSei","sigefConsultadoEm","createdAt","updatedAt"],
+  Process: ["dtAbertoSei","dtCompile","dtNascimentoIdoso","dtEmail","dtVisita1","dtVisita2","dtConf","dtAssTecnico","dtAssGerente","dtAssDiretor","dtSaida","dtInicioSobrestado","dtFimSobrestado","dtCancelado","dtUpadoSei","sigefConsultadoEm","nivelComplexidadeEm","createdAt","updatedAt"],
   User: ["createdAt","updatedAt"],
   Notification: ["createdAt"],
   WorkflowAction: ["createdAt"],
   SigefConsulta: ["createdAt"],
   Solicitante: ["createdAt","updatedAt"],
-  Solicitacao: ["createdAt","updatedAt"],
+  Solicitacao: ["pagamentoEm","finalizadaEm","chatLidoSolicitanteEm","chatLidoAtendimentoEm","devolvidaEm","congeladaEm","liberadaEm","analiseDuplicidadeEm","arquivadaEm","arquivamentoSolicitadoEm","docsConferidosEm","createdAt","updatedAt"],
+  MensagemSolicitacao: ["respondidaEm","createdAt"],
+  ExecucaoAgendada: ["iniciadaEm","concluidaEm"],
   Documento: ["createdAt"],
   LinhaDivisa: ["dataValidacao","createdAt"],
   CorteDivisa: ["dataCorte"],
 };
 const BOOL_COLS: Record<string, string[]> = {
   User: ["active"], Notification: ["read"], SigefConsulta: ["sucesso"],
-  Solicitante: ["cadastroCompleto"], Solicitacao: ["tipoViaSigef"],
+  Solicitante: ["cadastroCompleto"], Solicitacao: ["tipoViaSigef","cjtDeclaracaoAceita","sobreposicao"], LinhaDivisa: ["finalizada"],
 };
-const TABLES = ["User","Process","Notification","WorkflowAction","SigefConsulta","Solicitante","Solicitacao","Documento","LinhaDivisa","CorteDivisa"];
+const TABLES = ["User","Process","Notification","WorkflowAction","SigefConsulta","Solicitante","Solicitacao","Documento","MensagemSolicitacao","ExecucaoAgendada","LinhaDivisa","CorteDivisa"];
 
 function toDate(v: unknown): Date | null {
   if (v === null || v === undefined) return null;

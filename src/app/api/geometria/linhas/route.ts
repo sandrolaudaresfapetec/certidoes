@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirAdminApi, exigirGeometriaApi } from "@/lib/auth";
 import { garantirLinhasDemo } from "@/lib/linhas-demo";
+import { TIPOS_LINHA } from "@/lib/complexidade";
 
 /** GET /api/geometria/linhas — lista as linhas de divisa validadas. */
 export async function GET() {
@@ -27,11 +28,16 @@ export async function POST(request: NextRequest) {
   if (!body.codigo || !body.geometria) {
     return NextResponse.json({ error: "codigo e geometria sao obrigatorios" }, { status: 400 });
   }
+  const tipo = body.tipo ?? "DIVISA_MUNICIPAL";
+  if (!(TIPOS_LINHA as readonly string[]).includes(tipo)) {
+    return NextResponse.json({ error: `tipo deve ser um de: ${TIPOS_LINHA.join(", ")}` }, { status: 400 });
+  }
   const linha = await prisma.linhaDivisa.create({
     data: {
       codigo: body.codigo,
       descricao: body.descricao ?? null,
-      tipo: body.tipo ?? "DIVISA_MUNICIPAL",
+      tipo,
+      finalizada: body.finalizada === true,
       geometria: JSON.stringify(body.geometria),
       bancoOrigem: body.bancoOrigem ?? "manual",
       dataValidacao: body.dataValidacao ? new Date(body.dataValidacao) : new Date(),

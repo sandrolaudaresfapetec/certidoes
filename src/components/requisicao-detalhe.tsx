@@ -12,13 +12,23 @@ import {
 import { WORKFLOW_STAGES, type WorkflowStage } from "@/lib/workflow";
 import { AcompanhamentoRequisicao } from "@/components/requisicao/acompanhamento";
 import { MapaImovel } from "@/components/requisicao/mapa-imovel";
+import { MapaPoligonos } from "@/components/requisicao/mapa-poligonos";
+import { corDoPoligono } from "@/lib/cores-poligonos";
+import type { PoligonoDetalhe } from "@/lib/poligonos-detalhe";
 
 export type RequisicaoDetalhada = Prisma.SolicitacaoGetPayload<{
   include: {
     solicitante: true;
     documentos: { select: { id: true; tipo: true; nomeArquivo: true } };
     process: {
-      select: { id: true; ordem: true; situacao: true; tipoServico: true; expediente: true };
+      select: {
+        id: true;
+        ordem: true;
+        situacao: true;
+        tipoServico: true;
+        expediente: true;
+        nivelComplexidade: true;
+      };
     };
   };
 }>;
@@ -54,11 +64,20 @@ export function RequisicaoDetalhe({
   escopo,
   editavel = false,
   geometriaImovel = null,
+  chat = null,
+  acoesCliente = null,
+  poligonosVinculados = [],
 }: {
   requisicao: RequisicaoDetalhada;
   escopo: "CLIENTE" | "INTERNO";
   editavel?: boolean;
   geometriaImovel?: unknown | null;
+  /** Cartão do chat (montado pela página, que carrega as mensagens). */
+  chat?: React.ReactNode;
+  /** Ações do solicitante abaixo do acompanhamento (ex.: pedir o arquivamento). */
+  acoesCliente?: React.ReactNode;
+  /** Polígonos nomeados ligados às parcelas do SIGEF (gleba com 2 ou mais); vazio se não houver. */
+  poligonosVinculados?: PoligonoDetalhe[];
 }) {
   const st = statusRequisicao(requisicao.status);
   const poligonos = nomesPoligonos(requisicao.cjtNomesPoligonos);
@@ -83,19 +102,106 @@ export function RequisicaoDetalhe({
           </span>
         </div>
 
-        {escopo === "CLIENTE" && editavel && (
+        {escopo === "CLIENTE" && editavel && requisicao.status === "DEVOLVIDA" && (
           <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
             <p className="text-xs text-amber-900">
               <strong className="font-semibold">A equipe devolveu sua requisição.</strong>{" "}
               Revise os dados e envie novamente.
+            </p>
+            {requisicao.devolucaoMotivo && (
+              <blockquote className="mt-2 whitespace-pre-wrap rounded-md border border-amber-200 bg-white px-3 py-2 text-sm text-gray-900 [overflow-wrap:anywhere]">
+                {requisicao.devolucaoMotivo}
+              </blockquote>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                href={`/portal/requisicoes/${requisicao.id}/editar`}
+                className="inline-flex items-center gap-1 bg-emerald-700 text-white px-4 py-2 rounded-md text-sm hover:bg-emerald-800"
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Alterar requisição
+              </Link>
+              <a
+                href="#conversa"
+                className="inline-flex items-center rounded-md border border-gray-400 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
+              >
+                Ver conversa
+              </a>
+            </div>
+          </div>
+        )}
+
+        {escopo === "CLIENTE" && requisicao.status === "AGUARDANDO_LIBERACAO" && (
+          <div className="mt-4 rounded-md border border-orange-200 bg-orange-50 p-3">
+            <p className="text-xs text-orange-900">
+              <strong className="font-semibold">
+                Seu pedido tem {requisicao.cjtQtdPoligonos} polígonos e aguarda a liberação da DDD.
+              </strong>{" "}
+              Enquanto isso o preenchimento fica pausado. Use a conversa abaixo para enviar as
+              informações que a equipe pedir.
+            </p>
+          </div>
+        )}
+
+        {escopo === "CLIENTE" && requisicao.status === "RASCUNHO" && requisicao.congeladaEm && (
+          <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+            <p className="text-xs text-emerald-900">
+              <strong className="font-semibold">A DDD liberou o seu pedido.</strong> Você já pode
+              continuar o preenchimento e enviar a solicitação.
             </p>
             <Link
               href={`/portal/requisicoes/${requisicao.id}/editar`}
               className="mt-3 inline-flex items-center gap-1 bg-emerald-700 text-white px-4 py-2 rounded-md text-sm hover:bg-emerald-800"
             >
               <Pencil className="h-4 w-4" aria-hidden="true" />
-              Alterar requisição
+              Continuar solicitação
             </Link>
+          </div>
+        )}
+
+        {escopo === "CLIENTE" && requisicao.status === "ARQUIVAMENTO_SOLICITADO" && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs text-amber-900">
+              <strong className="font-semibold">
+                Pedido de arquivamento enviado
+                {requisicao.arquivamentoSolicitadoEm &&
+                  ` em ${new Date(requisicao.arquivamentoSolicitadoEm).toLocaleString("pt-BR", {
+                    timeZone: "America/Sao_Paulo",
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}`}
+                .
+              </strong>{" "}
+              Aguardando a decisão da DDD. Acompanhe pela conversa abaixo.
+            </p>
+            {requisicao.arquivamentoMotivo && (
+              <blockquote className="mt-2 whitespace-pre-wrap rounded-md border border-amber-200 bg-white px-3 py-2 text-sm text-gray-900 [overflow-wrap:anywhere]">
+                {requisicao.arquivamentoMotivo}
+              </blockquote>
+            )}
+          </div>
+        )}
+
+        {requisicao.status === "ARQUIVADA" && (
+          <div className="mt-4 rounded-md border border-gray-300 bg-gray-50 p-3">
+            <p className="text-xs text-gray-800">
+              <strong className="font-semibold">
+                Arquivada
+                {requisicao.arquivadaEm &&
+                  ` em ${new Date(requisicao.arquivadaEm).toLocaleString("pt-BR", {
+                    timeZone: "America/Sao_Paulo",
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}`}
+                .
+              </strong>{" "}
+              Esta requisição não terá mais andamento.
+            </p>
+            {requisicao.arquivamentoMotivo && (
+              <blockquote className="mt-2 whitespace-pre-wrap rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 [overflow-wrap:anywhere]">
+                {requisicao.arquivamentoMotivo}
+              </blockquote>
+            )}
           </div>
         )}
 
@@ -115,8 +221,18 @@ export function RequisicaoDetalhe({
           pagamentoStatus={requisicao.pagamentoStatus}
           pagamentoValor={requisicao.pagamentoValor}
           finalizadaEm={requisicao.finalizadaEm}
+          statusRequisicao={requisicao.status}
+          docsConferidosEm={requisicao.docsConferidosEm}
+          analiseDuplicidadeEm={requisicao.analiseDuplicidadeEm}
+          nivelComplexidade={requisicao.process?.nivelComplexidade ?? null}
+          reciboHref={`/portal/requisicoes/${requisicao.id}/recibo`}
+          certidaoHref={requisicao.process ? `/portal/requisicoes/${requisicao.id}/certidao` : undefined}
         />
       )}
+
+      {escopo === "CLIENTE" && acoesCliente}
+
+      {chat}
 
       <Bloco titulo="Identificação do pedido">
         <Item rotulo="Qualidade do solicitante" valor={rotuloOpcao(requisicao.cjtQualidade)} />
@@ -142,7 +258,48 @@ export function RequisicaoDetalhe({
       <Bloco
         titulo="Imóvel"
         rodape={
-          requisicao.tipoViaSigef ? (
+          poligonosVinculados.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500">
+                    <th className="py-1 pr-2 font-normal">Polígono</th>
+                    <th className="py-1 pr-2 font-normal">Parcela do SIGEF</th>
+                    <th className="py-1 font-normal">Área</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {poligonosVinculados.map((p, i) => (
+                    <tr key={p.nome} className="border-t border-gray-100 align-top">
+                      <td className="py-1.5 pr-2 text-gray-900 [overflow-wrap:anywhere]">
+                        <span
+                          className="mr-2 inline-block h-3 w-3 rounded-sm border border-gray-400 align-[-1px]"
+                          style={{ background: corDoPoligono(i) }}
+                          aria-hidden="true"
+                        />
+                        {p.nome}
+                      </td>
+                      <td className="py-1.5 pr-2 text-gray-800 [overflow-wrap:anywhere]">
+                        {p.nomeArea ?? "—"}
+                        <span className="block text-xs text-gray-500">{p.parcelaCodigo}</span>
+                      </td>
+                      <td className="py-1.5 text-gray-800 whitespace-nowrap">
+                        {p.areaHa != null ? `${p.areaHa.toLocaleString("pt-BR")} ha` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <MapaPoligonos
+                camadas={poligonosVinculados.map((p, i) => ({
+                  geometria: p.geometria,
+                  rotulo: p.nome,
+                  cor: corDoPoligono(i),
+                }))}
+                descricao={`Polígonos: ${poligonosVinculados.map((p) => p.nome).join(", ")}`}
+              />
+            </div>
+          ) : requisicao.tipoViaSigef ? (
             <div className="mt-4">
               <MapaImovel
                 geometria={geometriaImovel}
@@ -189,7 +346,7 @@ export function RequisicaoDetalhe({
         {requisicao.cjtQtdPoligonos != null && (
           <Item rotulo="Quantidade de polígonos" valor={String(requisicao.cjtQtdPoligonos)} />
         )}
-        {poligonos.length > 0 && (
+        {poligonos.length > 0 && poligonosVinculados.length === 0 && (
           <div>
             <dt className="text-xs text-gray-500">Polígonos</dt>
             <dd>
@@ -223,7 +380,15 @@ export function RequisicaoDetalhe({
             {requisicao.documentos.map((d) => (
               <li key={d.id} className="flex items-center gap-2 text-sm text-gray-700">
                 <Paperclip className="h-4 w-4 text-gray-400" />
-                {TIPO_DOC_LABEL[d.tipo] ?? d.tipo} — {d.nomeArquivo}
+                {TIPO_DOC_LABEL[d.tipo] ?? d.tipo} —{" "}
+                <a
+                  href={`${escopo === "CLIENTE" ? "/api/portal/documentos" : "/api/requisicoes/documentos"}/${d.id}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="text-blue-700 underline-offset-2 hover:underline"
+                >
+                  {d.nomeArquivo}
+                </a>
               </li>
             ))}
           </ul>

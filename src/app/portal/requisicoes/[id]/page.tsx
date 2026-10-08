@@ -1,10 +1,15 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
 import { geometriaDoAcervo } from "@/components/requisicao/geometria";
+import { clientePodeEditar, opcaoDeArquivamento } from "@/lib/solicitacao-estados";
+import { SolicitarArquivamento } from "@/components/requisicao/solicitar-arquivamento";
+import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
+import { ChatSolicitacao } from "@/components/requisicao/chat";
+import { carregarPoligonosDetalhe } from "@/lib/poligonos-detalhe";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +28,23 @@ export default async function AcompanharRequisicaoPage({
       solicitante: true,
       documentos: { select: { id: true, tipo: true, nomeArquivo: true } },
       process: {
-        select: { id: true, ordem: true, situacao: true, tipoServico: true, expediente: true },
+        select: {
+          id: true,
+          ordem: true,
+          situacao: true,
+          tipoServico: true,
+          expediente: true,
+          nivelComplexidade: true,
+        },
       },
     },
   });
   if (!requisicao) notFound();
+  // Rascunho não tem acompanhamento: o solicitante volta para continuar o formulário.
+  // (rascunho que já foi congelado tem conversa com a DDD e mostra o acompanhamento)
+  if (requisicao.status === "RASCUNHO" && !requisicao.congeladaEm) {
+    redirect(`/portal/requisicoes/${id}/editar`);
+  }
 
   // Contorno do imóvel no acervo SIGEF importado (vazio até a importação; #PEND-33).
   const parcela = requisicao.sigefParcelaCodigo
@@ -39,8 +56,18 @@ export default async function AcompanharRequisicaoPage({
   const geometriaImovel = geometriaDoAcervo(parcela?.geometria);
 
   // O cliente só altera a requisição depois que a equipe a devolve.
-  const editavel =
-    !requisicao.processId && !requisicao.finalizadaEm && requisicao.status === "DEVOLVIDA";
+  const editavel = clientePodeEditar(requisicao);
+
+  // Arquivamento: imediato (sem custo), via DDD, ou sem botão (#PEND-29).
+  const arquivamento = opcaoDeArquivamento(requisicao);
+
+  // Polígonos nomeados ligados às parcelas do SIGEF (gleba com 2 ou mais).
+  const poligonosVinculados = await carregarPoligonosDetalhe(requisicao);
+
+  // Chat: abrir a tela conta como leitura (some o selo "novas" da lista).
+  const chatDisponivel = chatVisivel(requisicao.status, requisicao.congeladaEm);
+  const mensagens = chatDisponivel ? await listarMensagens(requisicao.id) : [];
+  if (chatDisponivel) await marcarLido(requisicao.id, "SOLICITANTE");
 
   return (
     <div>
@@ -55,6 +82,27 @@ export default async function AcompanharRequisicaoPage({
       <RequisicaoDetalhe requisicao={requisicao} escopo="CLIENTE"
         editavel={editavel}
         geometriaImovel={geometriaImovel}
+        poligonosVinculados={poligonosVinculados}
+        acoesCliente={
+          arquivamento.tipo === "NAO" ? null : (
+            <SolicitarArquivamento requisicaoId={requisicao.id} tipo={arquivamento.tipo} />
+          )
+        }
+        chat={
+          chatDisponivel ? (
+            <ChatSolicitacao
+              // Recria o chat quando a página recarrega com outro estado (ex.: arquivada agora).
+              key={`${requisicao.status}-${mensagens.length}`}
+              endpoint={`/api/portal/solicitacoes/${requisicao.id}/mensagens`}
+              lado="SOLICITANTE"
+              inicial={mensagens}
+              aceitaInicial={chatAceitaMensagens(requisicao.status, requisicao.congeladaEm)}
+              titulo="Conversa com o IGC"
+              subtitulo="Todas as comunicações e pedidos de complementação são feitos aqui."
+              rotuloCampo="Mensagem para o IGC"
+            />
+          ) : null
+        }
       />
     </div>
   );

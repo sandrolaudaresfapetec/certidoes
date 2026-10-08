@@ -6,7 +6,7 @@ import { getSolicitanteLogado } from "@/lib/portal-auth";
 
 /**
  * POST /api/sigef/consulta
- * Body: { cpfCnpj: string, processId?: string }
+ * Body: { cpfCnpj: string, processId?: string, representado?: boolean }
  * Consulta parcelas do solicitante no SIGEF/INCRA (real via Conecta gov.br
  * ou simulado quando não há credenciais) e registra a consulta no banco.
  */
@@ -31,9 +31,12 @@ export async function POST(request: NextRequest) {
   if (!usuario && !solicitante) {
     return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
   }
-  if (!usuario && solicitante && solicitante.cpf !== digits) {
+  // Representante (procurador): consulta o CPF/CNPJ representado; a consulta fica registrada
+  // em SigefConsulta e a procuração é exigida no envio da requisição.
+  const representado = body.representado === true;
+  if (!usuario && solicitante && solicitante.cpf !== digits && !representado) {
     return NextResponse.json(
-      { error: "A consulta ao SIGEF é limitada ao CPF do solicitante logado." },
+      { error: "A consulta ao SIGEF é limitada ao CPF do solicitante logado ou ao representado." },
       { status: 403 }
     );
   }
@@ -45,7 +48,10 @@ export async function POST(request: NextRequest) {
       cpfCnpj: digits,
       origem: resultado.origem,
       sucesso: true,
-      mensagem: resultado.aviso ?? null,
+      mensagem: [
+        resultado.aviso,
+        !usuario && representado ? `representado por ${solicitante?.cpf}` : null,
+      ].filter(Boolean).join(" | ") || null,
       payload: JSON.stringify(resultado.parcelas),
       processId: body.processId ?? null,
     },

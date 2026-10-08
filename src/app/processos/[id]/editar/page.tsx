@@ -43,14 +43,16 @@ export default async function EditarProcessoPage({
     </Link>
   );
 
-  // Só facilita o uso: quem autoriza a alteração é a API (exigirAtendimentoApi).
-  if (!podeAtender(usuario)) {
+  // Só facilita o uso: quem autoriza a alteração é a API (PATCH /api/processes/[id]).
+  // GERENTE (quem distribui) só atribui técnico e conferente (#PEND-6).
+  const apenasAtribuicao = !podeAtender(usuario) && usuario.role === "GERENTE";
+  if (!podeAtender(usuario) && !apenasAtribuicao) {
     return (
       <div className="p-8 max-w-4xl">
         {voltar}
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Editar Processo #{processo.ordem}</h1>
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3">
-          Só o Atendimento (administrador ou SDTC) pode editar os dados do processo. Seu perfil,{" "}
+          Só o Atendimento (administrador ou SDTC) edita os dados do processo e a Gerência atribui técnico e conferente. Seu perfil,{" "}
           <strong>{usuario.role}</strong>, não tem esta permissão.
         </p>
       </div>
@@ -120,6 +122,7 @@ export default async function EditarProcessoPage({
         Altere os dados e salve. Só os campos que você mudar são enviados.
       </p>
       <ProcessoEdicaoForm
+        apenasAtribuicao={apenasAtribuicao}
         processoId={processo.id}
         inicial={inicial}
         tecnicos={tecnicos}
