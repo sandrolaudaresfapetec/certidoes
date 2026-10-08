@@ -178,7 +178,7 @@ export async function CertidaoDocumento({ processoId, voltarHref, voltarRotulo }
 
         {/* Corte por divisa municipal */}
         {fragmentos.length > 0 && (
-          <Section titulo="Localizacao por Municipio (corte pelas linhas de divisa validadas)">
+          <Section titulo="Localizacao por Municipio (pré-análise pelas linhas de divisa validadas)">
             <div className="col-span-2">
               <table className="w-full text-sm border border-gray-300">
                 <thead>
@@ -211,7 +211,7 @@ export async function CertidaoDocumento({ processoId, voltarHref, voltarRotulo }
                   Linha de divisa: {corte.linhaDivisa.codigo}
                   {corte.linhaDivisa.descricao ? ` — ${corte.linhaDivisa.descricao}` : ""} (
                   {corte.linhaDivisa.bancoOrigem}, validada em{" "}
-                  {formatDate(corte.linhaDivisa.dataValidacao)}) · Corte executado em{" "}
+                  {formatDate(corte.linhaDivisa.dataValidacao)}) · Pré-análise executada em{" "}
                   {formatDateTime(corte.dataCorte)}
                 </p>
               )}

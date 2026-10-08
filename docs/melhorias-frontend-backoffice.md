@@ -127,3 +127,9 @@ npm run dev          # http://localhost:3000
 Novos: `docs/correcoes-cjt-portal.md`, `docs/melhorias-frontend-backoffice.md`, `src/app/processos/[id]/editar/page.tsx`, `src/components/processo-edicao-form.tsx`, `src/components/campo-mascarado.tsx`, `src/lib/mascaras.ts`.
 
 Alterados: `AGENTS.md`, `PENDENCIAS.md`, `src/app/globals.css`, `src/app/geometria/page.tsx`, `src/app/notificacoes/page.tsx`, `src/app/portal/layout.tsx`, `src/app/portal/login/page.tsx`, `src/app/portal/page.tsx`, `src/app/processos/[id]/page.tsx`, `src/app/processos/[id]/certidao/page.tsx`, `src/app/processos/novo/page.tsx`, `src/app/quadro/page.tsx`, `src/components/cadastro-contato-form.tsx`, `src/components/cliente-form.tsx`, `src/components/requisicao-form.tsx`, `src/components/sidebar.tsx`, `src/components/sigef-consulta.tsx`.
+
+## Pré-análise de divisas (2026-10-08)
+
+- O módulo `/geometria` passou a se chamar **Pré-análise de divisas** em toda a interface (sidebar, botão da tela do processo, título, "Calcular pré-análise", mensagens de gravação, sugestão de nível e minuta da certidão). Rotas (`/api/geometria/corte`), modelo `CorteDivisa` e campos (`corteId`, `dataCorte`) não mudaram.
+- Novo botão "Abrir limites de municípios (KML/shapefile)" no painel de camadas: abre um arquivo KML, GeoJSON ou shapefile `.zip` com limites municipais e o desenha sobre o mapa base (contorno roxo tracejado) para a pré-análise, sem substituir o polígono em análise; a leitura de arquivo é compartilhada com a camada do proprietário (`lerArquivoGeografico`).
+

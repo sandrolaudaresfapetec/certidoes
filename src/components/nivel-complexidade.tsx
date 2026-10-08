@@ -72,11 +72,11 @@ export function NivelComplexidade({
       </h2>
       {sugestao ? (
         <p className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
-          Sugerido pelo corte de {sugestao.quando}: <strong className="font-semibold">{sugestao.nivel}</strong>.
+          Sugerido pela pré-análise de {sugestao.quando}: <strong className="font-semibold">{sugestao.nivel}</strong>.
         </p>
       ) : (
         <p className="mb-3 text-xs text-gray-600">
-          Nenhum corte de divisas com sugestão de nível foi registrado para este processo.
+          Nenhuma pré-análise de divisas com sugestão de nível foi registrada para este processo.
         </p>
       )}
 

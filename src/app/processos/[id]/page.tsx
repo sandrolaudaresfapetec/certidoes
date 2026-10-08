@@ -108,7 +108,7 @@ export default async function ProcessoDetailPage({ params, searchParams }: PageP
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
               >
                 <Scissors className="h-4 w-4" />
-                Corte de divisas
+                Pré-análise de divisas
               </Link>
             )}
             {/certid/i.test(processo.tipoServico) && (
