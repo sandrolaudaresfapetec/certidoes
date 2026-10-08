@@ -58,6 +58,7 @@ export function RequisicaoDetalhe({
   editavel = false,
   geometriaImovel = null,
   chat = null,
+  acoesCliente = null,
   poligonosVinculados = [],
 }: {
   requisicao: RequisicaoDetalhada;
@@ -66,6 +67,8 @@ export function RequisicaoDetalhe({
   geometriaImovel?: unknown | null;
   /** Cartão do chat (montado pela página, que carrega as mensagens). */
   chat?: React.ReactNode;
+  /** Ações do solicitante abaixo do acompanhamento (ex.: pedir o arquivamento). */
+  acoesCliente?: React.ReactNode;
   /** Polígonos nomeados ligados às parcelas do SIGEF (gleba com 2 ou mais); vazio se não houver. */
   poligonosVinculados?: PoligonoDetalhe[];
 }) {
@@ -149,6 +152,52 @@ export function RequisicaoDetalhe({
           </div>
         )}
 
+        {escopo === "CLIENTE" && requisicao.status === "ARQUIVAMENTO_SOLICITADO" && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs text-amber-900">
+              <strong className="font-semibold">
+                Pedido de arquivamento enviado
+                {requisicao.arquivamentoSolicitadoEm &&
+                  ` em ${new Date(requisicao.arquivamentoSolicitadoEm).toLocaleString("pt-BR", {
+                    timeZone: "America/Sao_Paulo",
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}`}
+                .
+              </strong>{" "}
+              Aguardando a decisão da DDD. Acompanhe pela conversa abaixo.
+            </p>
+            {requisicao.arquivamentoMotivo && (
+              <blockquote className="mt-2 whitespace-pre-wrap rounded-md border border-amber-200 bg-white px-3 py-2 text-sm text-gray-900 [overflow-wrap:anywhere]">
+                {requisicao.arquivamentoMotivo}
+              </blockquote>
+            )}
+          </div>
+        )}
+
+        {requisicao.status === "ARQUIVADA" && (
+          <div className="mt-4 rounded-md border border-gray-300 bg-gray-50 p-3">
+            <p className="text-xs text-gray-800">
+              <strong className="font-semibold">
+                Arquivada
+                {requisicao.arquivadaEm &&
+                  ` em ${new Date(requisicao.arquivadaEm).toLocaleString("pt-BR", {
+                    timeZone: "America/Sao_Paulo",
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}`}
+                .
+              </strong>{" "}
+              Esta requisição não terá mais andamento.
+            </p>
+            {requisicao.arquivamentoMotivo && (
+              <blockquote className="mt-2 whitespace-pre-wrap rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 [overflow-wrap:anywhere]">
+                {requisicao.arquivamentoMotivo}
+              </blockquote>
+            )}
+          </div>
+        )}
+
         {escopo === "CLIENTE" && !editavel && STATUS_AGUARDANDO_EQUIPE.includes(requisicao.status) && (
           <p className="mt-4 flex items-start gap-2 border-t border-gray-100 pt-3 text-xs text-gray-600">
             <Lock className="mt-px h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
@@ -165,8 +214,11 @@ export function RequisicaoDetalhe({
           pagamentoStatus={requisicao.pagamentoStatus}
           pagamentoValor={requisicao.pagamentoValor}
           finalizadaEm={requisicao.finalizadaEm}
+          statusRequisicao={requisicao.status}
         />
       )}
+
+      {escopo === "CLIENTE" && acoesCliente}
 
       {chat}
 

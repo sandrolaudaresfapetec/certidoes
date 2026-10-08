@@ -155,3 +155,137 @@ export function clientePodeEditar(requisicao: {
     STATUS_EDITAVEIS_PELO_CLIENTE.includes(requisicao.status)
   );
 }
+
+export const MOTIVO_ARQUIVAMENTO_MIN = 10;
+export const MOTIVO_ARQUIVAMENTO_MAX = 500;
+
+/**
+ * O que o solicitante pode fazer para arquivar a própria requisição (#PEND-29):
+ *  - `IMEDIATO`: ainda não foi analisada (a análise de duplicidade roda 12:00 e 00:00) e não
+ *    tem processo; arquiva na hora e sem custo;
+ *  - `VIA_DDD`: já analisada, devolvida ou com processo aberto; o pedido vai para a DDD, que
+ *    aceita ou recusa (pode haver custo);
+ *  - `NAO`: não há o que arquivar (rascunho, finalizada, já arquivada, pedido em aberto) ou
+ *    há pergunta de duplicidade esperando resposta (ali já existe a opção de arquivar).
+ */
+export type OpcaoArquivamento =
+  | { tipo: "IMEDIATO" }
+  | { tipo: "VIA_DDD" }
+  | { tipo: "NAO"; motivo: string };
+
+/** Status em que o arquivamento imediato vale (conferido de novo na gravação). */
+export const STATUS_ARQUIVAMENTO_IMEDIATO: readonly string[] = [
+  STATUS_SOLICITACAO.PENDENTE,
+  STATUS_SOLICITACAO.AGUARDANDO_LIBERACAO,
+];
+
+/** Status de onde o pedido segue para a DDD. */
+export const STATUS_ARQUIVAMENTO_VIA_DDD: readonly string[] = [
+  STATUS_SOLICITACAO.PENDENTE,
+  STATUS_SOLICITACAO.EM_ANALISE,
+  STATUS_SOLICITACAO.DEVOLVIDA,
+];
+
+export function opcaoDeArquivamento(requisicao: {
+  status: string;
+  processId?: string | null;
+  analiseDuplicidadeEm?: Date | string | null;
+  finalizadaEm?: Date | string | null;
+}): OpcaoArquivamento {
+  const { status } = requisicao;
+  if (status === STATUS_SOLICITACAO.ARQUIVADA) {
+    return { tipo: "NAO", motivo: "Esta requisição já está arquivada." };
+  }
+  if (status === STATUS_SOLICITACAO.ARQUIVAMENTO_SOLICITADO) {
+    return { tipo: "NAO", motivo: "O pedido de arquivamento já foi enviado e aguarda a DDD." };
+  }
+  if (status === STATUS_SOLICITACAO.RASCUNHO) {
+    return { tipo: "NAO", motivo: "Rascunho não é arquivado: basta não enviá-lo." };
+  }
+  if (
+    requisicao.finalizadaEm ||
+    status === STATUS_SOLICITACAO.CONCLUIDA ||
+    status === STATUS_SOLICITACAO.APROVADA
+  ) {
+    return { tipo: "NAO", motivo: "Requisição finalizada não pode ser arquivada." };
+  }
+  if (status === STATUS_SOLICITACAO.AGUARDANDO_CLIENTE) {
+    return { tipo: "NAO", motivo: "Responda a pergunta do chat: ela tem a opção de arquivar." };
+  }
+  if (
+    STATUS_ARQUIVAMENTO_IMEDIATO.includes(status) &&
+    !requisicao.processId &&
+    !requisicao.analiseDuplicidadeEm
+  ) {
+    return { tipo: "IMEDIATO" };
+  }
+  if (STATUS_ARQUIVAMENTO_VIA_DDD.includes(status) || status === STATUS_SOLICITACAO.AGUARDANDO_LIBERACAO) {
+    return { tipo: "VIA_DDD" };
+  }
+  return { tipo: "NAO", motivo: "Esta requisição não pode ser arquivada agora." };
+}
+
+/**
+ * Motivo do arquivamento ou da recusa. Opcional só no arquivamento imediato; quando
+ * informado, nunca passa do limite.
+ */
+export function validarMotivoArquivamento(
+  motivo: unknown,
+  obrigatorio: boolean,
+  rotulo: string = "motivo"
+): { ok: true; motivo: string | null } | { ok: false; erro: string } {
+  const limpo = typeof motivo === "string" ? motivo.trim() : "";
+  if (!limpo && !obrigatorio) return { ok: true, motivo: null };
+  if (limpo.length < MOTIVO_ARQUIVAMENTO_MIN) {
+    return { ok: false, erro: `Escreva o ${rotulo} com pelo menos ${MOTIVO_ARQUIVAMENTO_MIN} caracteres.` };
+  }
+  if (limpo.length > MOTIVO_ARQUIVAMENTO_MAX) {
+    return { ok: false, erro: `O ${rotulo} pode ter até ${MOTIVO_ARQUIVAMENTO_MAX} caracteres.` };
+  }
+  return { ok: true, motivo: limpo };
+}
+
+/**
+ * Para onde a requisição volta quando a DDD recusa o pedido: o status de antes do pedido
+ * (guardado) ou, em registro sem ele, o que os dados indicam.
+ */
+/** Status para onde uma requisição arquivada pode voltar (o resto vira `PENDENTE`). */
+export const STATUS_RETORNO_DESARQUIVAR: readonly string[] = [
+  STATUS_SOLICITACAO.PENDENTE,
+  STATUS_SOLICITACAO.EM_ANALISE,
+  STATUS_SOLICITACAO.DEVOLVIDA,
+  STATUS_SOLICITACAO.AGUARDANDO_LIBERACAO,
+];
+
+/** Só a requisição arquivada pode ser desarquivada (pela DDD). */
+export function podeDesarquivar(requisicao: { status: string }): boolean {
+  return requisicao.status === STATUS_SOLICITACAO.ARQUIVADA;
+}
+
+/**
+ * Para onde a requisição volta ao ser desarquivada: o status de antes do arquivamento
+ * (guardado) ou, sem ele, o que os dados indicam (processo aberto, pedido congelado). Uma
+ * pergunta de duplicidade já foi encerrada ao arquivar, então não se volta a "aguardando
+ * resposta": vai para a fila e a análise de duplicidade roda de novo.
+ */
+export function statusAposDesarquivar(requisicao: {
+  arquivamentoStatusAnterior?: string | null;
+  processId?: string | null;
+  congeladaEm?: Date | string | null;
+  liberadaEm?: Date | string | null;
+}): string {
+  const anterior = requisicao.arquivamentoStatusAnterior;
+  if (anterior && STATUS_RETORNO_DESARQUIVAR.includes(anterior)) return anterior;
+  if (requisicao.processId) return STATUS_SOLICITACAO.EM_ANALISE;
+  if (requisicao.congeladaEm && !requisicao.liberadaEm) return STATUS_SOLICITACAO.AGUARDANDO_LIBERACAO;
+  return STATUS_SOLICITACAO.PENDENTE;
+}
+
+export function statusAposRecusa(requisicao: {
+  arquivamentoStatusAnterior?: string | null;
+  processId?: string | null;
+}): string {
+  const anterior = requisicao.arquivamentoStatusAnterior;
+  if (anterior && STATUS_ARQUIVAMENTO_VIA_DDD.includes(anterior)) return anterior;
+  return requisicao.processId ? STATUS_SOLICITACAO.EM_ANALISE : STATUS_SOLICITACAO.PENDENTE;
+}

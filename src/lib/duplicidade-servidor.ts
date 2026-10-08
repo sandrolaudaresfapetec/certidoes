@@ -206,6 +206,15 @@ async function aplicarAnalise(
         opcoes: opcoesDaPergunta(pergunta.situacao, base.protocolo, outra.protocolo),
       });
       aberta = estaAberta.aberta;
+      if (!aberta) {
+        // Pergunta já respondida antes (ex.: requisição desarquivada ou reenviada): não pergunta
+        // de novo, mas a DDD continua vendo a repetição.
+        registros.push(paraRegistroSobreposicao(pergunta));
+        await tx.solicitacao.update({
+          where: { id: base.id },
+          data: { sobreposicao: true, sobreposicaoCom: JSON.stringify(registros) },
+        });
+      }
 
       if (pergunta.situacao === "S3") {
         // A mesma decisão é pedida na outra requisição, e ela sai da fila até alguém responder.

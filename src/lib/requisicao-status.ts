@@ -9,7 +9,7 @@ export const REQUISICAO_STATUS: Record<string, { label: string; classe: string }
   RASCUNHO: { label: "Não enviada", classe: "bg-gray-100 text-gray-700" },
   AGUARDANDO_LIBERACAO: { label: "Aguardando liberação", classe: "bg-orange-100 text-orange-800" },
   AGUARDANDO_CLIENTE: { label: "Aguardando sua resposta", classe: "bg-violet-100 text-violet-800" },
-  ARQUIVAMENTO_SOLICITADO: { label: "Arquivamento solicitado", classe: "bg-gray-200 text-gray-700" },
+  ARQUIVAMENTO_SOLICITADO: { label: "Arquivamento solicitado", classe: "bg-amber-100 text-amber-800" },
   ARQUIVADA: { label: "Arquivada", classe: "bg-gray-200 text-gray-700" },
 };
 
@@ -36,7 +36,9 @@ export const ETAPAS_ACOMPANHAMENTO = [
 export type AcompanhamentoRequisicao =
   | { tipo: "ETAPA"; atual: number; detalhe?: string }
   | { tipo: "SOBRESTADO" }
-  | { tipo: "CANCELADO" };
+  | { tipo: "CANCELADO" }
+  /** Requisição arquivada (#PEND-29): não tem mais andamento. */
+  | { tipo: "ARQUIVADA" };
 
 const SUBETAPA_TECNICA: Record<string, string> = {
   distribuicao_gdat: "Triagem da área",
@@ -53,8 +55,11 @@ export function acompanhamentoRequisicao(dados: {
   situacaoProcesso: string | null;
   pagamentoStatus: string | null;
   finalizadaEm?: Date | string | null;
+  /** Status da requisição; hoje só `ARQUIVADA` muda o acompanhamento (#PEND-27 trata o resto). */
+  statusRequisicao?: string | null;
 }): AcompanhamentoRequisicao {
   const { situacaoProcesso: s, pagamentoStatus, finalizadaEm } = dados;
+  if (dados.statusRequisicao === "ARQUIVADA") return { tipo: "ARQUIVADA" };
   const pago = pagamentoStatus === "PAGO" || pagamentoStatus === "ISENTO";
   if (!s) return { tipo: "ETAPA", atual: finalizadaEm ? (pago ? 5 : 4) : 0 };
   if (s === "sobrestado") return { tipo: "SOBRESTADO" };
@@ -73,19 +78,19 @@ export function acompanhamentoRequisicao(dados: {
 /**
  * Status Geral da tela Minhas Requisições (documento do cliente): cada grupo reúne os
  * status que o solicitante enxerga como uma coisa só. `status` vazio = grupo que o
- * backend ainda não alimenta (#PEND-42 rascunho, #PEND-29 arquivada); o cartão aparece
- * como "em breve" e passa a funcionar quando o código do status entrar na lista.
+ * backend ainda não alimenta; o cartão aparece como "em breve" e passa a funcionar quando o
+ * código do status entrar na lista. Hoje todos os grupos são alimentados.
  */
 export const GRUPOS_STATUS_GERAL = [
   { chave: "nao-enviadas", rotulo: "Não enviadas", status: ["RASCUNHO"] },
   {
     chave: "em-analise",
     rotulo: "Em análise",
-    // Congelada (13+ polígonos) e aguardando resposta também estão com a DDD.
-    status: ["PENDENTE", "EM_ANALISE", "AGUARDANDO_LIBERACAO", "AGUARDANDO_CLIENTE"],
+    // Congelada (13+ polígonos), aguardando resposta e pedido de arquivamento também estão com a DDD.
+    status: ["PENDENTE", "EM_ANALISE", "AGUARDANDO_LIBERACAO", "AGUARDANDO_CLIENTE", "ARQUIVAMENTO_SOLICITADO"],
   },
   { chave: "devolvidas", rotulo: "Devolvidas", status: ["DEVOLVIDA"] },
-  { chave: "arquivadas", rotulo: "Arquivadas", status: [] as string[] }, // PEND-29: ["ARQUIVADA"]
+  { chave: "arquivadas", rotulo: "Arquivadas", status: ["ARQUIVADA"] },
   { chave: "concluidas", rotulo: "Concluídas", status: ["APROVADA", "CONCLUIDA"] },
 ] as const;
 

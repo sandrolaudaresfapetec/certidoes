@@ -1,9 +1,9 @@
-import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { paraMensagemChat } from "@/lib/chat";
 import { RESPOSTA_ENCERRADA, type MensagemChat } from "@/lib/chat-tipos";
 import { chaveDuplicidade, lerChaveDuplicidade } from "@/lib/duplicidade";
 import { STATUS_SOLICITACAO } from "@/lib/solicitacao-estados";
+import { Conflito, arquivarNaTransacao, devolverAFilaSeLivre, eventoNaTransacao } from "@/lib/arquivamento-servidor";
 
 /**
  * Resposta do solicitante às perguntas de duplicidade (#PEND-30). Cada resposta é uma
@@ -12,13 +12,9 @@ import { STATUS_SOLICITACAO } from "@/lib/solicitacao-estados";
  * em ordem de id, para duas respostas simultâneas nunca arquivarem as duas requisições.
  */
 
-type Tx = Prisma.TransactionClient;
-
 export type ResultadoRespostaDuplicidade =
   | { ok: true; mensagem: MensagemChat }
   | { ok: false; erro: string; status: 400 | 404 | 409 };
-
-class Conflito extends Error {}
 
 function lerOpcoes(json: string | null): { id: string; rotulo: string }[] {
   try {
@@ -26,72 +22,6 @@ function lerOpcoes(json: string | null): { id: string; rotulo: string }[] {
     return Array.isArray(lista) ? lista.filter((o) => typeof o?.id === "string") : [];
   } catch {
     return [];
-  }
-}
-
-async function haPerguntaAberta(tx: Tx, solicitacaoId: string): Promise<boolean> {
-  return (
-    (await tx.mensagemSolicitacao.count({
-      where: { solicitacaoId, tipo: "PERGUNTA", respondidaEm: null, chave: { startsWith: "DUP:" } },
-    })) > 0
-  );
-}
-
-/** Sem pergunta aberta, a requisição volta para a fila da DDD. */
-async function devolverAFilaSeLivre(tx: Tx, solicitacaoId: string): Promise<void> {
-  if (await haPerguntaAberta(tx, solicitacaoId)) return;
-  await tx.solicitacao.updateMany({
-    where: { id: solicitacaoId, status: STATUS_SOLICITACAO.AGUARDANDO_CLIENTE },
-    data: { status: STATUS_SOLICITACAO.PENDENTE },
-  });
-}
-
-async function evento(tx: Tx, solicitacaoId: string, chave: string, texto: string): Promise<void> {
-  const ja = await tx.mensagemSolicitacao.findFirst({ where: { solicitacaoId, chave }, select: { id: true } });
-  if (ja) return;
-  await tx.mensagemSolicitacao.create({
-    data: { solicitacaoId, autorTipo: "SISTEMA", autorNome: "Sistema", tipo: "EVENTO", texto, chave },
-  });
-}
-
-/**
- * Arquiva a requisição (resposta do solicitante). As perguntas de duplicidade que dependiam
- * dela, abertas em outras requisições, são encerradas para ninguém ficar esperando à toa.
- */
-async function arquivar(
-  tx: Tx,
-  alvo: { id: string; protocolo: string },
-  motivo: string,
-  deStatus: string[]
-): Promise<void> {
-  const r = await tx.solicitacao.updateMany({
-    where: { id: alvo.id, processId: null, status: { in: deStatus } },
-    data: { status: STATUS_SOLICITACAO.ARQUIVADA, arquivadaEm: new Date(), arquivamentoMotivo: motivo },
-  });
-  if (r.count === 0) throw new Conflito();
-
-  // Perguntas da própria requisição ficam sem efeito; as das outras que citam esta, também.
-  const agora = new Date();
-  await tx.mensagemSolicitacao.updateMany({
-    where: { solicitacaoId: alvo.id, tipo: "PERGUNTA", respondidaEm: null, chave: { startsWith: "DUP:" } },
-    data: { respostaOpcao: RESPOSTA_ENCERRADA, respondidaEm: agora },
-  });
-  const dependentes = await tx.mensagemSolicitacao.findMany({
-    where: { chave: chaveDuplicidade("S3", alvo.id), respondidaEm: null },
-    select: { id: true, solicitacaoId: true },
-  });
-  for (const d of dependentes) {
-    await tx.mensagemSolicitacao.updateMany({
-      where: { id: d.id, respondidaEm: null },
-      data: { respostaOpcao: RESPOSTA_ENCERRADA, respondidaEm: agora },
-    });
-    await evento(
-      tx,
-      d.solicitacaoId,
-      `DUP-FIM:${alvo.id}`,
-      `A requisição ${alvo.protocolo} foi arquivada, então esta pergunta foi encerrada. A requisição segue para a fila.`
-    );
-    await devolverAFilaSeLivre(tx, d.solicitacaoId);
   }
 }
 
@@ -146,14 +76,14 @@ export async function responderDuplicidade(dados: {
         const manterEsta = dados.opcaoId === "manter_esta";
         const perde = manterEsta ? outra : esta;
         const fica = manterEsta ? esta : outra;
-        await arquivar(
+        await arquivarNaTransacao(
           tx,
           perde,
           `Arquivada a pedido do solicitante: duplicada da ${fica.protocolo}.`,
           [STATUS_SOLICITACAO.PENDENTE, STATUS_SOLICITACAO.AGUARDANDO_CLIENTE]
         );
-        await evento(tx, fica.id, `DUP-RESP:${pergunta.id}`, `Resposta registrada. Esta requisição segue; a ${perde.protocolo} foi arquivada.`);
-        await evento(tx, perde.id, `DUP-RESP:${parPergunta?.id ?? pergunta.id}`, `Resposta registrada. Esta requisição foi arquivada; a ${fica.protocolo} segue.`);
+        await eventoNaTransacao(tx, fica.id, `DUP-RESP:${pergunta.id}`, `Resposta registrada. Esta requisição segue; a ${perde.protocolo} foi arquivada.`);
+        await eventoNaTransacao(tx, perde.id, `DUP-RESP:${parPergunta?.id ?? pergunta.id}`, `Resposta registrada. Esta requisição foi arquivada; a ${fica.protocolo} segue.`);
         await devolverAFilaSeLivre(tx, fica.id);
         return;
       }
@@ -166,13 +96,13 @@ export async function responderDuplicidade(dados: {
       if (r.count === 0) throw new Conflito();
 
       if (dados.opcaoId === "arquivar") {
-        await arquivar(tx, esta, `Arquivada a pedido do solicitante: já existe a certidão ${outra?.protocolo ?? "anterior"}.`, [
+        await arquivarNaTransacao(tx, esta, `Arquivada a pedido do solicitante: já existe a certidão ${outra?.protocolo ?? "anterior"}.`, [
           STATUS_SOLICITACAO.AGUARDANDO_CLIENTE,
           STATUS_SOLICITACAO.PENDENTE,
         ]);
-        await evento(tx, esta.id, `DUP-RESP:${pergunta.id}`, "Resposta registrada. Esta requisição foi arquivada a seu pedido.");
+        await eventoNaTransacao(tx, esta.id, `DUP-RESP:${pergunta.id}`, "Resposta registrada. Esta requisição foi arquivada a seu pedido.");
       } else {
-        await evento(tx, esta.id, `DUP-RESP:${pergunta.id}`, "Resposta registrada. A requisição segue para a fila do atendimento.");
+        await eventoNaTransacao(tx, esta.id, `DUP-RESP:${pergunta.id}`, "Resposta registrada. A requisição segue para a fila do atendimento.");
         await devolverAFilaSeLivre(tx, esta.id);
       }
     });

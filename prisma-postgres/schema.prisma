@@ -102,9 +102,13 @@ model Solicitacao {
   sobreposicao      Boolean  @default(false) // aponta (ou e apontada) para outra requisicao com geometria repetida/sobreposta
   sobreposicaoCom   String?  // JSON [{id, protocolo, situacao, motivo}]
 
-  // Arquivamento (#PEND-29/#PEND-30): hoje so a resposta "nao" da duplicidade arquiva
+  // Arquivamento (#PEND-29/#PEND-30): o solicitante pede (imediato ou via DDD) e a resposta "nao"
+  // da duplicidade tambem arquiva. `arquivamentoStatusAnterior` devolve a requisicao ao lugar
+  // certo quando a DDD recusa o pedido.
   arquivadaEm       DateTime?
   arquivamentoMotivo String?
+  arquivamentoSolicitadoEm DateTime?
+  arquivamentoStatusAnterior String?
 
   solicitanteId     String
   solicitante       Solicitante @relation(fields: [solicitanteId], references: [id])

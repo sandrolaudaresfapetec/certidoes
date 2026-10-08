@@ -7,6 +7,8 @@ import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
 import { geometriaDoAcervo } from "@/components/requisicao/geometria";
 import {
   AberturaProcesso,
+  DecidirArquivamento,
+  DesarquivarRequisicao,
   DevolverRequisicao,
   FinalizacaoPagamento,
   LiberarRequisicao,
@@ -14,10 +16,13 @@ import {
 import {
   STATUS_SOLICITACAO,
   bloqueioAcaoAtendimento,
+  podeDesarquivar,
   podeDevolver,
   podeLiberar,
+  statusAposDesarquivar,
   visivelAoAtendimento,
 } from "@/lib/solicitacao-estados";
+import { statusRequisicao } from "@/lib/requisicao-status";
 import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
 import { ChatSolicitacao } from "@/components/requisicao/chat";
 import { carregarPoligonosDetalhe } from "@/lib/poligonos-detalhe";
@@ -80,6 +85,15 @@ export default async function VisualizarRequisicaoPage({
       </Link>
       <h1 className="text-2xl font-bold text-gray-900">Visualizar Requisição</h1>
 
+      {atendimento && podeDesarquivar(requisicao) && (
+        <div role="status" className="rounded-lg border border-gray-300 bg-gray-50 p-4 text-sm text-gray-800">
+          <strong className="font-semibold">Requisição arquivada.</strong> Para devolvê-la ao andamento,{" "}
+          <a href="#desarquivar" className="font-semibold text-emerald-700 underline">
+            desarquive-a
+          </a>{" "}
+          (o painel fica no fim da página).
+        </div>
+      )}
       <AvisoSobreposicao sobreposicoes={sobreposicoes} />
       {atendimento && (
         <AvisoAnaliseDuplicidade
@@ -87,6 +101,27 @@ export default async function VisualizarRequisicaoPage({
           processId={requisicao.processId}
           analiseDuplicidadeEm={requisicao.analiseDuplicidadeEm}
         />
+      )}
+
+      {atendimento && requisicao.status === STATUS_SOLICITACAO.ARQUIVAMENTO_SOLICITADO && (
+        <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong className="font-semibold">
+            O solicitante pediu o arquivamento
+            {requisicao.arquivamentoSolicitadoEm &&
+              ` em ${new Date(requisicao.arquivamentoSolicitadoEm).toLocaleString("pt-BR", {
+                timeZone: "America/Sao_Paulo",
+                dateStyle: "short",
+                timeStyle: "short",
+              })}`}
+            .
+          </strong>{" "}
+          Abertura de processo e pagamento ficam bloqueados até a decisão.
+          {requisicao.arquivamentoMotivo && (
+            <blockquote className="mt-2 whitespace-pre-wrap rounded-md border border-amber-200 bg-white px-3 py-2 text-gray-900">
+              {requisicao.arquivamentoMotivo}
+            </blockquote>
+          )}
+        </div>
       )}
 
       <RequisicaoDetalhe
@@ -97,6 +132,8 @@ export default async function VisualizarRequisicaoPage({
         chat={
           chatDisponivel ? (
             <ChatSolicitacao
+              // Recria o chat quando a página recarrega com outro estado (ex.: arquivada agora).
+              key={`${requisicao.status}-${mensagens.length}`}
               endpoint={`/api/requisicoes/${requisicao.id}/mensagens`}
               lado="ATENDIMENTO"
               inicial={mensagens}
@@ -158,6 +195,18 @@ export default async function VisualizarRequisicaoPage({
 
       {atendimento && (
         <div className="space-y-6">
+          {requisicao.status === STATUS_SOLICITACAO.ARQUIVAMENTO_SOLICITADO && (
+            <DecidirArquivamento
+              requisicaoId={requisicao.id}
+              numeroProcesso={requisicao.process?.ordem ?? null}
+            />
+          )}
+          {podeDesarquivar(requisicao) && (
+            <DesarquivarRequisicao
+              requisicaoId={requisicao.id}
+              destino={statusRequisicao(statusAposDesarquivar(requisicao)).label}
+            />
+          )}
           {podeLiberar(requisicao) && <LiberarRequisicao requisicaoId={requisicao.id} />}
           {podeDevolver(requisicao) && <DevolverRequisicao requisicaoId={requisicao.id} />}
           {bloqueioAcaoAtendimento(requisicao.status) === null && (

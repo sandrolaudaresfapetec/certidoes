@@ -5,14 +5,19 @@ import { formatarCPF } from "@/lib/cpf";
 import { statusRequisicao } from "@/lib/requisicao-status";
 import { RequisicaoFiltros } from "@/components/requisicao-filtros";
 import { requireUsuario, podeAtender } from "@/lib/auth";
-import { STATUS_FORA_DA_FILA } from "@/lib/solicitacao-estados";
 import type { Prisma } from "@prisma/client";
 import { naoLidasPorSolicitacao } from "@/lib/chat";
 import { SeloMensagensNovas } from "@/components/requisicao/selo-mensagens-novas";
 import { SeloSobreposicao } from "@/components/requisicao/avisos-duplicidade";
+import { CartoesSituacaoAtendimento } from "@/components/requisicao/cartoes-situacao-atendimento";
+import {
+  GRUPOS_ATENDIMENTO,
+  chaveDoGrupoPelosParametros,
+  grupoAtendimento,
+} from "@/lib/requisicao-grupos-atendimento";
 import { PainelDuplicidade } from "@/components/painel-duplicidade";
 import { descreverResumo } from "@/lib/duplicidade-resumo";
-import { contarAguardandoAnalise, idsComSobreposicao } from "@/lib/duplicidade-servidor";
+import { idsComSobreposicao } from "@/lib/duplicidade-servidor";
 import { proximoHorario, ultimaExecucao } from "@/lib/agendador";
 
 export const dynamic = "force-dynamic";
@@ -20,36 +25,45 @@ export const dynamic = "force-dynamic";
 export default async function RequisicoesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; semProcesso?: string; analise?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    grupo?: string;
+    semProcesso?: string;
+    analise?: string;
+  }>;
 }) {
-  const { q = "", status = "", semProcesso = "", analise = "" } = await searchParams;
+  const { q = "", status = "", grupo = "", semProcesso = "", analise = "" } = await searchParams;
   const usuario = await requireUsuario();
   const atendimento = podeAtender(usuario);
 
   // Rascunho é só do solicitante: o atendimento só o vê depois de congelado (13+ polígonos).
-  const where: Prisma.SolicitacaoWhereInput = {
+  const visiveis: Prisma.SolicitacaoWhereInput = {
     NOT: { status: "RASCUNHO", congeladaEm: null },
   };
-  if (status) where.status = status;
-  if (analise === "1") {
-    // Enviadas que ainda esperam a análise de duplicidade (12:00 e 00:00).
-    where.status = "PENDENTE";
-    where.analiseDuplicidadeEm = null;
-  } else if (semProcesso === "1") {
-    where.processId = null;
-    // Só o que está na fila: sem rascunho, congelada, devolvida, arquivada etc., e já analisada.
-    if (!status) where.status = { notIn: [...STATUS_FORA_DA_FILA] };
-    where.analiseDuplicidadeEm = { not: null };
-  }
+  const chaveGrupo = chaveDoGrupoPelosParametros({ grupo, semProcesso, analise });
+  const grupoAtivo = grupoAtendimento(chaveGrupo);
+  const condicoes: Prisma.SolicitacaoWhereInput[] = [visiveis];
+  if (status) condicoes.push({ status });
+  if (grupoAtivo) condicoes.push(grupoAtivo.filtro);
   if (q) {
-    where.OR = [
-      { protocolo: { contains: q } },
-      { sigefNomeArea: { contains: q } },
-      { sigefMunicipio: { contains: q } },
-      { solicitante: { nome: { contains: q } } },
-      { solicitante: { cpf: { contains: q.replace(/\D/g, "") || q } } },
-    ];
+    condicoes.push({
+      OR: [
+        { protocolo: { contains: q } },
+        { sigefNomeArea: { contains: q } },
+        { sigefMunicipio: { contains: q } },
+        { solicitante: { nome: { contains: q } } },
+        { solicitante: { cpf: { contains: q.replace(/\D/g, "") || q } } },
+      ],
+    });
   }
+  const where: Prisma.SolicitacaoWhereInput = { AND: condicoes };
+
+  // Contagem de cada cartão (sobre tudo o que o atendimento enxerga, sem a busca).
+  const contagensGrupos = await Promise.all(
+    GRUPOS_ATENDIMENTO.map(async (g) => [g.chave, await prisma.solicitacao.count({ where: { AND: [visiveis, g.filtro] } })] as const)
+  );
+  const contagens: Record<string, number> = Object.fromEntries(contagensGrupos);
 
   const requisicoes = await prisma.solicitacao.findMany({
     where,
@@ -61,7 +75,7 @@ export default async function RequisicoesPage({
     },
   });
   const comSobreposicao = await idsComSobreposicao();
-  const aguardandoAnalise = atendimento ? await contarAguardandoAnalise() : 0;
+  const aguardandoAnalise = contagens["analise-duplicidade"] ?? 0;
   const ultima = usuario.role === "ADMIN" ? await ultimaExecucao() : null;
   const formatoQuando = new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
@@ -109,46 +123,35 @@ export default async function RequisicoesPage({
         />
       )}
 
+      <CartoesSituacaoAtendimento
+        contagens={contagens}
+        ativo={grupoAtivo?.chave ?? ""}
+        q={q}
+        status={status}
+      />
+
       <RequisicaoFiltros
         action="/requisicoes"
         q={q}
         status={status}
+        grupo={grupoAtivo?.chave}
         placeholder="Buscar por protocolo, cliente, CPF ou município"
         ocultarStatus={["RASCUNHO"]}
       />
 
-      <div className="flex gap-3 text-sm">
-        <Link
-          href="/requisicoes"
-          className={`px-3 py-1 rounded-full border ${
-            semProcesso === "1" || analise === "1"
-              ? "border-gray-200 text-gray-600"
-              : "border-gray-900 text-gray-900"
-          }`}
-        >
-          Todas
-        </Link>
-        <Link
-          href="/requisicoes?semProcesso=1"
-          className={`px-3 py-1 rounded-full border ${
-            semProcesso === "1"
-              ? "border-gray-900 text-gray-900"
-              : "border-gray-200 text-gray-600"
-          }`}
-        >
-          Aguardando abertura de processo
-        </Link>
-        {atendimento && (
+      {grupoAtivo && (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <p className="text-gray-700">
+            Mostrando: <strong className="font-semibold text-gray-900">{grupoAtivo.rotulo}</strong>
+          </p>
           <Link
-            href="/requisicoes?analise=1"
-            className={`px-3 py-1 rounded-full border ${
-              analise === "1" ? "border-gray-900 text-gray-900" : "border-gray-200 text-gray-600"
-            }`}
+            href={q || status ? `/requisicoes?${new URLSearchParams({ ...(q ? { q } : {}), ...(status ? { status } : {}) })}` : "/requisicoes"}
+            className="text-xs text-emerald-700 hover:underline"
           >
-            Em análise de duplicidade ({aguardandoAnalise})
+            Limpar filtro
           </Link>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-lg">
         {requisicoes.length === 0 ? (

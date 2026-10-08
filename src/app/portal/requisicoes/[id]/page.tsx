@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { requireSolicitante } from "@/lib/portal-auth";
 import { RequisicaoDetalhe } from "@/components/requisicao-detalhe";
 import { geometriaDoAcervo } from "@/components/requisicao/geometria";
-import { clientePodeEditar } from "@/lib/solicitacao-estados";
+import { clientePodeEditar, opcaoDeArquivamento } from "@/lib/solicitacao-estados";
+import { SolicitarArquivamento } from "@/components/requisicao/solicitar-arquivamento";
 import { chatAceitaMensagens, chatVisivel, listarMensagens, marcarLido } from "@/lib/chat";
 import { ChatSolicitacao } from "@/components/requisicao/chat";
 import { carregarPoligonosDetalhe } from "@/lib/poligonos-detalhe";
@@ -50,6 +51,9 @@ export default async function AcompanharRequisicaoPage({
   // O cliente só altera a requisição depois que a equipe a devolve.
   const editavel = clientePodeEditar(requisicao);
 
+  // Arquivamento: imediato (sem custo), via DDD, ou sem botão (#PEND-29).
+  const arquivamento = opcaoDeArquivamento(requisicao);
+
   // Polígonos nomeados ligados às parcelas do SIGEF (gleba com 2 ou mais).
   const poligonosVinculados = await carregarPoligonosDetalhe(requisicao);
 
@@ -72,9 +76,16 @@ export default async function AcompanharRequisicaoPage({
         editavel={editavel}
         geometriaImovel={geometriaImovel}
         poligonosVinculados={poligonosVinculados}
+        acoesCliente={
+          arquivamento.tipo === "NAO" ? null : (
+            <SolicitarArquivamento requisicaoId={requisicao.id} tipo={arquivamento.tipo} />
+          )
+        }
         chat={
           chatDisponivel ? (
             <ChatSolicitacao
+              // Recria o chat quando a página recarrega com outro estado (ex.: arquivada agora).
+              key={`${requisicao.status}-${mensagens.length}`}
               endpoint={`/api/portal/solicitacoes/${requisicao.id}/mensagens`}
               lado="SOLICITANTE"
               inicial={mensagens}

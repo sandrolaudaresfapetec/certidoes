@@ -17,6 +17,8 @@ interface AcompanhamentoProps {
   pagamentoStatus: string | null;
   pagamentoValor: number | null;
   finalizadaEm: Date | null;
+  /** Status da requisição (hoje só `ARQUIVADA` muda o acompanhamento). */
+  statusRequisicao?: string;
 }
 
 type Estado = "FEITA" | "ATUAL" | "PENDENTE";
@@ -81,8 +83,9 @@ export function AcompanhamentoRequisicao({
   pagamentoStatus,
   pagamentoValor,
   finalizadaEm,
+  statusRequisicao,
 }: AcompanhamentoProps) {
-  const acomp = acompanhamentoRequisicao({ situacaoProcesso, pagamentoStatus, finalizadaEm });
+  const acomp = acompanhamentoRequisicao({ situacaoProcesso, pagamentoStatus, finalizadaEm, statusRequisicao });
   const ultima = ETAPAS_ACOMPANHAMENTO.length - 1;
   const mostrarRodape = Boolean(pagamentoStatus) || Boolean(finalizadaEm);
 
@@ -125,6 +128,13 @@ export function AcompanhamentoRequisicao({
         <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
           <strong className="font-semibold">Solicitação cancelada.</strong> Ela não terá mais
           andamento.
+        </p>
+      )}
+
+      {acomp.tipo === "ARQUIVADA" && (
+        <p className="rounded-md border border-gray-300 bg-gray-50 p-3 text-sm text-gray-800">
+          <strong className="font-semibold">Requisição arquivada.</strong> Ela não terá mais
+          andamento. A conversa continua disponível para consulta.
         </p>
       )}
 

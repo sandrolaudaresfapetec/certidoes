@@ -21,7 +21,7 @@ const DATE_COLS: Record<string, string[]> = {
   WorkflowAction: ["createdAt"],
   SigefConsulta: ["createdAt"],
   Solicitante: ["createdAt","updatedAt"],
-  Solicitacao: ["pagamentoEm","finalizadaEm","chatLidoSolicitanteEm","chatLidoAtendimentoEm","devolvidaEm","congeladaEm","liberadaEm","analiseDuplicidadeEm","arquivadaEm","createdAt","updatedAt"],
+  Solicitacao: ["pagamentoEm","finalizadaEm","chatLidoSolicitanteEm","chatLidoAtendimentoEm","devolvidaEm","congeladaEm","liberadaEm","analiseDuplicidadeEm","arquivadaEm","arquivamentoSolicitadoEm","createdAt","updatedAt"],
   MensagemSolicitacao: ["respondidaEm","createdAt"],
   ExecucaoAgendada: ["iniciadaEm","concluidaEm"],
   Documento: ["createdAt"],

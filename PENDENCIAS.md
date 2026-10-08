@@ -49,7 +49,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-26 | Devolução ao solicitante e bloqueio de edição fora de `DEVOLVIDA` | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-27 | Modelo de status da requisição para o solicitante (5 gerais + 6 etapas) | backend | adição | alta | aberta |
 | #PEND-28 | Download da certidão emitida pelo solicitante | backend | adição | média | aberta |
-| #PEND-29 | Pedido de arquivamento pelo solicitante (regra de custo/tempo) | backend | adição | média | bloqueada (#PEND-27) |
+| #PEND-29 | Pedido de arquivamento pelo solicitante (regra de custo/tempo) | backend | adição | média | resolvida (2026-10-07) |
 | #PEND-30 | Análise agendada de duplicidade e sobreposição (4 situações) | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-31 | Solicitação com 13+ polígonos: congelar e liberar pela DDD | backend | adição | alta | resolvida (2026-10-07) |
 | #PEND-32 | Nível de complexidade 1–9 (hoje são 4 classes) | backend | adição | média | aberta |
@@ -74,6 +74,7 @@ O **status** e a **prioridade** vivem só aqui; responsável e tipo aparecem tam
 | #PEND-51 | Integração com o SEI como última etapa do fluxo da certidão | backend | adição | média | aberta |
 | #PEND-52 | Agendador da duplicidade em produção: `CRON_TOKEN`, `AGENDADOR_DUPLICIDADE` e instância sempre ligada | infra | documentação | média | aberta |
 | #PEND-53 | Decisão: confirmar com o cliente as regras de duplicidade que o documento não detalha | negócio | decisão | média | aberta |
+| #PEND-54 | Decisão: aceitar o arquivamento não cancela o processo aberto | negócio | decisão | média | aberta |
 
 ## Detalhes
 
@@ -314,6 +315,8 @@ Documento (Acompanhar): botão para solicitar arquivamento. Se a DDD ainda não 
 **Impacto no frontend:** ao existir o status, basta incluir `"ARQUIVADA"` em `GRUPOS_STATUS_GERAL` (`src/lib/requisicao-status.ts`, marcado com `// PEND-29`) e o cartão passa a contar e a filtrar; o botão "Solicitar arquivamento" vai em Acompanhar.
 **Depende de:** #PEND-27.
 
+**Resolução:** Fase 8 do plano de atendimento CJT, branch `feat/portal-correcoes-cjt` (2026-10-07). O solicitante pede o arquivamento em `POST /api/portal/solicitacoes/[id]/arquivar`: se a requisição ainda não foi analisada pela duplicidade e não tem processo, arquiva na hora e sem custo (motivo opcional); se já foi analisada, está devolvida ou tem processo aberto, vira `ARQUIVAMENTO_SOLICITADO` (motivo de 10 a 500 caracteres) e a DDD decide em `POST /api/requisicoes/[id]/arquivamento` (aceitar arquiva; recusar exige justificativa, vai ao chat e devolve a requisição ao status de antes). Colunas `arquivadaEm`, `arquivamentoMotivo`, `arquivamentoSolicitadoEm` e `arquivamentoStatusAnterior` (migrations `20261007170000` e `20261007180000`). Lógica em `src/lib/arquivamento-servidor.ts`, regras puras em `solicitacao-estados.ts` (`opcaoDeArquivamento`), componentes `solicitar-arquivamento.tsx` e `DecidirArquivamento`. O cartão "Arquivadas" do portal passou a funcionar e o acompanhamento ganhou o ramo "Arquivada". Todo efeito é condicional e feito na mesma transação das mensagens do chat. A DDD (ADMIN e SDTC) também pode desarquivar (`POST /api/requisicoes/[id]/desarquivar`), com justificativa: a requisição volta ao status de antes do arquivamento. Aceitar não cancela o processo aberto: ver #PEND-54. Detalhes em [`docs/atendimento-cjt-pedidos-restantes.md`](docs/atendimento-cjt-pedidos-restantes.md).
+
 ### #PEND-30 · Análise agendada de duplicidade e sobreposição (4 situações)
 
 **Responsável:** backend (agendador: infra) · **Tipo:** adição · **Registrada em:** 2026-10-06
@@ -526,4 +529,13 @@ A análise de duplicidade (#PEND-30) roda dentro do app, às 12:00 e 00:00 de Br
 **Onde:** `src/lib/duplicidade.ts`
 
 O documento descreve quatro situações; o time completou o resto com hipóteses, aprovadas internamente em 2026-10-07 e pendentes de confirmação do cliente: (a) mesma geometria com solicitantes diferentes é sobreposição (S4), sem mensagem ao cliente; (b) S3 (duas em andamento) só vale quando a outra ainda não tem processo e não foi devolvida; com processo aberto ou devolvida vira S4, porque arquivar uma requisição já em análise é decisão da DDD; (c) com mais de uma repetição o solicitante recebe uma só pergunta (prioridade S3, S1, S2) e as demais entram na lista de sobreposição; (d) "mesma geometria" é o mesmo código de parcela ou 98% de sobreposição mútua, e sobreposição (S4) começa em 1% da menor parcela e 100 m²; (e) "mesmo cadastro" compara qualidade, resultado, situação, propriedade de, matrícula, código INCRA e representado; (f) "finalizada" é a requisição com finalização registrada pelo Atendimento; (g) requisição sem registro no INCRA não tem geometria e segue para a fila sem comparação; (h) requisição aberta pelo balcão é analisada na hora, a do portal espera o horário. Os limiares são constantes em `src/lib/duplicidade.ts`.
+**Depende de:** resposta do cliente.
+
+### #PEND-54 · Decisão: aceitar o arquivamento não cancela o processo aberto
+
+**Responsável:** negócio · **Tipo:** decisão · **Registrada em:** 2026-10-07
+**Onde:** `src/lib/arquivamento-servidor.ts` (`decidirArquivamento`)
+
+Quando a DDD aceita o pedido de arquivamento de uma requisição que já tem processo (`EM_ANALISE`), a requisição vira `ARQUIVADA` mas o processo continua na etapa em que estava; o painel avisa o número do processo e o cancelamento segue sendo feito em Processos, pela etapa "Cancelado" (SDTC, Gerente ou Administrador). O time escolheu esse caminho por prudência (cancelar mexe no fluxo e pode ter custo). Falta decidir se o arquivamento deve cancelar o processo sozinho, em que etapas isso é permitido e se a cobrança já feita muda algo. Se for decidido, a mudança é do backend: mover o processo para `cancelado` (com `dtCancelado` e o registro em `WorkflowAction`) na mesma transação do aceite.
+**Impacto no frontend:** o aviso do painel "Decidir arquivamento" deixaria de existir.
 **Depende de:** resposta do cliente.
